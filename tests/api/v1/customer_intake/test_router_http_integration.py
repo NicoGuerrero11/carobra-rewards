@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -37,6 +38,10 @@ from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _assert_valid_uuid(value: str) -> None:
+    assert str(UUID(value)) == value
 
 
 def _payload(
@@ -151,6 +156,137 @@ def _assert_safe_error_payload(payload: dict[str, object]) -> None:
     ]
     assert "detail" in payload
     assert all(fragment not in body for fragment in forbidden_fragments)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_successful_intake_persists_complete_flow_end_to_end(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    assert migrated_postgres_database.startswith("postgresql")
+    synthetic_suffix = uuid4().hex[:10]
+    normalized_curp = f"TSTX{synthetic_suffix}".upper()[:18]
+    payload = {
+        "source": "SISCA_SIMULATED",
+        "external_request_id": f"synthetic-success-{uuid4()}",
+        "curp": f"  {normalized_curp.lower()}  ",
+        "nss": f"99{uuid4().int % 10**14:014d}",
+        "name": "Synthetic Test User",
+        "email": f"synthetic-success-{synthetic_suffix}@example.test",
+        "phone": f"555{uuid4().int % 10**7:07d}",
+        "postal_code": "99999",
+    }
+
+    app = _build_app(postgres_session_factory)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/customers/intake", json=payload)
+
+    assert response.status_code == 201
+    response_body = response.json()
+    assert response_body["status"] == "APPROVED"
+    assert response_body["replayed"] is False
+    assert "X-Request-ID" not in response_body
+    _assert_valid_uuid(response_body["intake_request_id"])
+    _assert_valid_uuid(response_body["customer_id"])
+    assert response_body["rewards_id"].startswith("RWD-")
+    assert len(response_body["rewards_id"]) == 36
+    assert response_body["rewards_id"][4:].isalnum()
+    assert response_body["rewards_id"][4:] == response_body["rewards_id"][4:].lower()
+    request_id = response.headers["X-Request-ID"]
+    _assert_valid_uuid(request_id)
+
+    async with postgres_session_factory() as session:
+        stored_intakes = (
+            await session.execute(
+                select(CustomerIntakeRequestModel).where(
+                    CustomerIntakeRequestModel.source == payload["source"],
+                    CustomerIntakeRequestModel.external_request_id
+                    == payload["external_request_id"],
+                )
+            )
+        ).scalars().all()
+        stored_customers = (
+            await session.execute(
+                select(CustomerModel).where(CustomerModel.curp == normalized_curp)
+            )
+        ).scalars().all()
+        aforeservices = (
+            await session.execute(select(ServiceModel).where(ServiceModel.code == "AFORE"))
+        ).scalars().all()
+
+        assert len(stored_intakes) == 1
+        assert len(stored_customers) == 1
+        assert len(aforeservices) == 1
+
+        stored_intake = stored_intakes[0]
+        stored_customer = stored_customers[0]
+        aforeservice = aforeservices[0]
+
+        stored_relations = (
+            await session.execute(
+                select(CustomerServiceModel).where(
+                    CustomerServiceModel.customer_id == stored_customer.id,
+                    CustomerServiceModel.service_id == aforeservice.id,
+                )
+            )
+        ).scalars().all()
+        duplicate_customer_count = await session.scalar(
+            select(func.count()).select_from(CustomerModel).where(
+                CustomerModel.curp == normalized_curp
+            )
+        )
+        duplicate_intake_count = await session.scalar(
+            select(func.count()).select_from(CustomerIntakeRequestModel).where(
+                CustomerIntakeRequestModel.source == payload["source"],
+                CustomerIntakeRequestModel.external_request_id == payload["external_request_id"],
+            )
+        )
+        duplicate_relation_count = await session.scalar(
+            select(func.count()).select_from(CustomerServiceModel).where(
+                CustomerServiceModel.customer_id == stored_customer.id,
+                CustomerServiceModel.service_id == aforeservice.id,
+            )
+        )
+
+    assert len(stored_relations) == 1
+    stored_relation = stored_relations[0]
+
+    assert response_body["intake_request_id"] == str(stored_intake.id)
+    assert response_body["customer_id"] == str(stored_customer.id)
+    assert response_body["rewards_id"] == stored_customer.rewards_id
+
+    assert stored_intake.processing_status == IntakeProcessingStatus.APPROVED.value
+    assert stored_intake.customer_id == stored_customer.id
+    assert stored_intake.processed_at is not None
+    assert stored_intake.processing_details is None
+    assert stored_customer.customer_status == CustomerStatus.PENDING_ONBOARDING.value
+    assert stored_customer.onboarding_status == OnboardingStatus.PENDING.value
+    assert stored_relation.status == CustomerServiceStatus.ACTIVE.value
+
+    assert stored_intake.original_payload == payload
+    assert stored_intake.curp == normalized_curp
+    assert stored_customer.name == payload["name"]
+    assert stored_customer.email == payload["email"]
+    assert stored_customer.nss == payload["nss"]
+    assert stored_customer.phone == payload["phone"]
+    assert stored_customer.postal_code == payload["postal_code"]
+
+    assert duplicate_intake_count == 1
+    assert duplicate_customer_count == 1
+    assert duplicate_relation_count == 1
+
+    assert request_id not in str(stored_intake.original_payload)
+    assert request_id not in str(stored_intake.id)
+    assert request_id not in str(stored_customer.id)
+    assert request_id not in stored_customer.rewards_id
+    assert not hasattr(stored_intake, "request_id")
+    assert not hasattr(stored_customer, "request_id")
+    assert not hasattr(stored_relation, "request_id")
+    assert payload["name"].startswith("Synthetic")
+    assert payload["email"].endswith("@example.test")
 
 
 @pytest.mark.integration
