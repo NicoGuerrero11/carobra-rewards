@@ -164,11 +164,12 @@ Si `DATABASE_URL` no está configurada, el comando falla con un mensaje claro. L
 
 ## Funcionalidad pendiente
 
+El endpoint provisional `/api/v1/customers/intake` ya está implementado, usa
+persistencia PostgreSQL y representa un flujo técnico y simulado. No constituye
+todavía la integración definitiva con SISCA.
+
 Todavía no están implementados:
 
-- flujo de alta desde SISCA
-- endpoint `/api/v1/customers/intake`
-- modelos y tablas de negocio
 - reglas de elegibilidad
 - autenticación
 - onboarding, campañas, puntos o recompensas
