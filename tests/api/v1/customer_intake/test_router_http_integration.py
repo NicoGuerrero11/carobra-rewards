@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Final
 from uuid import UUID, uuid4
 
 import pytest
@@ -33,6 +34,9 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.reposito
 )
 from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator import (
     TokenHexRewardsIdGenerator,
+)
+from carobra_rewards.modules.customer_intake.ports.rewards_id_generator import (
+    RewardsIdGenerator,
 )
 
 
@@ -118,15 +122,28 @@ async def _counts(
     return intake_count or 0, customer_count or 0, relation_count or 0
 
 
+class RepeatingRewardsIdGenerator:
+    def __init__(self, rewards_id: str) -> None:
+        self._rewards_id = rewards_id
+        self.calls = 0
+
+    def generate(self) -> str:
+        self.calls += 1
+        return self._rewards_id
+
+
 def _build_app(
     postgres_session_factory: async_sessionmaker[AsyncSession],
+    *,
+    rewards_id_generator: RewardsIdGenerator | None = None,
 ) -> FastAPI:
     app = create_application()
+    generator = rewards_id_generator or TokenHexRewardsIdGenerator()
 
     def override_service() -> ProcessSimulatedCustomerIntake:
         return ProcessSimulatedCustomerIntake(
             unit_of_work=SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory),
-            rewards_id_generator=TokenHexRewardsIdGenerator(),
+            rewards_id_generator=generator,
         )
 
     app.dependency_overrides[get_process_customer_intake] = override_service
@@ -155,6 +172,21 @@ def _assert_safe_error_payload(payload: dict[str, object]) -> None:
         "delete ",
     ]
     assert "detail" in payload
+    assert all(fragment not in body for fragment in forbidden_fragments)
+
+
+def _assert_safe_validation_error_payload(
+    payload: dict[str, object],
+    *,
+    forbidden_fragments: tuple[str, ...],
+) -> None:
+    body = str(payload).lower()
+    assert payload == {
+        "detail": {
+            "code": "validation_error",
+            "message": "The request payload is invalid.",
+        }
+    }
     assert all(fragment not in body for fragment in forbidden_fragments)
 
 
@@ -315,6 +347,54 @@ async def test_http_flow_returns_201_then_replays_200(
         "status",
         "replayed",
     }
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_returns_422_for_invalid_email_format_without_persisting_intake(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    assert migrated_postgres_database.startswith("postgresql")
+    synthetic_suffix: Final[str] = uuid4().hex[:10]
+    payload = {
+        "source": "SISCA_SIMULATED",
+        "external_request_id": f"synthetic-invalid-email-{uuid4()}",
+        "curp": f"  inva{synthetic_suffix}".upper()[:18].lower() + "  ",
+        "nss": f"88{uuid4().int % 10**14:014d}",
+        "name": "Synthetic Invalid Email",
+        "email": f"invalid-email-{synthetic_suffix}.example.test",
+        "phone": f"556{uuid4().int % 10**7:07d}",
+        "postal_code": "88991",
+    }
+    before_counts = await _counts(postgres_session_factory)
+    app = _build_app(postgres_session_factory)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/customers/intake", json=payload)
+
+    assert response.status_code == 422
+    _assert_valid_uuid(response.headers["X-Request-ID"])
+    body = response.json()
+    _assert_safe_validation_error_payload(
+        body,
+        forbidden_fragments=(
+            "loc",
+            "msg",
+            "type",
+            "input",
+            "ctx",
+            payload["email"].lower(),
+            payload["curp"].strip().lower(),
+            payload["nss"],
+            payload["phone"],
+            "traceback",
+            "sqlalchemy",
+            "postgres",
+        ),
+    )
+    assert await _counts(postgres_session_factory) == before_counts == (0, 0, 0)
 
 
 @pytest.mark.integration
@@ -594,6 +674,80 @@ async def test_http_flow_replays_identity_conflict_without_duplicate_intake(
         assert stored.original_payload == first_payload
 
     assert await _counts(postgres_session_factory) == (1, 1, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_returns_500_for_rewards_id_collision_exhausted_with_full_rollback(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    assert migrated_postgres_database.startswith("postgresql")
+    existing_rewards_id = f"RWD-collision-{uuid4().hex[:12]}"
+    existing_customer = _customer(
+        rewards_id=existing_rewards_id,
+        curp=f"COLL{uuid4().hex[:14]}".upper()[:18],
+        nss=f"77{uuid4().int % 10**14:014d}",
+        name="Existing Collision Holder",
+        email=f"existing-collision-{uuid4().hex[:8]}@example.test",
+    )
+    generator = RepeatingRewardsIdGenerator(existing_rewards_id)
+
+    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
+        await uow.customers.create(existing_customer)
+
+    before_counts = await _counts(postgres_session_factory)
+    app = _build_app(
+        postgres_session_factory,
+        rewards_id_generator=generator,
+    )
+    transport = ASGITransport(app=app)
+    payload = {
+        "source": "SISCA_SIMULATED",
+        "external_request_id": f"synthetic-collision-{uuid4()}",
+        "curp": f"  fail{uuid4().hex[:14]}  ".upper()[:22].lower(),
+        "nss": f"66{uuid4().int % 10**14:014d}",
+        "name": "Synthetic Collision Failure",
+        "email": f"synthetic-collision-{uuid4().hex[:8]}@example.test",
+        "phone": f"557{uuid4().int % 10**7:07d}",
+        "postal_code": "66772",
+    }
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/customers/intake", json=payload)
+
+    assert response.status_code == 500
+    _assert_valid_uuid(response.headers["X-Request-ID"])
+    body = response.json()
+    assert body["detail"] == {
+        "code": "rewards_id_collision_exhausted",
+        "message": "The simulated intake flow could not allocate a Rewards ID.",
+    }
+    _assert_safe_error_payload(body)
+    assert generator.calls == 3
+    assert await _counts(postgres_session_factory) == before_counts == (0, 1, 0)
+
+    async with postgres_session_factory() as session:
+        stored_customers = (
+            await session.execute(select(CustomerModel).order_by(CustomerModel.created_at.asc()))
+        ).scalars().all()
+        stored_intakes = (
+            await session.execute(select(CustomerIntakeRequestModel))
+        ).scalars().all()
+        stored_relations = (
+            await session.execute(select(CustomerServiceModel))
+        ).scalars().all()
+
+    assert len(stored_intakes) == 0
+    assert len(stored_relations) == 0
+    assert len(stored_customers) == 1
+    stored_customer = stored_customers[0]
+    assert stored_customer.id == existing_customer.id
+    assert stored_customer.rewards_id == existing_rewards_id
+    assert stored_customer.curp == existing_customer.curp
+    assert stored_customer.nss == existing_customer.nss
+    assert stored_customer.name == existing_customer.name
+    assert stored_customer.email == existing_customer.email
 
 
 @pytest.mark.integration
