@@ -24,6 +24,9 @@ site/
 # Local tooling
 .codex/
 docs/
+!docs/
+docs/*
+!docs/customer-intake-demo-walkthrough.md
 
 # IDE / OS
 .DS_Store
