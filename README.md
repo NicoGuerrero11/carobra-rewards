@@ -162,6 +162,24 @@ uv run carobra-rewards-verify-neon
 
 Si `DATABASE_URL` no está configurada, el comando falla con un mensaje claro. La verificación abre una conexión, ejecuta `SELECT 1` y cierra la sesión.
 
+## Demo de evidencia de API
+
+Además de la demo tecnica simple, el repositorio incluye una suite demostrable
+de escenarios para probar la API y dejar evidencia visible en Neon. La guia
+esta en `docs/customer-intake-api-proof-demo.md` y se ejecuta con:
+
+```bash
+PYTHONPATH=src APP_ENV=test TEST_DATABASE_URL="<test_database_url>" DATABASE_URL="<otra_url_o_vacio>" .venv/bin/python scripts/demo_customer_intake.py --suite api-proof --keep-data
+```
+
+## Material de reunión sugerido
+
+Para presentar el avance con narrativa funcional y evidencia verificable, usa:
+
+- `docs/customer-intake-meeting-playbook.md`
+- `docs/sisca-excel-preliminary-classification.md`
+- `docs/customer-intake-work-evidence-matrix.md`
+
 ## Funcionalidad pendiente
 
 El endpoint provisional `/api/v1/customers/intake` ya está implementado, usa
