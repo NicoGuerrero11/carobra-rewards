@@ -7,7 +7,9 @@ from scripts.demo_customer_intake import (
     CreatedRecordIds,
     DemoConfigurationError,
     build_cleanup_statements,
+    build_named_payload,
     build_synthetic_payload,
+    parse_args,
     validate_safe_environment,
 )
 from sqlalchemy.dialects import postgresql
@@ -47,6 +49,24 @@ def test_generates_unique_synthetic_payloads() -> None:
     assert first["nss"] != second["nss"]
     assert first["email"] != second["email"]
     assert first["phone"] != second["phone"]
+
+
+def test_build_named_payload_uses_requested_scenario_name_and_defaults() -> None:
+    payload = build_named_payload("already_active")
+
+    assert payload["source"] == "SISCA_SIMULATED"
+    assert payload["external_request_id"].startswith("demo-already-active-")
+    assert payload["name"] == "Demo Already Active"
+    assert payload["email"].endswith("@example.test")
+    assert len(payload["curp"]) <= 18
+    assert payload["nss"].isdigit()
+
+
+def test_parse_args_accepts_api_proof_suite() -> None:
+    args = parse_args(["--suite", "api-proof", "--keep-data"])
+
+    assert args.suite == "api-proof"
+    assert args.keep_data is True
 
 
 def test_cleanup_statements_are_limited_to_created_ids() -> None:
