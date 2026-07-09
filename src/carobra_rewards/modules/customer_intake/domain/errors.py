@@ -13,6 +13,10 @@ class DuplicateCustomerCurpError(CustomerIntakeError):
     """Raised when the normalized CURP already belongs to another customer."""
 
 
+class DuplicateCustomerNssError(CustomerIntakeError):
+    """Raised when the NSS already belongs to another customer."""
+
+
 class DuplicateCustomerRewardsIdError(CustomerIntakeError):
     """Raised when a generated Rewards ID already exists."""
 

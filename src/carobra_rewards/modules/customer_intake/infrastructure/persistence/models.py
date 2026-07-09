@@ -41,7 +41,7 @@ class CustomerModel(TimestampMixin, Base):
     )
     rewards_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     curp: Mapped[str] = mapped_column(String(18), nullable=False, unique=True)
-    nss: Mapped[str] = mapped_column(String(16), nullable=False)
+    nss: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(254), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -52,9 +52,7 @@ class CustomerModel(TimestampMixin, Base):
     intake_requests: Mapped[list[CustomerIntakeRequestModel]] = relationship(
         back_populates="customer"
     )
-    customer_services: Mapped[list[CustomerServiceModel]] = relationship(
-        back_populates="customer"
-    )
+    customer_services: Mapped[list[CustomerServiceModel]] = relationship(back_populates="customer")
 
 
 class ServiceModel(TimestampMixin, Base):
@@ -69,9 +67,7 @@ class ServiceModel(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    customer_services: Mapped[list[CustomerServiceModel]] = relationship(
-        back_populates="service"
-    )
+    customer_services: Mapped[list[CustomerServiceModel]] = relationship(back_populates="service")
 
 
 class CustomerIntakeRequestModel(TimestampMixin, Base):

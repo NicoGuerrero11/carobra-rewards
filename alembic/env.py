@@ -12,6 +12,9 @@ from carobra_rewards.infrastructure.database.base import Base
 from carobra_rewards.modules.customer_intake.infrastructure.persistence import (
     models as _customer_intake_models,  # noqa: F401
 )
+from carobra_rewards.modules.sisca_validation.infrastructure.persistence import (
+    models as _sisca_validation_models,  # noqa: F401
+)
 
 config = context.config
 

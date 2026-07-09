@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import date
 
 import pytest
 
-from carobra_rewards.api.v1.customer_intake.schemas import (
-    CustomerIntakeRequest as CustomerIntakeHttpRequest,
-)
-from carobra_rewards.modules.customer_intake.application.commands import (
-    ProcessSimulatedCustomerIntakeCommand,
-)
+from carobra_rewards.api.v1.customer_intake.schemas import CustomerIntakeRequest
 from carobra_rewards.modules.customer_intake.application.errors import (
     CurpNssConflict,
-    CustomerServiceInconsistency,
-    ExternalRequestConflict,
-    RewardsIdCollisionExhausted,
-    SuccessfulIntakeInconsistency,
+    MvpStartDateNotConfigured,
 )
 from carobra_rewards.modules.customer_intake.application.results import (
     SimulatedCustomerIntakeStatus,
@@ -25,7 +17,6 @@ from carobra_rewards.modules.customer_intake.application.service import (
 )
 from carobra_rewards.modules.customer_intake.domain.entities import (
     Customer,
-    CustomerIntakeRequest,
     CustomerService,
     CustomerServiceStatus,
     CustomerStatus,
@@ -40,6 +31,7 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.reposito
     InMemoryCustomerServiceRepository,
     InMemoryServiceRepository,
 )
+from carobra_rewards.modules.customer_intake.infrastructure.persistence.timestamps import utc_now
 
 
 class StubRewardsIdGenerator:
@@ -53,40 +45,71 @@ class StubRewardsIdGenerator:
         return value
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
+def _payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "external_request_id": "external-1",
+        "curp": "  abcd123456hmnlrs09  ",
+        "nss": "0012345678901234",
+        "nombre": "Ada",
+        "apellido_paterno": "Lovelace",
+        "apellido_materno": "Byron",
+        "correo_electronico": "ada@example.com",
+        "fecha_de_nacimiento": "1990-05-17",
+        "advisor_identifier": "advisor-123",
+        "tipo_de_movimiento": "Traspaso NAP",
+        "estatus_sf": "ACEPTADA PROCESAR",
+        "fecha_de_traspaso": "2026-07-01",
+        "celular": "5551234567",
+        "codigo_postal": "01010",
+        "estado": "CDMX",
+        "ciudad": "Ciudad de Mexico",
+    }
+    payload.update(overrides)
+    return payload
 
 
-def _make_service(code: str = "AFORE") -> Service:
-    now = _now()
-    return Service.create(
-        code=code,
-        name=code,
+def _request(**overrides: object) -> CustomerIntakeRequest:
+    return CustomerIntakeRequest.model_validate(_payload(**overrides))
+
+
+def _service(
+    *,
+    repository: InMemoryCustomerIntakeRepository | None = None,
+    customers: InMemoryCustomerRepository | None = None,
+    customer_services: InMemoryCustomerServiceRepository | None = None,
+    mvp_start_date: date | None = date(2026, 7, 1),
+    service_entity: Service | None = None,
+) -> ProcessSimulatedCustomerIntake:
+    service = service_entity or Service.create(
+        code="AFORE",
+        name="AFORE",
         is_active=True,
-        created_at=now,
-        updated_at=now,
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    uow = InMemoryCustomerIntakeUnitOfWork(
+        repository=repository or InMemoryCustomerIntakeRepository(),
+        customers=customers or InMemoryCustomerRepository(),
+        services=InMemoryServiceRepository([service]),
+        customer_services=customer_services or InMemoryCustomerServiceRepository(),
+    )
+    return ProcessSimulatedCustomerIntake(
+        uow,
+        StubRewardsIdGenerator(["RWD-accepted"]),
+        mvp_start_date=mvp_start_date,
     )
 
 
-def _make_customer(
-    *,
-    rewards_id: str,
-    curp: str,
-    nss: str = "0012345678901234",
-    name: str = "Test User",
-    email: str = "test@example.com",
-    phone: str | None = "5551234567",
-    postal_code: str | None = "01010",
-) -> Customer:
-    now = _now()
+def _existing_customer(curp: str = "ABCD123456HMNLRS09", nss: str = "0012345678901234") -> Customer:
+    now = utc_now()
     return Customer.create(
-        rewards_id=rewards_id,
+        rewards_id="RWD-existing",
         curp=curp,
         nss=nss,
-        name=name,
-        email=email,
-        phone=phone,
-        postal_code=postal_code,
+        name="Existing Customer",
+        email="existing@example.com",
+        phone="5550000000",
+        postal_code="99999",
         customer_status=CustomerStatus.PENDING_ONBOARDING,
         onboarding_status=OnboardingStatus.PENDING,
         created_at=now,
@@ -94,494 +117,223 @@ def _make_customer(
     )
 
 
-def _make_relation(
-    *,
-    customer_id,
-    service_id,
-    status=CustomerServiceStatus.ACTIVE,
-) -> CustomerService:
-    now = _now()
-    return CustomerService.create(
-        customer_id=customer_id,
-        service_id=service_id,
-        status=status,
-        started_at=now,
+async def _seed_existing_identity(
+    customers: InMemoryCustomerRepository,
+    customer_services: InMemoryCustomerServiceRepository,
+) -> tuple[Customer, Service]:
+    customer = _existing_customer()
+    service = Service.create(
+        code="AFORE",
+        name="AFORE",
+        is_active=True,
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    relation = CustomerService.create(
+        customer_id=customer.id,
+        service_id=service.id,
+        status=CustomerServiceStatus.ACTIVE,
+        started_at=utc_now(),
         ended_at=None,
-        created_at=now,
-        updated_at=now,
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
-
-
-def _make_command(
-    external_request_id: str = "external-1",
-    *,
-    nss: str = "0012345678901234",
-    name: str = "  Test User  ",
-    email: str = "test@example.com",
-    phone: str | None = "5551234567",
-    postal_code: str | None = "01010",
-) -> ProcessSimulatedCustomerIntakeCommand:
-    return ProcessSimulatedCustomerIntakeCommand(
-        source="SISCA_SIMULATED",
-        external_request_id=external_request_id,
-        curp="  abcd123456hmnlrs09  ",
-        nss=nss,
-        name=name,
-        email=email,
-        phone=phone,
-        postal_code=postal_code,
-        original_payload={
-            "source": "SISCA_SIMULATED",
-            "external_request_id": external_request_id,
-            "curp": "  abcd123456hmnlrs09  ",
-            "nss": nss,
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "postal_code": postal_code,
-        },
-    )
+    await customers.create(customer)
+    await customer_services.create(relation)
+    return customer, service
 
 
 @pytest.mark.asyncio
-async def test_processes_new_simulated_intake_and_returns_rewards_id() -> None:
+async def test_accepts_valid_payload_and_creates_internal_customer_data() -> None:
     repository = InMemoryCustomerIntakeRepository()
-    services = InMemoryServiceRepository([_make_service()])
-    uow = InMemoryCustomerIntakeUnitOfWork(repository=repository, services=services)
-    generator = StubRewardsIdGenerator(["RWD-approved"])
-    service = ProcessSimulatedCustomerIntake(uow, generator)
+    service = _service(repository=repository)
 
-    result = await service(_make_command())
+    result = await service(_request().to_command())
 
-    assert result.status is SimulatedCustomerIntakeStatus.APPROVED
+    assert result.status is SimulatedCustomerIntakeStatus.ACCEPTED
     assert result.replayed is False
-    assert result.rewards_id == "RWD-approved"
-    assert generator.calls == 1
-
+    assert result.customer_id is not None
+    assert result.rewards_id == "RWD-accepted"
     stored_intake = repository.list_submissions()[0]
-    assert stored_intake.processing_status is IntakeProcessingStatus.APPROVED
-    assert stored_intake.processing_details is None
-    assert stored_intake.processed_at is not None
-    assert stored_intake.original_payload["curp"] == "  abcd123456hmnlrs09  "
-
-    stored_customer = await uow.customers.get_by_curp("ABCD123456HMNLRS09")
-    assert stored_customer is not None
-    assert stored_customer.nss == "0012345678901234"
-    assert stored_customer.customer_status is CustomerStatus.PENDING_ONBOARDING
-    assert stored_customer.onboarding_status is OnboardingStatus.PENDING
-
-    aforeservice = await uow.services.get_by_code("AFORE")
-    assert aforeservice is not None
-    relation = await uow.customer_services.get_by_customer_and_service(
-        stored_customer.id,
-        aforeservice.id,
-    )
-    assert relation is not None
-    assert relation.status is CustomerServiceStatus.ACTIVE
+    assert stored_intake.processing_status is IntakeProcessingStatus.ACCEPTED
+    assert "source" not in stored_intake.original_payload
+    assert "password" not in stored_intake.original_payload
+    assert "terms_accepted_at" not in stored_intake.original_payload
 
 
 @pytest.mark.asyncio
-async def test_replays_approved_intake_idempotently() -> None:
-    services = InMemoryServiceRepository([_make_service()])
-    repository = InMemoryCustomerIntakeRepository()
-    uow = InMemoryCustomerIntakeUnitOfWork(repository=repository, services=services)
-    generator = StubRewardsIdGenerator(["RWD-approved"])
-    service = ProcessSimulatedCustomerIntake(uow, generator)
-    command = _make_command()
-
-    first = await service(command)
-    second = await service(command)
-
-    assert first.intake_request_id == second.intake_request_id
-    assert first.customer_id == second.customer_id
-    assert second.replayed is True
-    assert second.status is SimulatedCustomerIntakeStatus.APPROVED
-    assert generator.calls == 1
-    assert len(repository.list_submissions()) == 1
-
-
-@pytest.mark.asyncio
-async def test_returns_already_active_for_existing_customer_with_active_afore() -> None:
-    aforeservice = _make_service()
-    customer = _make_customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-    customers = InMemoryCustomerRepository()
-    customer_services = InMemoryCustomerServiceRepository()
-    async_uow = InMemoryCustomerIntakeUnitOfWork(
-        repository=InMemoryCustomerIntakeRepository(),
-        customers=customers,
-        services=InMemoryServiceRepository([aforeservice]),
-        customer_services=customer_services,
-    )
-    async with async_uow:
-        await async_uow.customers.create(customer)
-        await async_uow.customer_services.create(
-            _make_relation(customer_id=customer.id, service_id=aforeservice.id)
-        )
-
-    service = ProcessSimulatedCustomerIntake(
-        async_uow,
-        StubRewardsIdGenerator(["RWD-unused"]),
-    )
-
-    result = await service(_make_command())
-
-    assert result.status is SimulatedCustomerIntakeStatus.ALREADY_ACTIVE
-    assert result.replayed is False
-    assert result.rewards_id == "RWD-existing"
-    stored_intake = async_uow.intake_requests.list_submissions()[0]
-    assert stored_intake.processing_status is IntakeProcessingStatus.ALREADY_ACTIVE
-
-
-@pytest.mark.asyncio
-async def test_returns_already_active_for_same_nss_with_combined_contact_differences() -> None:
-    aforeservice = _make_service()
-    customer = _make_customer(
-        rewards_id="RWD-existing",
-        curp="ABCD123456HMNLRS09",
-        name="Existing User",
-        email="existing@example.com",
-        phone="5550000000",
-        postal_code="99999",
-    )
-    customers = InMemoryCustomerRepository()
-    customer_services = InMemoryCustomerServiceRepository()
-    async_uow = InMemoryCustomerIntakeUnitOfWork(
-        repository=InMemoryCustomerIntakeRepository(),
-        customers=customers,
-        services=InMemoryServiceRepository([aforeservice]),
-        customer_services=customer_services,
-    )
-    async with async_uow:
-        await async_uow.customers.create(customer)
-        await async_uow.customer_services.create(
-            _make_relation(customer_id=customer.id, service_id=aforeservice.id)
-        )
-
-    service = ProcessSimulatedCustomerIntake(
-        async_uow,
-        StubRewardsIdGenerator(["RWD-unused"]),
-    )
+async def test_optional_fields_can_be_absent() -> None:
+    service = _service()
 
     result = await service(
-        _make_command(
-            "external-contact-diff",
-            name="  Changed Name  ",
-            email="changed@example.com",
-            phone="5551234567",
-            postal_code="01010",
-        )
+        _request(celular=None, codigo_postal=None, estado=None, ciudad=None).to_command()
     )
 
-    assert result.status is SimulatedCustomerIntakeStatus.ALREADY_ACTIVE
-    assert result.rewards_id == "RWD-existing"
-    stored_customer = await async_uow.customers.get_by_id(customer.id)
-    assert stored_customer == customer
-
-    stored_intake = async_uow.intake_requests.list_submissions()[0]
-    assert stored_intake.processing_status is IntakeProcessingStatus.ALREADY_ACTIVE
-    assert stored_intake.original_payload == {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": "external-contact-diff",
-        "curp": "  abcd123456hmnlrs09  ",
-        "nss": "0012345678901234",
-        "name": "  Changed Name  ",
-        "email": "changed@example.com",
-        "phone": "5551234567",
-        "postal_code": "01010",
-    }
+    assert result.status is SimulatedCustomerIntakeStatus.ACCEPTED
 
 
 @pytest.mark.asyncio
-async def test_schema_and_application_trim_only_nss_preserves_leading_zeroes_for_already_active(
-) -> None:
-    aforeservice = _make_service()
-    customer = _make_customer(
-        rewards_id="RWD-existing",
-        curp="ABCD123456HMNLRS09",
-        nss="00123456789",
-        name="Existing User",
-        email="existing@example.com",
-        phone="5550000000",
-        postal_code="99999",
-    )
-    customers = InMemoryCustomerRepository()
-    customer_services = InMemoryCustomerServiceRepository()
+async def test_invalid_movement_type_is_not_eligible() -> None:
     repository = InMemoryCustomerIntakeRepository()
-    async_uow = InMemoryCustomerIntakeUnitOfWork(
-        repository=repository,
-        customers=customers,
-        services=InMemoryServiceRepository([aforeservice]),
-        customer_services=customer_services,
-    )
-    async with async_uow:
-        await async_uow.customers.create(customer)
-        await async_uow.customer_services.create(
-            _make_relation(customer_id=customer.id, service_id=aforeservice.id)
-        )
+    service = _service(repository=repository)
 
-    request = CustomerIntakeHttpRequest(
-        source="SISCA_SIMULATED",
-        external_request_id="external-trimmed-nss",
-        curp="  abcd123456hmnlrs09  ",
-        nss="  00123456789  ",
-        name=" Changed Name ",
-        email="changed@example.com",
-        phone="5551234567",
-        postal_code="01010",
-    )
-    command = request.to_command()
-    service = ProcessSimulatedCustomerIntake(
-        async_uow,
-        StubRewardsIdGenerator(["RWD-unused"]),
-    )
+    result = await service(_request(tipo_de_movimiento="Cambio").to_command())
 
-    assert command.nss == "00123456789"
-    assert isinstance(command.nss, str)
-
-    result = await service(command)
-
-    assert result.status is SimulatedCustomerIntakeStatus.ALREADY_ACTIVE
-    assert result.replayed is False
-    assert result.rewards_id == "RWD-existing"
-
-    stored_customer = await async_uow.customers.get_by_id(customer.id)
-    assert stored_customer == customer
-    assert stored_customer is not None
-    assert stored_customer.nss == "00123456789"
-
+    assert result.status is SimulatedCustomerIntakeStatus.NOT_ELIGIBLE
     stored_intake = repository.list_submissions()[0]
-    assert stored_intake.processing_status is IntakeProcessingStatus.ALREADY_ACTIVE
-    assert stored_intake.processing_details is None
-    assert stored_intake.original_payload == {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": "external-trimmed-nss",
-        "curp": "  abcd123456hmnlrs09  ",
-        "nss": "  00123456789  ",
-        "name": " Changed Name ",
-        "email": "changed@example.com",
-        "phone": "5551234567",
-        "postal_code": "01010",
-    }
+    assert stored_intake.processing_status is IntakeProcessingStatus.NOT_ELIGIBLE
+    assert stored_intake.processing_details == {"reason": "invalid_movement_type"}
 
 
 @pytest.mark.asyncio
-async def test_persists_identity_conflict_and_commits_before_raising_409_equivalent() -> None:
-    aforeservice = _make_service()
-    customer = _make_customer(
-        rewards_id="RWD-existing",
-        curp="ABCD123456HMNLRS09",
-        nss="0012345678901234",
-    )
+async def test_aceptada_operaciones_is_not_eligible() -> None:
     repository = InMemoryCustomerIntakeRepository()
-    customers = InMemoryCustomerRepository()
-    customer_services = InMemoryCustomerServiceRepository()
-    uow = InMemoryCustomerIntakeUnitOfWork(
-        repository=repository,
-        customers=customers,
-        services=InMemoryServiceRepository([aforeservice]),
-        customer_services=customer_services,
-    )
-    async with uow:
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _make_relation(customer_id=customer.id, service_id=aforeservice.id)
-        )
+    service = _service(repository=repository)
 
-    service = ProcessSimulatedCustomerIntake(uow, StubRewardsIdGenerator(["RWD-unused"]))
+    result = await service(_request(estatus_sf="ACEPTADA OPERACIONES").to_command())
 
-    with pytest.raises(CurpNssConflict):
-        await service(_make_command("external-conflict", nss="0000000000000001"))
-
-    assert uow.committed is True
-    assert uow.rolled_back is False
-    stored_intake = repository.list_submissions()[0]
-    assert stored_intake.customer_id == customer.id
-    assert stored_intake.processing_status is IntakeProcessingStatus.IDENTITY_CONFLICT
-    assert stored_intake.processing_details == {"reason": "curp_nss_conflict"}
-    assert stored_intake.processed_at is not None
-    assert stored_intake.original_payload["nss"] == "0000000000000001"
-    stored_customer = await uow.customers.get_by_id(customer.id)
-    assert stored_customer == customer
-
-
-@pytest.mark.asyncio
-async def test_replays_identity_conflict_without_creating_duplicate_intake() -> None:
-    aforeservice = _make_service()
-    customer = _make_customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-    repository = InMemoryCustomerIntakeRepository()
-    uow = InMemoryCustomerIntakeUnitOfWork(
-        repository=repository,
-        customers=InMemoryCustomerRepository(),
-        services=InMemoryServiceRepository([aforeservice]),
-        customer_services=InMemoryCustomerServiceRepository(),
-    )
-    async with uow:
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _make_relation(customer_id=customer.id, service_id=aforeservice.id)
-        )
-
-    service = ProcessSimulatedCustomerIntake(uow, StubRewardsIdGenerator(["RWD-unused"]))
-    conflict_command = _make_command("external-conflict-replay", nss="0000000000000001")
-
-    with pytest.raises(CurpNssConflict):
-        await service(conflict_command)
-
-    stored_before = repository.list_submissions()[0]
-
-    with pytest.raises(CurpNssConflict):
-        await service(_make_command("external-conflict-replay", nss="9999999999999999"))
-
-    stored_after = repository.list_submissions()[0]
-    assert len(repository.list_submissions()) == 1
-    assert stored_after.id == stored_before.id
-    assert stored_after.original_payload == stored_before.original_payload
-    assert stored_after.customer_id == stored_before.customer_id
-    assert stored_after.processed_at == stored_before.processed_at
-    assert stored_after.processing_details == {"reason": "curp_nss_conflict"}
+    assert result.status is SimulatedCustomerIntakeStatus.NOT_ELIGIBLE
+    assert repository.list_submissions()[0].processing_details == {"reason": "invalid_sf_status"}
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "relation_status",
-    [None, CustomerServiceStatus.INACTIVE, CustomerServiceStatus.ENDED],
+    ("sf_status", "label"),
+    [
+        ("RECHAZADA", "rejected"),
+        ("CANCELADA", "canceled"),
+        ("EN PROCESO", "in-process"),
+    ],
 )
-async def test_fails_when_existing_customer_lacks_active_afore_relation(
-    relation_status: CustomerServiceStatus | None,
+async def test_named_non_eligible_statuses_fall_back_to_invalid_sf_status(
+    sf_status: str,
+    label: str,
 ) -> None:
-    customer = _make_customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-    uow = InMemoryCustomerIntakeUnitOfWork(
-        customers=InMemoryCustomerRepository(),
-        services=InMemoryServiceRepository([_make_service()]),
-        customer_services=InMemoryCustomerServiceRepository(),
-    )
-    async with uow:
-        await uow.customers.create(customer)
-        if relation_status is not None:
-            service = await uow.services.get_by_code("AFORE")
-            assert service is not None
-            await uow.customer_services.create(
-                _make_relation(
-                    customer_id=customer.id,
-                    service_id=service.id,
-                    status=relation_status,
-                )
-            )
-
-    service = ProcessSimulatedCustomerIntake(uow, StubRewardsIdGenerator(["RWD-unused"]))
-
-    with pytest.raises(CustomerServiceInconsistency):
-        await service(_make_command(nss="9999999999999999"))
-
-    assert len(uow.intake_requests.list_submissions()) == 0
-
-
-@pytest.mark.asyncio
-async def test_retries_rewards_id_collision_and_then_succeeds() -> None:
-    existing_customer = _make_customer(rewards_id="RWD-collision", curp="QWER123456HMNLRS10")
-    customers = InMemoryCustomerRepository()
-    uow = InMemoryCustomerIntakeUnitOfWork(
-        customers=customers,
-        services=InMemoryServiceRepository([_make_service()]),
-    )
-    async with uow:
-        await uow.customers.create(existing_customer)
-
-    generator = StubRewardsIdGenerator(["RWD-collision", "RWD-final"])
-    service = ProcessSimulatedCustomerIntake(uow, generator)
-
-    result = await service(_make_command())
-
-    assert result.status is SimulatedCustomerIntakeStatus.APPROVED
-    assert result.rewards_id == "RWD-final"
-    assert generator.calls == 2
-
-
-@pytest.mark.asyncio
-async def test_fails_after_exhausting_rewards_id_collisions() -> None:
-    customers = InMemoryCustomerRepository()
-    uow = InMemoryCustomerIntakeUnitOfWork(
-        customers=customers,
-        services=InMemoryServiceRepository([_make_service()]),
-    )
-    async with uow:
-        for index, curp in enumerate(
-            ["QWER123456HMNLRS10", "ZXCV123456HMNLRS11", "ASDF123456HMNLRS12"],
-            start=1,
-        ):
-            await uow.customers.create(
-                _make_customer(rewards_id=f"RWD-{index}", curp=curp)
-            )
-
-    service = ProcessSimulatedCustomerIntake(
-        uow,
-        StubRewardsIdGenerator(["RWD-1", "RWD-2", "RWD-3"]),
-    )
-
-    with pytest.raises(RewardsIdCollisionExhausted):
-        await service(_make_command())
-
-    assert len(uow.intake_requests.list_submissions()) == 0
-
-
-@pytest.mark.asyncio
-async def test_conflicts_when_external_request_exists_in_non_replayable_state() -> None:
     repository = InMemoryCustomerIntakeRepository()
-    now = _now()
-    intake = CustomerIntakeRequest.create(
-        source="SISCA_SIMULATED",
-        external_request_id="external-1",
-        curp="ABCD123456HMNLRS09",
-        processing_status=IntakeProcessingStatus.PROCESSING,
-        processing_details={"step": "processing"},
-        original_payload={"external_request_id": "external-1"},
-        customer_id=None,
-        received_at=now,
-        created_at=now,
-        updated_at=now,
-    )
-    async with InMemoryCustomerIntakeUnitOfWork(repository=repository) as uow:
-        await uow.intake_requests.save(intake)
+    service = _service(repository=repository)
 
+    result = await service(_request(estatus_sf=sf_status).to_command())
+
+    assert result.status is SimulatedCustomerIntakeStatus.NOT_ELIGIBLE, label
+    assert repository.list_submissions()[0].processing_details == {"reason": "invalid_sf_status"}
+
+
+@pytest.mark.asyncio
+async def test_transfer_date_before_mvp_is_not_eligible() -> None:
+    repository = InMemoryCustomerIntakeRepository()
+    service = _service(repository=repository)
+
+    result = await service(_request(fecha_de_traspaso="2026-06-30").to_command())
+
+    assert result.status is SimulatedCustomerIntakeStatus.NOT_ELIGIBLE
+    assert repository.list_submissions()[0].processing_details == {
+        "reason": "pre_mvp_transfer_date"
+    }
+
+
+@pytest.mark.asyncio
+async def test_missing_mvp_start_date_fails_in_controlled_way() -> None:
+    service = _service(mvp_start_date=None)
+
+    with pytest.raises(MvpStartDateNotConfigured):
+        await service(_request().to_command())
+
+
+@pytest.mark.asyncio
+async def test_duplicate_request_returns_idempotent_duplicate() -> None:
+    repository = InMemoryCustomerIntakeRepository()
+    service = _service(repository=repository)
+    command = _request().to_command()
+
+    first = await service(command)
+    replay = await service(command)
+
+    assert first.status is SimulatedCustomerIntakeStatus.ACCEPTED
+    assert replay.status is SimulatedCustomerIntakeStatus.IDEMPOTENT_DUPLICATE
+    assert replay.replayed is True
+    assert len(repository.list_submissions()) == 1
+
+
+@pytest.mark.asyncio
+async def test_duplicate_customer_by_curp_reuses_existing_customer_without_duplication() -> None:
+    customers = InMemoryCustomerRepository()
+    customer_services = InMemoryCustomerServiceRepository()
+    existing, service_entity = await _seed_existing_identity(customers, customer_services)
+    service = _service(
+        customers=customers,
+        customer_services=customer_services,
+        service_entity=service_entity,
+    )
+
+    result = await service(_request(external_request_id="external-2").to_command())
+
+    assert result.status is SimulatedCustomerIntakeStatus.ACCEPTED
+    assert result.rewards_id == existing.rewards_id
+    assert result.customer_id == str(existing.id)
+
+
+@pytest.mark.asyncio
+async def test_duplicate_customer_by_nss_reuses_existing_customer_without_duplication() -> None:
+    customers = InMemoryCustomerRepository()
+    customer_services = InMemoryCustomerServiceRepository()
+    existing = _existing_customer(curp="ZXCV123456HMNLRS11")
+    service_entity = Service.create(
+        code="AFORE",
+        name="AFORE",
+        is_active=True,
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    await customers.create(existing)
+    await customer_services.create(
+        CustomerService.create(
+            customer_id=existing.id,
+            service_id=service_entity.id,
+            status=CustomerServiceStatus.ACTIVE,
+            started_at=utc_now(),
+            ended_at=None,
+            created_at=utc_now(),
+            updated_at=utc_now(),
+        )
+    )
     service = ProcessSimulatedCustomerIntake(
         InMemoryCustomerIntakeUnitOfWork(
-            repository=repository,
-            services=InMemoryServiceRepository([_make_service()]),
+            repository=InMemoryCustomerIntakeRepository(),
+            customers=customers,
+            services=InMemoryServiceRepository([service_entity]),
+            customer_services=customer_services,
         ),
         StubRewardsIdGenerator(["RWD-unused"]),
+        mvp_start_date=date(2026, 7, 1),
     )
 
-    with pytest.raises(ExternalRequestConflict):
-        await service(_make_command())
+    result = await service(
+        _request(
+            external_request_id="external-3",
+            curp="ZXCV123456HMNLRS11",
+            nss="0012345678901234",
+        ).to_command()
+    )
+
+    assert result.status is SimulatedCustomerIntakeStatus.ACCEPTED
+    assert result.customer_id == str(existing.id)
 
 
 @pytest.mark.asyncio
-async def test_fails_when_successful_replay_cannot_recover_customer() -> None:
-    repository = InMemoryCustomerIntakeRepository()
-    now = _now()
-    intake = CustomerIntakeRequest.create(
-        source="SISCA_SIMULATED",
-        external_request_id="external-1",
-        curp="ABCD123456HMNLRS09",
-        processing_status=IntakeProcessingStatus.APPROVED,
-        processing_details=None,
-        original_payload={"external_request_id": "external-1"},
-        customer_id=None,
-        received_at=now,
-        processed_at=now,
-        created_at=now,
-        updated_at=now,
-    )
-    async with InMemoryCustomerIntakeUnitOfWork(repository=repository) as uow:
-        await uow.intake_requests.save(intake)
-
-    service = ProcessSimulatedCustomerIntake(
-        InMemoryCustomerIntakeUnitOfWork(
-            repository=repository,
-            services=InMemoryServiceRepository([_make_service()]),
-        ),
-        StubRewardsIdGenerator(["RWD-unused"]),
+async def test_conflicting_curp_and_nss_keeps_identity_immutable() -> None:
+    customers = InMemoryCustomerRepository()
+    customer_services = InMemoryCustomerServiceRepository()
+    existing, service_entity = await _seed_existing_identity(customers, customer_services)
+    service = _service(
+        customers=customers,
+        customer_services=customer_services,
+        service_entity=service_entity,
     )
 
-    with pytest.raises(SuccessfulIntakeInconsistency):
-        await service(_make_command())
+    with pytest.raises(CurpNssConflict):
+        await service(
+            _request(external_request_id="external-4", nss="9999999999999999").to_command()
+        )
+
+    stored_customer = await customers.get_by_id(existing.id)
+    assert stored_customer == existing

@@ -37,6 +37,10 @@ class IntakeMutationFailedError(ProcessSimulatedCustomerIntakeError):
     """A required intake mutation could not be completed consistently."""
 
 
+class MvpStartDateNotConfiguredError(ProcessSimulatedCustomerIntakeError):
+    """Operational configuration is incomplete for eligibility evaluation."""
+
+
 ExternalRequestConflict = ExternalRequestConflictError
 CurpNssConflict = CurpNssConflictError
 ServiceNotFound = ServiceNotFoundError
@@ -44,3 +48,4 @@ CustomerServiceInconsistency = CustomerServiceInconsistencyError
 SuccessfulIntakeInconsistency = SuccessfulIntakeInconsistencyError
 RewardsIdCollisionExhausted = RewardsIdCollisionExhaustedError
 IntakeMutationFailed = IntakeMutationFailedError
+MvpStartDateNotConfigured = MvpStartDateNotConfiguredError

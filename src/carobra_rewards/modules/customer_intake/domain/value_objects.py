@@ -8,3 +8,8 @@ type JsonObject = dict[str, JsonValue]
 def normalize_curp(curp: str) -> str:
     """Apply the closed CURP normalization rule for structured persistence."""
     return curp.strip().upper()
+
+
+def normalize_nss(nss: str) -> str:
+    """Keep NSS stable while trimming outer whitespace only."""
+    return nss.strip()

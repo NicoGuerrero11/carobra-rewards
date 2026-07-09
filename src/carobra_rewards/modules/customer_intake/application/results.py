@@ -5,10 +5,11 @@ from enum import StrEnum
 
 
 class SimulatedCustomerIntakeStatus(StrEnum):
-    """Successful outcomes for the provisional simulated intake flow."""
+    """Functional outcomes for the SISCA intake flow."""
 
-    APPROVED = "APPROVED"
-    ALREADY_ACTIVE = "ALREADY_ACTIVE"
+    ACCEPTED = "accepted"
+    NOT_ELIGIBLE = "not_eligible"
+    IDEMPOTENT_DUPLICATE = "idempotent_duplicate"
 
 
 @dataclass(slots=True, frozen=True)
@@ -16,7 +17,7 @@ class SimulatedCustomerIntakeResult:
     """Result returned by the use case without HTTP concerns."""
 
     intake_request_id: str
-    customer_id: str
-    rewards_id: str
+    customer_id: str | None
+    rewards_id: str | None
     status: SimulatedCustomerIntakeStatus
     replayed: bool

@@ -51,6 +51,8 @@ class CustomerRepository(Protocol):
 
     async def get_by_curp(self, curp: str) -> Customer | None: ...
 
+    async def get_by_nss(self, nss: str) -> Customer | None: ...
+
 
 class ServiceRepository(Protocol):
     """Query service catalog entries."""

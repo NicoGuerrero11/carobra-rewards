@@ -1,25 +1,30 @@
-"""Application commands for the simulated customer intake flow."""
+"""Application commands for the SISCA customer intake flow."""
 
 from dataclasses import dataclass
+from datetime import date
 
 from carobra_rewards.modules.customer_intake.domain.value_objects import JsonObject
 
 
 @dataclass(slots=True, frozen=True)
 class ProcessSimulatedCustomerIntakeCommand:
-    """Plain application command for the provisional simulated intake flow.
-
-    Structural validity implies simulated approval only for this change. The
-    rule is intentionally provisional and must not be promoted automatically to
-    the real SISCA contract.
-    """
+    """Plain application command for the SISCA intake flow."""
 
     source: str
     external_request_id: str
     curp: str
     nss: str
-    name: str
+    first_name: str
+    paternal_last_name: str
+    maternal_last_name: str
     email: str
+    birth_date: date
+    advisor_identifier: str
+    movement_type: str
+    sf_status: str
+    transfer_date: date
     phone: str | None
     postal_code: str | None
+    state: str | None
+    city: str | None
     original_payload: JsonObject

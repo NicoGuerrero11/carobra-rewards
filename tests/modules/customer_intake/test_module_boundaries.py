@@ -51,7 +51,6 @@ def test_module_does_not_import_http_schemas() -> None:
     for path in _iter_python_files(MODULE_ROOT):
         imports = _collect_imports(path)
         assert not any(
-            imported == "carobra_rewards.api"
-            or imported.startswith("carobra_rewards.api.")
+            imported == "carobra_rewards.api" or imported.startswith("carobra_rewards.api.")
             for imported in imports
         ), path.as_posix()

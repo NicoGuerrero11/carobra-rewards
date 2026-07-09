@@ -26,6 +26,7 @@ from carobra_rewards.modules.customer_intake.domain.entities import (
 )
 from carobra_rewards.modules.customer_intake.domain.errors import (
     DuplicateCustomerCurpError,
+    DuplicateCustomerNssError,
     DuplicateCustomerRewardsIdError,
     DuplicateCustomerServiceError,
     DuplicateExternalRequestError,
@@ -33,7 +34,11 @@ from carobra_rewards.modules.customer_intake.domain.errors import (
     IntakeRequestNotFoundError,
     UnexpectedPersistenceError,
 )
-from carobra_rewards.modules.customer_intake.domain.value_objects import JsonObject, normalize_curp
+from carobra_rewards.modules.customer_intake.domain.value_objects import (
+    JsonObject,
+    normalize_curp,
+    normalize_nss,
+)
 from carobra_rewards.modules.customer_intake.infrastructure.persistence.models import (
     CustomerIntakeRequestModel,
     CustomerModel,
@@ -46,6 +51,7 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.timestam
 
 _UNSET = object()
 _SUCCESS_STATUSES = {
+    IntakeProcessingStatus.ACCEPTED,
     IntakeProcessingStatus.APPROVED,
     IntakeProcessingStatus.ALREADY_ACTIVE,
 }
@@ -140,6 +146,7 @@ def _constraint_name(error: IntegrityError) -> str | None:
         for known_name in (
             "uq_intake_source_external",
             "uq_customers_curp",
+            "uq_customers_nss",
             "uq_customers_rewards_id",
             "uq_customer_service_pair",
         ):
@@ -154,6 +161,8 @@ def _map_integrity_error(error: IntegrityError) -> Exception:
             return DuplicateExternalRequestError()
         case "uq_customers_curp":
             return DuplicateCustomerCurpError()
+        case "uq_customers_nss":
+            return DuplicateCustomerNssError()
         case "uq_customers_rewards_id":
             return DuplicateCustomerRewardsIdError()
         case "uq_customer_service_pair":
@@ -210,10 +219,7 @@ class InMemoryCustomerIntakeRequestRepository:
         intake_request = self._records.get(intake_request_id)
         if intake_request is None:
             raise IntakeRequestNotFoundError()
-        if (
-            intake_request.processing_status == processing_status
-            or processed_at is _UNSET
-        ):
+        if intake_request.processing_status == processing_status or processed_at is _UNSET:
             next_processed_at = intake_request.processed_at
         else:
             next_processed_at = cast(datetime | None, processed_at)
@@ -237,17 +243,22 @@ class InMemoryCustomerRepository:
         self._by_id: dict[UUID, Customer] = {}
         self._by_rewards_id: dict[str, UUID] = {}
         self._by_curp: dict[str, UUID] = {}
+        self._by_nss: dict[str, UUID] = {}
 
     async def create(self, customer: Customer) -> None:
         normalized_curp = normalize_curp(customer.curp)
+        normalized_nss = normalize_nss(customer.nss)
         if customer.rewards_id in self._by_rewards_id:
             raise DuplicateCustomerRewardsIdError()
         if normalized_curp in self._by_curp:
             raise DuplicateCustomerCurpError()
-        stored = replace(customer, curp=normalized_curp)
+        if normalized_nss in self._by_nss:
+            raise DuplicateCustomerNssError()
+        stored = replace(customer, curp=normalized_curp, nss=normalized_nss)
         self._by_id[stored.id] = stored
         self._by_rewards_id[stored.rewards_id] = stored.id
         self._by_curp[stored.curp] = stored.id
+        self._by_nss[stored.nss] = stored.id
 
     async def get_by_id(self, customer_id: UUID) -> Customer | None:
         return self._by_id.get(customer_id)
@@ -260,6 +271,12 @@ class InMemoryCustomerRepository:
 
     async def get_by_curp(self, curp: str) -> Customer | None:
         customer_id = self._by_curp.get(normalize_curp(curp))
+        if customer_id is None:
+            return None
+        return self._by_id[customer_id]
+
+    async def get_by_nss(self, nss: str) -> Customer | None:
+        customer_id = self._by_nss.get(normalize_nss(nss))
         if customer_id is None:
             return None
         return self._by_id[customer_id]
@@ -308,13 +325,9 @@ class InMemoryCustomerServiceRepository:
             relation,
             status=status,
             started_at=(
-                relation.started_at
-                if started_at is _UNSET
-                else cast(datetime | None, started_at)
+                relation.started_at if started_at is _UNSET else cast(datetime | None, started_at)
             ),
-            ended_at=(
-                relation.ended_at if ended_at is _UNSET else cast(datetime | None, ended_at)
-            ),
+            ended_at=(relation.ended_at if ended_at is _UNSET else cast(datetime | None, ended_at)),
             updated_at=utc_now(),
         )
 
@@ -500,7 +513,7 @@ class SqlAlchemyCustomerRepository:
             id=customer.id,
             rewards_id=customer.rewards_id,
             curp=normalize_curp(customer.curp),
-            nss=customer.nss,
+            nss=normalize_nss(customer.nss),
             name=customer.name,
             email=customer.email,
             phone=customer.phone,
@@ -539,6 +552,16 @@ class SqlAlchemyCustomerRepository:
 
     async def get_by_curp(self, curp: str) -> Customer | None:
         statement = select(CustomerModel).where(CustomerModel.curp == normalize_curp(curp))
+        try:
+            model = (await self._session.execute(statement)).scalar_one_or_none()
+        except SQLAlchemyError as exc:
+            raise UnexpectedPersistenceError() from exc
+        if model is None:
+            return None
+        return _to_customer_entity(model)
+
+    async def get_by_nss(self, nss: str) -> Customer | None:
+        statement = select(CustomerModel).where(CustomerModel.nss == normalize_nss(nss))
         try:
             model = (await self._session.execute(statement)).scalar_one_or_none()
         except SQLAlchemyError as exc:
