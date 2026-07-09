@@ -3,9 +3,9 @@ from typing import cast
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
-from carobra_rewards.api.router import api_router
+from carobra_rewards.api.router import build_api_router
 from carobra_rewards.api.v1.customer_intake.error_mapping import (
     build_validation_error_response,
 )
@@ -23,6 +23,16 @@ async def _handle_request_validation_error(
     validation_exc = cast(RequestValidationError, exc)
     if is_customer_intake_http_request(request):
         return build_validation_error_response()
+    if request.url.path.startswith("/api/v1/internal/sisca-validations/"):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "code": "validation_error",
+                    "message": "Request validation failed",
+                }
+            },
+        )
     return await request_validation_exception_handler(request, validation_exc)
 
 
@@ -36,9 +46,10 @@ def create_application() -> FastAPI:
         redoc_url="/redoc" if settings.is_docs_enabled else None,
         openapi_url="/openapi.json" if settings.is_docs_enabled else None,
     )
-    app.middleware("http")(customer_intake_http_tracing_middleware)
+    if settings.legacy_customer_intake_enabled:
+        app.middleware("http")(customer_intake_http_tracing_middleware)
     app.add_exception_handler(RequestValidationError, _handle_request_validation_error)
-    app.include_router(api_router)
+    app.include_router(build_api_router(settings))
     return app
 
 
