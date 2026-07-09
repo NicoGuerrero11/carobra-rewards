@@ -1,6 +1,10 @@
 # Carobra Rewards
 
-Base técnica inicial del backend de Carobra Rewards. En esta etapa el repositorio prepara un monolito modular en Python listo para comenzar el desarrollo real del backend, sin implementar todavía reglas de negocio ni el flujo de alta desde SISCA.
+Base técnica inicial del backend de Carobra Rewards. La base implementada actual
+incluye un flujo técnico simulado de intake, pero la documentación funcional
+vigente ya no asume que SISCA envía clientes completos: el criterio objetivo
+del MVP es que Rewards registra al cliente y SISCA solo valida el estado del
+trámite AFORE.
 
 ## Stack actual
 
@@ -180,14 +184,29 @@ Para presentar el avance con narrativa funcional y evidencia verificable, usa:
 - `docs/sisca-excel-preliminary-classification.md`
 - `docs/customer-intake-work-evidence-matrix.md`
 
+## Documentación funcional vigente
+
+Antes de tocar implementación, la referencia funcional vigente es:
+
+- `docs/sisca-rewards-initial-integration-contract.md`
+- `docs/customer-intake-business-rules.md`
+
+Esos documentos fijan el criterio actual:
+
+- Rewards registra al cliente.
+- Rewards captura CURP sin hash.
+- SISCA solo devuelve `tipo_movimiento`, `estatus_sf` y `fecha_traspaso`.
+- Rewards consulta a las 24, 72 y 120 horas transcurridas desde el registro.
+
 ## Funcionalidad pendiente
 
-El endpoint provisional `/api/v1/customers/intake` ya está implementado, usa
-persistencia PostgreSQL y representa un flujo técnico y simulado. No constituye
-todavía la integración definitiva con SISCA.
+El endpoint provisional `/api/v1/customers/intake` permanece en código solo para
+rollback y evidencia histórica, pero está deshabilitado por defecto y ausente de
+OpenAPI. El flujo vigente usa validaciones SISCA creadas por el registro Rewards.
 
 Todavía no están implementados:
 
-- reglas de elegibilidad
-- autenticación
-- onboarding, campañas, puntos o recompensas
+- registro y login final de Rewards;
+- validación real con SISCA por CURP;
+- reglas de activación y cancelación del nuevo flujo documental;
+- onboarding, campañas, puntos o recompensas.

@@ -1,4 +1,8 @@
-# Customer Intake API Proof Demo
+# Customer Intake API Proof Demo (histórica)
+
+Esta evidencia corresponde al endpoint retirado y no representa el contrato
+vigente. Solo puede ejecutarse con `--allow-legacy`; el runtime normal mantiene
+`LEGACY_CUSTOMER_INTAKE_ENABLED=false`.
 
 ## 1. Proposito
 
