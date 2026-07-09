@@ -76,9 +76,7 @@ class CreatedRecordIds:
     customer_service_ids: set[UUID] = field(default_factory=set)
 
     def is_empty(self) -> bool:
-        return not (
-            self.intake_request_ids or self.customer_ids or self.customer_service_ids
-        )
+        return not (self.intake_request_ids or self.customer_ids or self.customer_service_ids)
 
 
 @dataclass(slots=True, frozen=True)
@@ -102,8 +100,7 @@ class ScenarioRecord:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Demuestra el alta provisional SISCA_SIMULATED -> Rewards "
-            "usando el endpoint real."
+            "Demuestra el alta provisional SISCA_SIMULATED -> Rewards usando el endpoint real."
         ),
     )
     parser.add_argument(
@@ -120,6 +117,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "`single-approved` conserva la demo tecnica existente y "
             "`api-proof` ejecuta varios escenarios para demostrar la API."
         ),
+    )
+    parser.add_argument(
+        "--allow-legacy",
+        action="store_true",
+        help="Habilita explícitamente la demo histórica del intake retirado.",
     )
     return parser.parse_args(argv)
 
@@ -353,7 +355,9 @@ async def load_counts_for_execution(
 ) -> tuple[int, int, int]:
     async with session_factory() as session:
         intake_count = await session.scalar(
-            select(func.count()).select_from(CustomerIntakeRequestModel).where(
+            select(func.count())
+            .select_from(CustomerIntakeRequestModel)
+            .where(
                 CustomerIntakeRequestModel.source == markers.source,
                 CustomerIntakeRequestModel.external_request_id == markers.external_request_id,
             )
@@ -395,9 +399,9 @@ async def load_customer_count_for_curp(
 ) -> int:
     async with session_factory() as session:
         count = await session.scalar(
-            select(func.count()).select_from(CustomerModel).where(
-                CustomerModel.curp == curp.strip().upper()
-            )
+            select(func.count())
+            .select_from(CustomerModel)
+            .where(CustomerModel.curp == curp.strip().upper())
         )
     return count or 0
 
@@ -515,9 +519,7 @@ def build_cleanup_statements(created_ids: CreatedRecordIds) -> list[Delete]:
         )
     if created_ids.customer_ids:
         statements.append(
-            delete(CustomerModel).where(
-                CustomerModel.id.in_(tuple(created_ids.customer_ids))
-            )
+            delete(CustomerModel).where(CustomerModel.id.in_(tuple(created_ids.customer_ids)))
         )
     return statements
 
@@ -536,19 +538,19 @@ async def cleanup_created_records(
 
     async with session_factory() as verification_session:
         remaining_intakes = await verification_session.scalar(
-            select(func.count()).select_from(CustomerIntakeRequestModel).where(
-                CustomerIntakeRequestModel.id.in_(tuple(created_ids.intake_request_ids))
-            )
+            select(func.count())
+            .select_from(CustomerIntakeRequestModel)
+            .where(CustomerIntakeRequestModel.id.in_(tuple(created_ids.intake_request_ids)))
         )
         remaining_customers = await verification_session.scalar(
-            select(func.count()).select_from(CustomerModel).where(
-                CustomerModel.id.in_(tuple(created_ids.customer_ids))
-            )
+            select(func.count())
+            .select_from(CustomerModel)
+            .where(CustomerModel.id.in_(tuple(created_ids.customer_ids)))
         )
         remaining_relations = await verification_session.scalar(
-            select(func.count()).select_from(CustomerServiceModel).where(
-                CustomerServiceModel.id.in_(tuple(created_ids.customer_service_ids))
-            )
+            select(func.count())
+            .select_from(CustomerServiceModel)
+            .where(CustomerServiceModel.id.in_(tuple(created_ids.customer_service_ids)))
         )
 
     return remaining_intakes or 0, remaining_customers or 0, remaining_relations or 0
@@ -693,7 +695,9 @@ async def _run_approved_scenario(
     markers = build_execution_markers(payload)
     status_code, response_body, request_id = await _submit_http_request(payload)
     if status_code != 201:
-        raise DemoExecutionError(f"approved_new_customer esperaba HTTP 201 y recibio {status_code}.")
+        raise DemoExecutionError(
+            f"approved_new_customer esperaba HTTP 201 y recibio {status_code}."
+        )
     if response_body.get("status") != "APPROVED" or response_body.get("replayed") is not False:
         raise DemoExecutionError("approved_new_customer no devolvio APPROVED con replayed=false.")
 
@@ -714,7 +718,9 @@ async def _run_approved_scenario(
         customer_id=customer_id,
     )
     if counts != (1, 1, 1):
-        raise DemoExecutionError("approved_new_customer no quedo con conteos intake=1, customer=1, relacion=1.")
+        raise DemoExecutionError(
+            "approved_new_customer no quedo con conteos intake=1, customer=1, relacion=1."
+        )
 
     return ScenarioRecord(
         name="approved_new_customer",
@@ -757,7 +763,9 @@ async def _run_approved_replay_scenario(
     if first_status != 201 or replay_status != 200:
         raise DemoExecutionError("approved_replay esperaba HTTP 201 seguido de HTTP 200.")
     if first_body.get("status") != "APPROVED" or replay_body.get("status") != "APPROVED":
-        raise DemoExecutionError("approved_replay no devolvio status APPROVED en ambas ejecuciones.")
+        raise DemoExecutionError(
+            "approved_replay no devolvio status APPROVED en ambas ejecuciones."
+        )
     if first_body.get("replayed") is not False or replay_body.get("replayed") is not True:
         raise DemoExecutionError("approved_replay no marco correctamente replayed.")
     if first_body["intake_request_id"] != replay_body["intake_request_id"]:
@@ -787,7 +795,9 @@ async def _run_approved_replay_scenario(
     return ScenarioRecord(
         name="approved_replay_same_external_request",
         outcome="HTTP 201 seguido de HTTP 200 replayed=true",
-        explanation="La API demuestra idempotencia: el segundo request reutiliza la misma identidad.",
+        explanation=(
+            "La API demuestra idempotencia: el segundo request reutiliza la misma identidad."
+        ),
         request_payload=payload,
         responses=[
             {"http_status": first_status, "x_request_id": first_request_id, **first_body},
@@ -831,7 +841,10 @@ async def _run_already_active_scenario(
     status_code, response_body, request_id = await _submit_http_request(payload)
     if status_code != 200:
         raise DemoExecutionError(f"already_active esperaba HTTP 200 y recibio {status_code}.")
-    if response_body.get("status") != "ALREADY_ACTIVE" or response_body.get("replayed") is not False:
+    if (
+        response_body.get("status") != "ALREADY_ACTIVE"
+        or response_body.get("replayed") is not False
+    ):
         raise DemoExecutionError("already_active no devolvio ALREADY_ACTIVE con replayed=false.")
     if response_body.get("customer_id") != str(seeded_customer.id):
         raise DemoExecutionError("already_active no reutilizo el customer sembrado.")
@@ -1025,8 +1038,13 @@ async def _run_already_active_replay_scenario(
     replay_status, replay_body, replay_request_id = await _submit_http_request(payload)
     if first_status != 200 or replay_status != 200:
         raise DemoExecutionError("already_active_replay esperaba HTTP 200 en ambas ejecuciones.")
-    if first_body.get("status") != "ALREADY_ACTIVE" or replay_body.get("status") != "ALREADY_ACTIVE":
-        raise DemoExecutionError("already_active_replay no devolvio ALREADY_ACTIVE en ambas ejecuciones.")
+    if (
+        first_body.get("status") != "ALREADY_ACTIVE"
+        or replay_body.get("status") != "ALREADY_ACTIVE"
+    ):
+        raise DemoExecutionError(
+            "already_active_replay no devolvio ALREADY_ACTIVE en ambas ejecuciones."
+        )
     if first_body.get("replayed") is not False or replay_body.get("replayed") is not True:
         raise DemoExecutionError("already_active_replay no marco replayed correctamente.")
     if first_body["intake_request_id"] != replay_body["intake_request_id"]:
@@ -1048,7 +1066,9 @@ async def _run_already_active_replay_scenario(
     return ScenarioRecord(
         name="already_active_replay_same_external_request",
         outcome="HTTP 200 seguido de HTTP 200 replayed=true",
-        explanation="La API también mantiene idempotencia cuando el resultado base es ALREADY_ACTIVE.",
+        explanation=(
+            "La API también mantiene idempotencia cuando el resultado base es ALREADY_ACTIVE."
+        ),
         request_payload=payload,
         responses=[
             {"http_status": first_status, "x_request_id": first_request_id, **first_body},
@@ -1119,7 +1139,10 @@ async def _run_identity_conflict_replay_scenario(
     return ScenarioRecord(
         name="identity_conflict_replay_same_external_request",
         outcome="HTTP 409 seguido de HTTP 409 sin duplicados",
-        explanation="El conflicto de identidad también queda fijado por idempotencia para la misma clave externa.",
+        explanation=(
+            "El conflicto de identidad también queda fijado por idempotencia para la misma clave "
+            "externa."
+        ),
         request_payload=payload,
         responses=[
             {"http_status": first_status, "x_request_id": first_request_id, **first_body},
@@ -1163,7 +1186,9 @@ async def _run_external_request_conflict_scenario(
         }
     }
     if status_code != 409:
-        raise DemoExecutionError(f"external_request_conflict esperaba HTTP 409 y recibio {status_code}.")
+        raise DemoExecutionError(
+            f"external_request_conflict esperaba HTTP 409 y recibio {status_code}."
+        )
     if response_body != expected_error:
         raise DemoExecutionError("external_request_conflict no devolvio el cuerpo esperado.")
 
@@ -1204,7 +1229,9 @@ async def _run_validation_missing_email_scenario(
     markers = build_execution_markers(payload)
     status_code, response_body, request_id = await _submit_http_request(payload_without_email)
     if status_code != 422:
-        raise DemoExecutionError(f"validation_missing_email esperaba HTTP 422 y recibio {status_code}.")
+        raise DemoExecutionError(
+            f"validation_missing_email esperaba HTTP 422 y recibio {status_code}."
+        )
     if response_body != {
         "detail": {
             "code": "validation_error",
@@ -1245,7 +1272,9 @@ async def _run_validation_extra_field_scenario(
     markers = build_execution_markers(payload)
     status_code, response_body, request_id = await _submit_http_request(payload_with_extra)
     if status_code != 422:
-        raise DemoExecutionError(f"validation_extra_field esperaba HTTP 422 y recibio {status_code}.")
+        raise DemoExecutionError(
+            f"validation_extra_field esperaba HTTP 422 y recibio {status_code}."
+        )
     if response_body != {
         "detail": {
             "code": "validation_error",
@@ -1286,7 +1315,9 @@ async def _run_validation_invalid_email_scenario(
     markers = build_execution_markers(payload)
     status_code, response_body, request_id = await _submit_http_request(payload_with_bad_email)
     if status_code != 422:
-        raise DemoExecutionError(f"validation_invalid_email esperaba HTTP 422 y recibio {status_code}.")
+        raise DemoExecutionError(
+            f"validation_invalid_email esperaba HTTP 422 y recibio {status_code}."
+        )
     if response_body != {
         "detail": {
             "code": "validation_error",
@@ -1339,7 +1370,10 @@ async def _run_seeded_not_approved_scenario(
     return ScenarioRecord(
         name="seeded_not_approved_intake",
         outcome="Seeded intake in NOT_APPROVED",
-        explanation="Dato sembrado para mostrar un caso de rechazo funcional todavía no producido por la API actual.",
+        explanation=(
+            "Dato sembrado para mostrar un caso de rechazo funcional todavía no producido "
+            "por la API actual."
+        ),
         request_payload=payload,
         responses=[],
         persistence_summary={
@@ -1503,9 +1537,17 @@ async def run_api_proof_demo(keep_data: bool) -> int:
         print("  approved_new_customer: prueba creacion completa")
         print("  approved_replay_same_external_request: prueba idempotencia")
         print("  already_active_existing_customer: prueba reutilizacion de cliente existente")
-        print("  already_active_replay_same_external_request: prueba replay sobre cliente ya activo")
-        print("  identity_conflict_same_curp_different_nss: prueba rechazo controlado con rastro persistido")
-        print("  identity_conflict_replay_same_external_request: prueba replay de conflicto sin duplicados")
+        print(
+            "  already_active_replay_same_external_request: prueba replay sobre cliente ya activo"
+        )
+        print(
+            "  identity_conflict_same_curp_different_nss: prueba rechazo controlado con "
+            "rastro persistido"
+        )
+        print(
+            "  identity_conflict_replay_same_external_request: prueba replay de conflicto "
+            "sin duplicados"
+        )
         print("  external_request_conflict_processing_state: prueba conflicto no replayable")
         print("  validation_error_bad_source: prueba rechazo estructural sin persistencia")
         print("  validation_error_missing_email: prueba campo requerido ausente")
@@ -1520,7 +1562,10 @@ async def run_api_proof_demo(keep_data: bool) -> int:
         if keep_data:
             print("  limpieza omitida por --keep-data")
             print("  quedaron datos sinteticos listos para mostrar en Neon")
-            print(f"  intake_request_ids={sorted(str(value) for value in created_ids.intake_request_ids)}")
+            print(
+                "  intake_request_ids="
+                f"{sorted(str(value) for value in created_ids.intake_request_ids)}"
+            )
             print(f"  customer_ids={sorted(str(value) for value in created_ids.customer_ids)}")
             print(
                 "  customer_service_ids="
@@ -1546,6 +1591,12 @@ async def run_api_proof_demo(keep_data: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
+        if not args.allow_legacy:
+            raise DemoConfigurationError(
+                "La demo de intake es histórica; usa --allow-legacy solo para evidencia."
+            )
+        os.environ["LEGACY_CUSTOMER_INTAKE_ENABLED"] = "true"
+        reset_settings_cache()
         if args.suite == "api-proof":
             return asyncio.run(run_api_proof_demo(keep_data=args.keep_data))
         return asyncio.run(run_single_approved_demo(keep_data=args.keep_data))

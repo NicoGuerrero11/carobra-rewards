@@ -1,4 +1,4 @@
-"""HTTP request tracing for the simulated customer intake endpoint."""
+"""HTTP request tracing for the customer intake endpoint."""
 
 from __future__ import annotations
 

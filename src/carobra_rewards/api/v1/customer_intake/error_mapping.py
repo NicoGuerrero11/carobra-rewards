@@ -9,6 +9,7 @@ from carobra_rewards.modules.customer_intake.application.errors import (
     CustomerServiceInconsistency,
     ExternalRequestConflict,
     IntakeMutationFailed,
+    MvpStartDateNotConfigured,
     ProcessSimulatedCustomerIntakeError,
     RewardsIdCollisionExhausted,
     ServiceNotFound,
@@ -23,12 +24,12 @@ CUSTOMER_INTAKE_PATH = "/api/v1/customers/intake"
 VALIDATION_ERROR_CODE = "validation_error"
 VALIDATION_ERROR_MESSAGE = "The request payload is invalid."
 INTERNAL_ERROR_CODE = "internal_error"
-INTERNAL_ERROR_MESSAGE = "The simulated intake flow failed unexpectedly."
+INTERNAL_ERROR_MESSAGE = "The customer intake flow failed unexpectedly."
 
 
 def map_result_to_http_status(result: SimulatedCustomerIntakeResult) -> int:
     """Keep HTTP semantics in the API layer instead of the module."""
-    if result.replayed or result.status is SimulatedCustomerIntakeStatus.ALREADY_ACTIVE:
+    if result.status is not SimulatedCustomerIntakeStatus.ACCEPTED:
         return status.HTTP_200_OK
     return status.HTTP_201_CREATED
 
@@ -45,19 +46,25 @@ def map_error_to_http_exception(error: ProcessSimulatedCustomerIntakeError) -> H
         return _http_error(
             status.HTTP_409_CONFLICT,
             "curp_nss_conflict",
-            "The simulated intake flow could not reuse the existing customer safely.",
+            "The intake could not reconcile CURP and NSS with a single SISCA identity.",
+        )
+    if isinstance(error, MvpStartDateNotConfigured):
+        return _http_error(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "configuration_incomplete",
+            "The intake eligibility configuration is incomplete.",
         )
     if isinstance(error, ServiceNotFound):
         return _http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "service_not_found",
-            "The simulated intake flow is temporarily unavailable.",
+            "The customer intake flow is temporarily unavailable.",
         )
     if isinstance(error, CustomerServiceInconsistency):
         return _http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "customer_service_inconsistency",
-            "The simulated intake flow could not reuse the existing customer safely.",
+            "The customer intake flow could not reuse the existing customer safely.",
         )
     if isinstance(error, SuccessfulIntakeInconsistency):
         return _http_error(
@@ -69,13 +76,13 @@ def map_error_to_http_exception(error: ProcessSimulatedCustomerIntakeError) -> H
         return _http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "rewards_id_collision_exhausted",
-            "The simulated intake flow could not allocate a Rewards ID.",
+            "The customer intake flow could not allocate a Rewards ID.",
         )
     if isinstance(error, IntakeMutationFailed):
         return _http_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "intake_mutation_failed",
-            "The simulated intake flow could not complete the required persistence updates.",
+            "The customer intake flow could not complete the required persistence updates.",
         )
     return _http_error(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -92,8 +99,8 @@ def _http_error(status_code: int, code: str, message: str) -> HTTPException:
 def build_validation_error_response() -> JSONResponse:
     """Return the documented generic 422 contract for intake payload validation."""
     payload = CustomerIntakeErrorResponse(
-        code=VALIDATION_ERROR_CODE,
-        message=VALIDATION_ERROR_MESSAGE,
+        code="structurally_invalid",
+        message="The intake payload is structurally invalid.",
     )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

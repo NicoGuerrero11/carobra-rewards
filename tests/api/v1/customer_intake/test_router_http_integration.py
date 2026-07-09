@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Final
+from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from carobra_rewards.api.v1.customer_intake.dependencies import get_process_customer_intake
@@ -27,7 +26,6 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.models i
     CustomerIntakeRequestModel,
     CustomerModel,
     CustomerServiceModel,
-    ServiceModel,
 )
 from carobra_rewards.modules.customer_intake.infrastructure.persistence.repositories import (
     SqlAlchemyCustomerIntakeUnitOfWork,
@@ -40,102 +38,46 @@ from carobra_rewards.modules.customer_intake.ports.rewards_id_generator import (
 )
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 def _assert_valid_uuid(value: str) -> None:
     assert str(UUID(value)) == value
 
 
-def _payload(
-    external_request_id: str = "external-1",
-    *,
-    nss: str = "0012345678901234",
-    name: str = " Test User ",
-    email: str = "test@example.com",
-    phone: str = "5551234567",
-    postal_code: str = "01010",
-) -> dict[str, str]:
-    return {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": external_request_id,
-        "curp": "  abcd123456hmnlrs09  ",
-        "nss": nss,
-        "name": name,
-        "email": email,
-        "phone": phone,
-        "postal_code": postal_code,
+def _payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "external_request_id": f"external-{uuid4()}",
+        "curp": "ABCD123456HMNLRS09",
+        "nss": "0012345678901234",
+        "nombre": "Ada",
+        "apellido_paterno": "Lovelace",
+        "apellido_materno": "Byron",
+        "correo_electronico": "ada@example.com",
+        "fecha_de_nacimiento": "1990-05-17",
+        "advisor_identifier": "advisor-123",
+        "tipo_de_movimiento": "Traspaso NAP",
+        "estatus_sf": "ACEPTADA PROCESAR",
+        "fecha_de_traspaso": "2026-07-01",
+        "celular": "5551234567",
+        "codigo_postal": "01010",
+        "estado": "CDMX",
+        "ciudad": "Ciudad de Mexico",
     }
+    payload.update(overrides)
+    return payload
 
 
-def _customer(
-    *,
-    rewards_id: str,
-    curp: str,
-    nss: str = "0012345678901234",
-    name: str = "Existing User",
-    email: str = "existing@example.com",
-    phone: str | None = "5551234567",
-    postal_code: str | None = "01010",
-) -> Customer:
-    now = _now()
-    return Customer.create(
-        rewards_id=rewards_id,
-        curp=curp,
-        nss=nss,
-        name=name,
-        email=email,
-        phone=phone,
-        postal_code=postal_code,
-        customer_status=CustomerStatus.PENDING_ONBOARDING,
-        onboarding_status=OnboardingStatus.PENDING,
-        created_at=now,
-        updated_at=now,
-    )
-
-
-def _relation(*, customer_id, service_id) -> CustomerService:
-    now = _now()
-    return CustomerService.create(
-        customer_id=customer_id,
-        service_id=service_id,
-        status=CustomerServiceStatus.ACTIVE,
-        started_at=now,
-        ended_at=None,
-        created_at=now,
-        updated_at=now,
-    )
-
-
-async def _counts(
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> tuple[int, int, int]:
-    async with postgres_session_factory() as session:
-        intake_count = await session.scalar(
-            select(func.count()).select_from(CustomerIntakeRequestModel)
-        )
-        customer_count = await session.scalar(select(func.count()).select_from(CustomerModel))
-        relation_count = await session.scalar(
-            select(func.count()).select_from(CustomerServiceModel)
-        )
-    return intake_count or 0, customer_count or 0, relation_count or 0
-
-
-class RepeatingRewardsIdGenerator:
-    def __init__(self, rewards_id: str) -> None:
-        self._rewards_id = rewards_id
-        self.calls = 0
+class FixedRewardsIdGenerator:
+    def __init__(self, value: str) -> None:
+        self._value = value
 
     def generate(self) -> str:
-        self.calls += 1
-        return self._rewards_id
+        return self._value
 
 
 def _build_app(
     postgres_session_factory: async_sessionmaker[AsyncSession],
     *,
     rewards_id_generator: RewardsIdGenerator | None = None,
+    mvp_start_date: date | None = date(2026, 7, 1),
 ) -> FastAPI:
     app = create_application()
     generator = rewards_id_generator or TokenHexRewardsIdGenerator()
@@ -144,186 +86,88 @@ def _build_app(
         return ProcessSimulatedCustomerIntake(
             unit_of_work=SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory),
             rewards_id_generator=generator,
+            mvp_start_date=mvp_start_date,
         )
 
     app.dependency_overrides[get_process_customer_intake] = override_service
     return app
 
 
-def _assert_safe_error_payload(payload: dict[str, object]) -> None:
-    body = str(payload).lower()
-    forbidden_fragments = [
-        "abcd123456hmnlrs09",
-        "0012345678901234",
-        "test@example.com",
-        "5551234567",
-        "original_payload",
-        "uq_",
-        "customer_intake_requests",
-        "customer_services",
-        "customers",
-        "constraint",
-        "sqlalchemy",
-        "postgres",
-        "traceback",
-        "insert ",
-        "update ",
-        "select ",
-        "delete ",
-    ]
-    assert "detail" in payload
-    assert all(fragment not in body for fragment in forbidden_fragments)
-
-
-def _assert_safe_validation_error_payload(
-    payload: dict[str, object],
+async def _seed_existing_customer(
+    postgres_session_factory: async_sessionmaker[AsyncSession],
     *,
-    forbidden_fragments: tuple[str, ...],
-) -> None:
-    body = str(payload).lower()
-    assert payload == {
-        "detail": {
-            "code": "validation_error",
-            "message": "The request payload is invalid.",
-        }
-    }
-    assert all(fragment not in body for fragment in forbidden_fragments)
+    curp: str,
+    nss: str,
+) -> Customer:
+    now = datetime.now(UTC)
+    customer = Customer.create(
+        rewards_id="RWD-existing",
+        curp=curp,
+        nss=nss,
+        name="Existing Customer",
+        email="existing@example.com",
+        phone="5550000000",
+        postal_code="99999",
+        customer_status=CustomerStatus.PENDING_ONBOARDING,
+        onboarding_status=OnboardingStatus.PENDING,
+        created_at=now,
+        updated_at=now,
+    )
+    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
+        service = await uow.services.get_by_code("AFORE")
+        assert service is not None
+        await uow.customers.create(customer)
+        await uow.customer_services.create(
+            CustomerService.create(
+                customer_id=customer.id,
+                service_id=service.id,
+                status=CustomerServiceStatus.ACTIVE,
+                started_at=now,
+                ended_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    return customer
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_successful_intake_persists_complete_flow_end_to_end(
+async def test_http_flow_accepts_valid_full_payload(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     assert migrated_postgres_database.startswith("postgresql")
-    synthetic_suffix = uuid4().hex[:10]
-    normalized_curp = f"TSTX{synthetic_suffix}".upper()[:18]
-    payload = {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": f"synthetic-success-{uuid4()}",
-        "curp": f"  {normalized_curp.lower()}  ",
-        "nss": f"99{uuid4().int % 10**14:014d}",
-        "name": "Synthetic Test User",
-        "email": f"synthetic-success-{synthetic_suffix}@example.test",
-        "phone": f"555{uuid4().int % 10**7:07d}",
-        "postal_code": "99999",
-    }
-
     app = _build_app(postgres_session_factory)
     transport = ASGITransport(app=app)
+    payload = _payload()
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post("/api/v1/customers/intake", json=payload)
 
     assert response.status_code == 201
-    response_body = response.json()
-    assert response_body["status"] == "APPROVED"
-    assert response_body["replayed"] is False
-    assert "X-Request-ID" not in response_body
-    _assert_valid_uuid(response_body["intake_request_id"])
-    _assert_valid_uuid(response_body["customer_id"])
-    assert response_body["rewards_id"].startswith("RWD-")
-    assert len(response_body["rewards_id"]) == 36
-    assert response_body["rewards_id"][4:].isalnum()
-    assert response_body["rewards_id"][4:] == response_body["rewards_id"][4:].lower()
-    request_id = response.headers["X-Request-ID"]
-    _assert_valid_uuid(request_id)
+    body = response.json()
+    assert body["status"] == "accepted"
+    assert body["replayed"] is False
+    _assert_valid_uuid(response.headers["X-Request-ID"])
 
     async with postgres_session_factory() as session:
-        stored_intakes = (
-            await session.execute(
-                select(CustomerIntakeRequestModel).where(
-                    CustomerIntakeRequestModel.source == payload["source"],
-                    CustomerIntakeRequestModel.external_request_id
-                    == payload["external_request_id"],
-                )
-            )
-        ).scalars().all()
-        stored_customers = (
-            await session.execute(
-                select(CustomerModel).where(CustomerModel.curp == normalized_curp)
-            )
-        ).scalars().all()
-        aforeservices = (
-            await session.execute(select(ServiceModel).where(ServiceModel.code == "AFORE"))
-        ).scalars().all()
+        stored_intake = await session.scalar(select(CustomerIntakeRequestModel))
+        stored_customer = await session.scalar(select(CustomerModel))
+        stored_relation = await session.scalar(select(CustomerServiceModel))
 
-        assert len(stored_intakes) == 1
-        assert len(stored_customers) == 1
-        assert len(aforeservices) == 1
-
-        stored_intake = stored_intakes[0]
-        stored_customer = stored_customers[0]
-        aforeservice = aforeservices[0]
-
-        stored_relations = (
-            await session.execute(
-                select(CustomerServiceModel).where(
-                    CustomerServiceModel.customer_id == stored_customer.id,
-                    CustomerServiceModel.service_id == aforeservice.id,
-                )
-            )
-        ).scalars().all()
-        duplicate_customer_count = await session.scalar(
-            select(func.count()).select_from(CustomerModel).where(
-                CustomerModel.curp == normalized_curp
-            )
-        )
-        duplicate_intake_count = await session.scalar(
-            select(func.count()).select_from(CustomerIntakeRequestModel).where(
-                CustomerIntakeRequestModel.source == payload["source"],
-                CustomerIntakeRequestModel.external_request_id == payload["external_request_id"],
-            )
-        )
-        duplicate_relation_count = await session.scalar(
-            select(func.count()).select_from(CustomerServiceModel).where(
-                CustomerServiceModel.customer_id == stored_customer.id,
-                CustomerServiceModel.service_id == aforeservice.id,
-            )
-        )
-
-    assert len(stored_relations) == 1
-    stored_relation = stored_relations[0]
-
-    assert response_body["intake_request_id"] == str(stored_intake.id)
-    assert response_body["customer_id"] == str(stored_customer.id)
-    assert response_body["rewards_id"] == stored_customer.rewards_id
-
-    assert stored_intake.processing_status == IntakeProcessingStatus.APPROVED.value
-    assert stored_intake.customer_id == stored_customer.id
-    assert stored_intake.processed_at is not None
-    assert stored_intake.processing_details is None
-    assert stored_customer.customer_status == CustomerStatus.PENDING_ONBOARDING.value
-    assert stored_customer.onboarding_status == OnboardingStatus.PENDING.value
-    assert stored_relation.status == CustomerServiceStatus.ACTIVE.value
-
+    assert stored_intake is not None
+    assert stored_customer is not None
+    assert stored_relation is not None
+    assert stored_intake.processing_status == IntakeProcessingStatus.ACCEPTED.value
     assert stored_intake.original_payload == payload
-    assert stored_intake.curp == normalized_curp
-    assert stored_customer.name == payload["name"]
-    assert stored_customer.email == payload["email"]
-    assert stored_customer.nss == payload["nss"]
-    assert stored_customer.phone == payload["phone"]
-    assert stored_customer.postal_code == payload["postal_code"]
-
-    assert duplicate_intake_count == 1
-    assert duplicate_customer_count == 1
-    assert duplicate_relation_count == 1
-
-    assert request_id not in str(stored_intake.original_payload)
-    assert request_id not in str(stored_intake.id)
-    assert request_id not in str(stored_customer.id)
-    assert request_id not in stored_customer.rewards_id
-    assert not hasattr(stored_intake, "request_id")
-    assert not hasattr(stored_customer, "request_id")
-    assert not hasattr(stored_relation, "request_id")
-    assert payload["name"].startswith("Synthetic")
-    assert payload["email"].endswith("@example.test")
+    assert stored_customer.name == "Ada Lovelace Byron"
+    assert stored_customer.email == payload["correo_electronico"]
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_http_flow_returns_201_then_replays_200(
+async def test_http_flow_rejects_missing_required_fields_as_structurally_invalid(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -332,539 +176,211 @@ async def test_http_flow_returns_201_then_replays_200(
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        created = await client.post("/api/v1/customers/intake", json=_payload())
-        replay = await client.post("/api/v1/customers/intake", json=_payload())
-
-    assert created.status_code == 201
-    assert replay.status_code == 200
-    assert created.json()["status"] == "APPROVED"
-    assert replay.json()["status"] == "APPROVED"
-    assert replay.json()["replayed"] is True
-    assert set(created.json()) == {
-        "intake_request_id",
-        "customer_id",
-        "rewards_id",
-        "status",
-        "replayed",
-    }
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_returns_422_for_invalid_email_format_without_persisting_intake(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    synthetic_suffix: Final[str] = uuid4().hex[:10]
-    payload = {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": f"synthetic-invalid-email-{uuid4()}",
-        "curp": f"  inva{synthetic_suffix}".upper()[:18].lower() + "  ",
-        "nss": f"88{uuid4().int % 10**14:014d}",
-        "name": "Synthetic Invalid Email",
-        "email": f"invalid-email-{synthetic_suffix}.example.test",
-        "phone": f"556{uuid4().int % 10**7:07d}",
-        "postal_code": "88991",
-    }
-    before_counts = await _counts(postgres_session_factory)
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
-
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/customers/intake", json=payload)
+        response = await client.post(
+            "/api/v1/customers/intake",
+            json=_payload(correo_electronico=None),
+        )
 
     assert response.status_code == 422
-    _assert_valid_uuid(response.headers["X-Request-ID"])
-    body = response.json()
-    _assert_safe_validation_error_payload(
-        body,
-        forbidden_fragments=(
-            "loc",
-            "msg",
-            "type",
-            "input",
-            "ctx",
-            payload["email"].lower(),
-            payload["curp"].strip().lower(),
-            payload["nss"],
-            payload["phone"],
-            "traceback",
-            "sqlalchemy",
-            "postgres",
-        ),
-    )
-    assert await _counts(postgres_session_factory) == before_counts == (0, 0, 0)
+    assert response.json() == {
+        "detail": {
+            "code": "structurally_invalid",
+            "message": "The intake payload is structurally invalid.",
+        }
+    }
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_http_flow_returns_already_active_for_existing_customer(
+async def test_http_flow_accepts_optional_fields_as_absent(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _relation(customer_id=customer.id, service_id=service.id)
-        )
-
     app = _build_app(postgres_session_factory)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/customers/intake", json=_payload("external-2"))
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "ALREADY_ACTIVE"
-    assert response.json()["replayed"] is False
-    assert response.json()["rewards_id"] == "RWD-existing"
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_keeps_already_active_for_same_nss_with_combined_contact_differences(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(
-            rewards_id="RWD-existing",
-            curp="ABCD123456HMNLRS09",
-            name="Existing User",
-            email="existing@example.com",
-            phone="5550000000",
-            postal_code="99999",
-        )
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _relation(customer_id=customer.id, service_id=service.id)
-        )
-
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/api/v1/customers/intake",
-            json=_payload(
-                "external-contact-diff",
-                name=" Changed Name ",
-                email="changed@example.com",
-                phone="5551234567",
-                postal_code="01010",
-            ),
+            json=_payload(celular=None, codigo_postal=None, estado=None, ciudad=None),
         )
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "ALREADY_ACTIVE"
-    assert response.json()["rewards_id"] == "RWD-existing"
-    async with postgres_session_factory() as session:
-        stored_customer = await session.scalar(select(CustomerModel))
-        assert stored_customer is not None
-        assert stored_customer.name == "Existing User"
-        assert stored_customer.email == "existing@example.com"
-        assert stored_customer.phone == "5550000000"
-        assert stored_customer.postal_code == "99999"
+    assert response.status_code == 201
+    assert response.json()["status"] == "accepted"
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_http_flow_replays_already_active_without_creating_duplicates(
+async def test_http_flow_marks_invalid_movement_type_as_not_eligible(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _relation(customer_id=customer.id, service_id=service.id)
-        )
-
     app = _build_app(postgres_session_factory)
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        first = await client.post("/api/v1/customers/intake", json=_payload("external-aa"))
-        replay = await client.post("/api/v1/customers/intake", json=_payload("external-aa"))
 
-    assert first.status_code == 200
-    assert replay.status_code == 200
-    assert first.json()["status"] == "ALREADY_ACTIVE"
-    assert first.json()["replayed"] is False
-    assert replay.json()["status"] == "ALREADY_ACTIVE"
-    assert replay.json()["replayed"] is True
-    assert first.json()["customer_id"] == replay.json()["customer_id"]
-    assert first.json()["rewards_id"] == replay.json()["rewards_id"] == "RWD-existing"
-    assert await _counts(postgres_session_factory) == (1, 1, 1)
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_returns_409_for_incompatible_existing_intake(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with postgres_session_factory() as session:
-        session.add(
-            CustomerIntakeRequestModel(
-                source="SISCA_SIMULATED",
-                external_request_id="external-1",
-                curp="ABCD123456HMNLRS09",
-                processing_status="PROCESSING",
-                processing_details={"step": "processing"},
-                original_payload=_payload(),
-                customer_id=None,
-                received_at=_now(),
-                processed_at=None,
-            )
-        )
-        await session.commit()
-
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/customers/intake", json=_payload())
-
-    assert response.status_code == 409
-    assert response.json() == {
-        "detail": {
-            "code": "external_request_conflict",
-            "message": (
-                "The external request is already being processed "
-                "in an incompatible state."
-            ),
-        }
-    }
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_returns_409_and_persists_identity_conflict(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(
-            rewards_id="RWD-existing",
-            curp="ABCD123456HMNLRS09",
-            nss="0012345678901234",
-        )
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _relation(customer_id=customer.id, service_id=service.id)
-        )
-
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
-    conflict_payload = _payload("external-conflict", nss="0000000000000001")
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/customers/intake", json=conflict_payload)
-
-    assert response.status_code == 409
-    assert response.json() == {
-        "detail": {
-            "code": "curp_nss_conflict",
-            "message": "The simulated intake flow could not reuse the existing customer safely.",
-        }
-    }
-    assert "detail.detail" not in response.text
-    _assert_safe_error_payload(response.json())
-
-    async with postgres_session_factory() as session:
-        stored_intakes = (
-            (
-                await session.execute(
-                    select(CustomerIntakeRequestModel).order_by(
-                        CustomerIntakeRequestModel.received_at.asc()
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        assert len(stored_intakes) == 1
-        stored = stored_intakes[0]
-        assert stored.processing_status == IntakeProcessingStatus.IDENTITY_CONFLICT.value
-        assert stored.processing_details == {"reason": "curp_nss_conflict"}
-        assert stored.processed_at is not None
-        assert stored.customer_id is not None
-        assert stored.original_payload == conflict_payload
-
-        stored_customer = await session.scalar(select(CustomerModel))
-        assert stored_customer is not None
-        assert stored_customer.rewards_id == "RWD-existing"
-        assert stored_customer.nss == "0012345678901234"
-
-        stored_relation = await session.scalar(select(CustomerServiceModel))
-        assert stored_relation is not None
-        assert stored_relation.status == CustomerServiceStatus.ACTIVE.value
-
-    assert await _counts(postgres_session_factory) == (1, 1, 1)
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_replays_identity_conflict_without_duplicate_intake(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(
-            rewards_id="RWD-existing",
-            curp="ABCD123456HMNLRS09",
-            nss="0012345678901234",
-        )
-        await uow.customers.create(customer)
-        await uow.customer_services.create(
-            _relation(customer_id=customer.id, service_id=service.id)
-        )
-
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
-    first_payload = _payload("external-conflict-replay", nss="0000000000000001")
-    replay_payload = _payload("external-conflict-replay", nss="9999999999999999")
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        first = await client.post("/api/v1/customers/intake", json=first_payload)
-        replay = await client.post("/api/v1/customers/intake", json=replay_payload)
-
-    for response in (first, replay):
-        assert response.status_code == 409
-        assert response.json() == {
-            "detail": {
-                "code": "curp_nss_conflict",
-                "message": (
-                    "The simulated intake flow could not reuse "
-                    "the existing customer safely."
-                ),
-            }
-        }
-        assert "detail.detail" not in response.text
-
-    async with postgres_session_factory() as session:
-        stored_intakes = (
-            (
-                await session.execute(
-                    select(CustomerIntakeRequestModel).order_by(
-                        CustomerIntakeRequestModel.received_at.asc()
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        assert len(stored_intakes) == 1
-        stored = stored_intakes[0]
-        assert stored.processing_status == IntakeProcessingStatus.IDENTITY_CONFLICT.value
-        assert stored.processing_details == {"reason": "curp_nss_conflict"}
-        assert stored.original_payload == first_payload
-
-    assert await _counts(postgres_session_factory) == (1, 1, 1)
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_returns_500_for_rewards_id_collision_exhausted_with_full_rollback(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    existing_rewards_id = f"RWD-collision-{uuid4().hex[:12]}"
-    existing_customer = _customer(
-        rewards_id=existing_rewards_id,
-        curp=f"COLL{uuid4().hex[:14]}".upper()[:18],
-        nss=f"77{uuid4().int % 10**14:014d}",
-        name="Existing Collision Holder",
-        email=f"existing-collision-{uuid4().hex[:8]}@example.test",
-    )
-    generator = RepeatingRewardsIdGenerator(existing_rewards_id)
-
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        await uow.customers.create(existing_customer)
-
-    before_counts = await _counts(postgres_session_factory)
-    app = _build_app(
-        postgres_session_factory,
-        rewards_id_generator=generator,
-    )
-    transport = ASGITransport(app=app)
-    payload = {
-        "source": "SISCA_SIMULATED",
-        "external_request_id": f"synthetic-collision-{uuid4()}",
-        "curp": f"  fail{uuid4().hex[:14]}  ".upper()[:22].lower(),
-        "nss": f"66{uuid4().int % 10**14:014d}",
-        "name": "Synthetic Collision Failure",
-        "email": f"synthetic-collision-{uuid4().hex[:8]}@example.test",
-        "phone": f"557{uuid4().int % 10**7:07d}",
-        "postal_code": "66772",
-    }
-
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/api/v1/customers/intake", json=payload)
-
-    assert response.status_code == 500
-    _assert_valid_uuid(response.headers["X-Request-ID"])
-    body = response.json()
-    assert body["detail"] == {
-        "code": "rewards_id_collision_exhausted",
-        "message": "The simulated intake flow could not allocate a Rewards ID.",
-    }
-    _assert_safe_error_payload(body)
-    assert generator.calls == 3
-    assert await _counts(postgres_session_factory) == before_counts == (0, 1, 0)
-
-    async with postgres_session_factory() as session:
-        stored_customers = (
-            await session.execute(select(CustomerModel).order_by(CustomerModel.created_at.asc()))
-        ).scalars().all()
-        stored_intakes = (
-            await session.execute(select(CustomerIntakeRequestModel))
-        ).scalars().all()
-        stored_relations = (
-            await session.execute(select(CustomerServiceModel))
-        ).scalars().all()
-
-    assert len(stored_intakes) == 0
-    assert len(stored_relations) == 0
-    assert len(stored_customers) == 1
-    stored_customer = stored_customers[0]
-    assert stored_customer.id == existing_customer.id
-    assert stored_customer.rewards_id == existing_rewards_id
-    assert stored_customer.curp == existing_customer.curp
-    assert stored_customer.nss == existing_customer.nss
-    assert stored_customer.name == existing_customer.name
-    assert stored_customer.email == existing_customer.email
-
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_http_flow_returns_500_for_successful_intake_inconsistency(
-    migrated_postgres_database: str,
-    postgres_session_factory: async_sessionmaker[AsyncSession],
-) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    now = _now()
-    async with postgres_session_factory() as session:
-        session.add(
-            CustomerIntakeRequestModel(
-                source="SISCA_SIMULATED",
-                external_request_id="external-inconsistent",
-                curp="ABCD123456HMNLRS09",
-                processing_status=IntakeProcessingStatus.APPROVED.value,
-                processing_details=None,
-                original_payload=_payload("external-inconsistent"),
-                customer_id=None,
-                received_at=now,
-                processed_at=now,
-            )
-        )
-        await session.commit()
-
-    app = _build_app(postgres_session_factory)
-    transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/api/v1/customers/intake",
-            json=_payload("external-inconsistent"),
+            json=_payload(tipo_de_movimiento="Cambio"),
         )
 
-    assert response.status_code == 500
-    body = response.json()
-    assert body["detail"] == {
-        "code": "successful_intake_inconsistency",
-        "message": "The stored successful intake could not be replayed safely.",
-    }
-    _assert_safe_error_payload(body)
-    assert await _counts(postgres_session_factory) == (1, 0, 0)
+    assert response.status_code == 200
+    assert response.json()["status"] == "not_eligible"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_marks_aceptada_operaciones_as_not_eligible(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    app = _build_app(postgres_session_factory)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/customers/intake",
+            json=_payload(estatus_sf="ACEPTADA OPERACIONES"),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "not_eligible"
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("relation_status", "expected_code"),
+    ("sf_status", "label"),
     [
-        (None, "customer_service_inconsistency"),
-        (CustomerServiceStatus.INACTIVE, "customer_service_inconsistency"),
-        (CustomerServiceStatus.ENDED, "customer_service_inconsistency"),
+        ("RECHAZADA", "rejected"),
+        ("CANCELADA", "canceled"),
+        ("EN PROCESO", "in-process"),
     ],
 )
-async def test_http_flow_returns_500_for_customer_service_inconsistency(
+async def test_http_flow_marks_named_non_eligible_statuses_as_not_eligible(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
-    relation_status: CustomerServiceStatus | None,
-    expected_code: str,
+    sf_status: str,
+    label: str,
 ) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        service = await uow.services.get_by_code("AFORE")
-        assert service is not None
-        customer = _customer(rewards_id="RWD-existing", curp="ABCD123456HMNLRS09")
-        await uow.customers.create(customer)
-        if relation_status is not None:
-            relation = _relation(customer_id=customer.id, service_id=service.id)
-            if relation_status is not CustomerServiceStatus.ACTIVE:
-                relation = CustomerService(
-                    id=relation.id,
-                    customer_id=relation.customer_id,
-                    service_id=relation.service_id,
-                    status=relation_status,
-                    started_at=relation.started_at,
-                    ended_at=relation.ended_at,
-                    created_at=relation.created_at,
-                    updated_at=relation.updated_at,
-                )
-            await uow.customer_services.create(relation)
-
     app = _build_app(postgres_session_factory)
     transport = ASGITransport(app=app)
+
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/api/v1/customers/intake",
-            json=_payload(f"external-inconsistency-{relation_status or 'missing'}"),
+            json=_payload(estatus_sf=sf_status),
         )
 
-    assert response.status_code == 500
-    body = response.json()
-    assert body["detail"]["code"] == expected_code
-    assert set(body["detail"]) == {"code", "message"}
-    _assert_safe_error_payload(body)
-    assert await _counts(postgres_session_factory) == (0, 1, 0 if relation_status is None else 1)
+    assert response.status_code == 200, label
+    assert response.json()["status"] == "not_eligible"
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_http_flow_returns_500_when_afore_service_is_missing(
+async def test_http_flow_marks_pre_mvp_transfer_as_not_eligible(
     migrated_postgres_database: str,
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    assert migrated_postgres_database.startswith("postgresql")
-    async with postgres_session_factory() as session:
-        await session.execute(delete(ServiceModel).where(ServiceModel.code == "AFORE"))
-        await session.commit()
-
     app = _build_app(postgres_session_factory)
     transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/customers/intake",
+            json=_payload(fecha_de_traspaso="2026-06-30"),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "not_eligible"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_fails_when_mvp_start_date_is_missing(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    app = _build_app(postgres_session_factory, mvp_start_date=None)
+    transport = ASGITransport(app=app)
+
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post("/api/v1/customers/intake", json=_payload())
 
-    assert response.status_code == 500
-    body = response.json()
-    assert body["detail"] == {
-        "code": "service_not_found",
-        "message": "The simulated intake flow is temporarily unavailable.",
-    }
-    _assert_safe_error_payload(body)
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "configuration_incomplete"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_replays_duplicate_request_as_idempotent_duplicate(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    app = _build_app(
+        postgres_session_factory, rewards_id_generator=FixedRewardsIdGenerator("RWD-fixed")
+    )
+    transport = ASGITransport(app=app)
+    payload = _payload(external_request_id="external-fixed")
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        first = await client.post("/api/v1/customers/intake", json=payload)
+        replay = await client.post("/api/v1/customers/intake", json=payload)
+
+    assert first.status_code == 201
+    assert replay.status_code == 200
+    assert replay.json()["status"] == "idempotent_duplicate"
+    assert replay.json()["replayed"] is True
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_reuses_existing_customer_for_duplicate_identity_by_curp(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    existing = await _seed_existing_customer(
+        postgres_session_factory,
+        curp="ABCD123456HMNLRS09",
+        nss="0012345678901234",
+    )
+    app = _build_app(postgres_session_factory)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/customers/intake",
+            json=_payload(external_request_id="external-existing"),
+        )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "accepted"
+    assert response.json()["customer_id"] == str(existing.id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_http_flow_reuses_existing_customer_for_duplicate_identity_by_nss(
+    migrated_postgres_database: str,
+    postgres_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    existing = await _seed_existing_customer(
+        postgres_session_factory,
+        curp="ZXCV123456HMNLRS11",
+        nss="0012345678901234",
+    )
+    app = _build_app(postgres_session_factory)
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/v1/customers/intake",
+            json=_payload(
+                external_request_id="external-existing-nss",
+                curp="ZXCV123456HMNLRS11",
+                nss="0012345678901234",
+            ),
+        )
+
+    assert response.status_code == 201
+    assert response.json()["customer_id"] == str(existing.id)

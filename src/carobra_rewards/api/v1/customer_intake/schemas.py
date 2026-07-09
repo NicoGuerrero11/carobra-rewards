@@ -1,7 +1,8 @@
-"""HTTP schemas for the provisional simulated customer intake endpoint."""
+"""HTTP schemas for the SISCA customer intake endpoint."""
 
 from __future__ import annotations
 
+from datetime import date
 from email.utils import parseaddr
 from typing import Literal
 
@@ -25,30 +26,49 @@ def _validate_stripped(value: str, *, field_name: str, max_length: int) -> str:
     return value
 
 
+def _parse_iso_date(value: str, *, field_name: str) -> date:
+    trimmed = value.strip()
+    if len(trimmed) != 10:
+        raise ValueError(f"{field_name} must use YYYY-MM-DD")
+    try:
+        return date.fromisoformat(trimmed)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must use YYYY-MM-DD") from exc
+
+
 class CustomerIntakeRequest(BaseModel):
-    """Provisional transport contract for the simulated intake flow."""
+    """Transport contract for the target SISCA intake flow."""
 
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
             "description": (
-                "Functional but provisional endpoint. It only accepts "
-                "`SISCA_SIMULATED`, and structural validity implies simulated "
-                "approval only for this technical flow."
+                "Target SISCA -> Rewards intake contract on the existing "
+                "`POST /api/v1/customers/intake` endpoint."
             ),
         },
     )
 
-    source: Literal["SISCA_SIMULATED"] = Field(
-        description="Provisional fixed source literal for the simulated flow."
-    )
     external_request_id: str = Field(min_length=1, max_length=120)
     curp: str = Field(min_length=1, max_length=64)
     nss: str = Field(min_length=1, max_length=16)
-    name: str = Field(min_length=1, max_length=200)
-    email: str = Field(min_length=3, max_length=254)
-    phone: str | None = Field(default=None, max_length=32)
-    postal_code: str | None = Field(default=None, max_length=16)
+    nombre: str = Field(min_length=1, max_length=100)
+    apellido_paterno: str = Field(min_length=1, max_length=100)
+    apellido_materno: str = Field(min_length=1, max_length=100)
+    correo_electronico: str = Field(min_length=3, max_length=254)
+    fecha_de_nacimiento: str = Field(min_length=10, max_length=10)
+    advisor_identifier: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Canonical placeholder for the mandatory advisor identifier concept.",
+    )
+    tipo_de_movimiento: str = Field(min_length=1, max_length=80)
+    estatus_sf: str = Field(min_length=1, max_length=80)
+    fecha_de_traspaso: str = Field(min_length=10, max_length=10)
+    celular: str | None = Field(default=None, max_length=32)
+    codigo_postal: str | None = Field(default=None, max_length=16)
+    estado: str | None = Field(default=None, max_length=100)
+    ciudad: str | None = Field(default=None, max_length=100)
 
     @field_validator("external_request_id")
     @classmethod
@@ -70,44 +90,64 @@ class CustomerIntakeRequest(BaseModel):
     def validate_nss(cls, value: str) -> str:
         return _validate_stripped(value, field_name="nss", max_length=16)
 
-    @field_validator("name")
+    @field_validator("nombre", "apellido_paterno", "apellido_materno", "advisor_identifier")
     @classmethod
-    def validate_name(cls, value: str) -> str:
-        return _validate_stripped(value, field_name="name", max_length=200)
+    def validate_required_names(cls, value: str, info) -> str:
+        max_length = 120 if info.field_name == "advisor_identifier" else 100
+        return _validate_stripped(value, field_name=info.field_name, max_length=max_length)
 
-    @field_validator("email")
+    @field_validator("correo_electronico")
     @classmethod
     def validate_email(cls, value: str) -> str:
         trimmed = value.strip()
         if len(trimmed) < 3 or len(trimmed) > 254:
-            raise ValueError("email length is invalid")
+            raise ValueError("correo_electronico length is invalid")
         _, parsed = parseaddr(trimmed)
         if parsed != trimmed or "@" not in trimmed:
-            raise ValueError("email structure is invalid")
+            raise ValueError("correo_electronico structure is invalid")
         return value
 
-    @field_validator("phone", "postal_code")
+    @field_validator("fecha_de_nacimiento", "fecha_de_traspaso")
+    @classmethod
+    def validate_iso_dates(cls, value: str, info) -> str:
+        _parse_iso_date(value, field_name=info.field_name)
+        return value
+
+    @field_validator("tipo_de_movimiento", "estatus_sf")
+    @classmethod
+    def validate_business_strings(cls, value: str, info) -> str:
+        return _validate_stripped(value, field_name=info.field_name, max_length=80)
+
+    @field_validator("celular", "codigo_postal", "estado", "ciudad")
     @classmethod
     def validate_optional_trimmed(cls, value: str | None, info) -> str | None:
         if value is None:
             return None
-        return _validate_stripped(
-            value,
-            field_name=info.field_name,
-            max_length=32 if info.field_name == "phone" else 16,
-        )
+        max_length = 32 if info.field_name == "celular" else 16
+        if info.field_name in {"estado", "ciudad"}:
+            max_length = 100
+        return _validate_stripped(value, field_name=info.field_name, max_length=max_length)
 
     def to_command(self) -> ProcessSimulatedCustomerIntakeCommand:
         payload = self.model_dump()
         return ProcessSimulatedCustomerIntakeCommand(
-            source=self.source,
+            source="SISCA",
             external_request_id=self.external_request_id.strip(),
             curp=self.curp,
             nss=self.nss.strip(),
-            name=self.name.strip(),
-            email=self.email.strip(),
-            phone=None if self.phone is None else self.phone.strip(),
-            postal_code=None if self.postal_code is None else self.postal_code.strip(),
+            first_name=self.nombre.strip(),
+            paternal_last_name=self.apellido_paterno.strip(),
+            maternal_last_name=self.apellido_materno.strip(),
+            email=self.correo_electronico.strip(),
+            birth_date=_parse_iso_date(self.fecha_de_nacimiento, field_name="fecha_de_nacimiento"),
+            advisor_identifier=self.advisor_identifier.strip(),
+            movement_type=self.tipo_de_movimiento.strip(),
+            sf_status=self.estatus_sf.strip(),
+            transfer_date=_parse_iso_date(self.fecha_de_traspaso, field_name="fecha_de_traspaso"),
+            phone=None if self.celular is None else self.celular.strip(),
+            postal_code=None if self.codigo_postal is None else self.codigo_postal.strip(),
+            state=None if self.estado is None else self.estado.strip(),
+            city=None if self.ciudad is None else self.ciudad.strip(),
             original_payload=payload_as_json(payload),
         )
 
@@ -117,12 +157,12 @@ def payload_as_json(payload: dict[str, object]) -> JsonObject:
 
 
 class CustomerIntakeResponse(BaseModel):
-    """HTTP representation of a successful simulated intake result."""
+    """HTTP representation of a classified intake result."""
 
     intake_request_id: str
-    customer_id: str
-    rewards_id: str
-    status: Literal["APPROVED", "ALREADY_ACTIVE"]
+    customer_id: str | None
+    rewards_id: str | None
+    status: Literal["accepted", "not_eligible", "idempotent_duplicate"]
     replayed: bool
 
     @classmethod

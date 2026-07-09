@@ -58,7 +58,7 @@ _REQUEST_ID_RESPONSE_HEADER = {
             "headers": {CUSTOMER_INTAKE_REQUEST_ID_HEADER: _REQUEST_ID_RESPONSE_HEADER},
         },
     },
-    summary="Process provisional simulated customer intake",
+    summary="Process SISCA customer intake",
 )
 async def process_customer_intake(
     http_request: Request,
@@ -66,7 +66,7 @@ async def process_customer_intake(
     response: Response,
     service: Annotated[ProcessSimulatedCustomerIntake, Depends(get_process_customer_intake)],
 ) -> CustomerIntakeResponse:
-    """Process the functional but provisional simulated intake flow."""
+    """Process the target SISCA intake contract on the existing endpoint."""
 
     try:
         result = await service(request.to_command())
