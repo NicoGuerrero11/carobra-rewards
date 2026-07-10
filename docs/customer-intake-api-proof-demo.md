@@ -81,11 +81,12 @@ para mostrar evidencia de que la API:
 - `APP_ENV=test`
 - `TEST_DATABASE_URL` configurada
 - la base de pruebas debe tener migraciones aplicadas
-- dependencias instaladas en `.venv`
+- dependencias instaladas en `api/.venv`
 
 ## 4. Comando
 
 ```bash
+cd api
 PYTHONPATH=src APP_ENV=test TEST_DATABASE_URL="<test_database_url>" DATABASE_URL="<otra_url_o_vacio>" .venv/bin/python scripts/demo_customer_intake.py --suite api-proof --keep-data
 ```
 

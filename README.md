@@ -1,212 +1,131 @@
 # Carobra Rewards
 
-Base técnica inicial del backend de Carobra Rewards. La base implementada actual
-incluye un flujo técnico simulado de intake, pero la documentación funcional
-vigente ya no asume que SISCA envía clientes completos: el criterio objetivo
-del MVP es que Rewards registra al cliente y SISCA solo valida el estado del
-trámite AFORE.
+Repositorio único del MVP de registro de clientes. Las tres aplicaciones viven
+en carpetas independientes y FastAPI conserva la propiedad de autenticación,
+clientes, consentimientos, sesiones y validaciones SISCA.
 
-## Stack actual
-
-- Python 3.13
-- FastAPI
-- Pydantic Settings
-- SQLAlchemy 2
-- Alembic
-- PostgreSQL sobre Neon
-- asyncpg
-- uv
-- pytest
-- Ruff
-- Pyright
-- GitHub Actions
+```text
+carobra-rewards/
+├── api/             # FastAPI, dominio, PostgreSQL, Alembic y pruebas Python
+├── site-backend/    # BFF TypeScript/Node para el contrato web y las cookies
+├── site-frontend/   # Sitio Astro para registro, login y estado del cliente
+├── docs/            # Documentación compartida
+└── openspec/        # Especificaciones y cambios
+```
 
 ## Requisitos
 
-- Tener `uv` instalado
-- Usar Python 3.13
-- Definir variables de entorno en un archivo `.env` local
+- Python 3.13 y `uv`
+- Node.js 20 y npm
+- PostgreSQL/Neon para migraciones y pruebas de integración de la API
 
-Neon es la base PostgreSQL principal. Docker no es requisito para la base de datos. No uses la base de producción para desarrollo o pruebas iniciales, y no uses datos personales reales.
+No uses la base de producción ni datos personales reales en desarrollo o
+pruebas. `TEST_DATABASE_URL` debe apuntar a una base distinta de `DATABASE_URL`;
+las pruebas de integración recrean su esquema.
 
-## Instalación con uv
+## Configuración
+
+Cada aplicación carga su propio archivo de entorno:
 
 ```bash
+cp api/.env.example api/.env
+cp site-backend/.env.example site-backend/.env
+cp site-frontend/.env.example site-frontend/.env
+```
+
+El archivo raíz `.env.example` reúne las variables como referencia, pero los
+comandos deben ejecutarse desde la carpeta de cada aplicación.
+
+El nombre de cookie debe coincidir entre
+`api/AUTH_SESSION_COOKIE_NAME` y
+`site-backend/SESSION_COOKIE_NAME`. En HTTP local ambos servicios usan
+`*_COOKIE_SECURE=false` y `SameSite=lax`. En producción HTTPS usa cookies
+`Secure`; `SameSite=none` requiere `Secure=true` en el BFF.
+
+FastAPI acepta credenciales CORS únicamente desde la lista explícita
+`CORS_ALLOWED_ORIGINS`; el valor `*` está rechazado. El sitio normal no depende
+de CORS porque el navegador llama rutas same-origin de Astro y Astro las
+reenvía al BFF.
+
+## Desarrollo local
+
+Primero instala dependencias:
+
+```bash
+cd api
 uv python install 3.13
 uv sync --dev
+
+cd ../site-backend
+npm install
+
+cd ../site-frontend
+npm install
 ```
 
-## Configuración local
-
-Crear `.env` a partir de `.env.example` y ajustar los valores locales:
+Después inicia cada servicio en una terminal distinta y en este orden:
 
 ```bash
-cp .env.example .env
+cd api
+uv run uvicorn carobra_rewards.main:app --reload --host 127.0.0.1 --port 8000
 ```
-
-Variables iniciales:
-
-- `APP_NAME`
-- `APP_ENV` (`development`, `test`, `production`)
-- `APP_DEBUG`
-- `LOG_LEVEL`
-- `DATABASE_URL`
-
-`DATABASE_URL` debe venir de Neon y usar el dialecto async de SQLAlchemy, por ejemplo:
-
-```text
-postgresql+asyncpg://user:password@host/database?sslmode=require
-```
-
-Cada ambiente debe usar su propia conexión o aislamiento en Neon. La estrategia exacta de proyectos o branches en Neon queda pendiente.
-
-## API en desarrollo
 
 ```bash
-uv run uvicorn carobra_rewards.main:app --reload
+cd site-backend
+npm run build
+npm start
 ```
 
-La aplicación expone:
+```bash
+cd site-frontend
+npm run dev -- --host 127.0.0.1 --port 4321
+```
 
-- `GET /health`
-- OpenAPI en `/docs` y `/redoc` en desarrollo
+URLs locales:
 
-## Verificaciones
+| Aplicación | URL | Uso |
+| --- | --- | --- |
+| Site frontend | `http://127.0.0.1:4321` | Registro, login y dashboard |
+| Site backend | `http://127.0.0.1:3001` | BFF; no es una UI |
+| API | `http://127.0.0.1:8000` | API de negocio |
+| OpenAPI | `http://127.0.0.1:8000/docs` | Contrato HTTP en desarrollo |
 
-Pruebas:
+El navegador llama rutas `/api/v1` del mismo origen del frontend. Una ruta SSR
+de Astro las envía al BFF tanto en desarrollo como en producción, y el BFF
+llama a FastAPI mediante `API_BASE_URL`.
+
+## Migraciones y verificaciones
 
 ```bash
+cd api
+uv run alembic upgrade head
+uv run ruff format --check .
+uv run ruff check .
+uv run pyright
 uv run pytest
 ```
 
-Formato:
-
 ```bash
-uv run ruff format .
-uv run ruff format --check .
+cd site-backend
+npm run check
+npm test
+npm run build
 ```
 
-Lint:
-
 ```bash
-uv run ruff check .
-uv run ruff check . --fix
+cd site-frontend
+npm run check
+npm run build
+npm run test:e2e
 ```
 
-Tipos:
+Playwright levanta un BFF simulado y el frontend automáticamente. La suite corre
+el flujo de registro/login/estado tanto en viewport de escritorio como móvil.
+Con los tres servicios reales levantados contra una base segura también puedes
+ejecutar `SITE_URL=http://127.0.0.1:4321 npm run test:smoke:live` desde
+`site-frontend/`.
 
-```bash
-uv run pyright
-```
-
-## Alembic
-
-Crear una migración:
-
-```bash
-uv run alembic revision --autogenerate -m "descripcion"
-```
-
-Aplicar migraciones:
-
-```bash
-uv run alembic upgrade head
-```
-
-Consultar estado actual:
-
-```bash
-uv run alembic current
-uv run alembic history
-```
-
-Revertir de forma controlada:
-
-```bash
-uv run alembic downgrade -1
-```
-
-Las migraciones son la fuente reproducible del esquema. No modifiques Neon manualmente como flujo principal.
-
-## Modelo de persistencia inicial de clientes
-
-El repositorio ya incluye el primer slice persistente para `customer_intake`
-bajo PostgreSQL:
-
-- `customer_intake_requests` guarda la solicitud original sin crear clientes por
-  sí misma, con `processing_status`, `processing_details` y `original_payload`.
-- `customers` separa UUID técnico, `rewards_id`, CURP normalizada y NSS sin
-  mezclar identidad con datos operativos de AFORE.
-- `services` y `customer_services` modelan el catálogo y la relación
-  cliente-servicio por separado.
-- La migración inicial siembra `AFORE` de forma determinística.
-
-Invariantes cerradas en esta versión:
-
-- CURP estructurada usa `strip + uppercase`.
-- `original_payload` conserva la representación recibida.
-- CURP y NSS se tratan como campos no editables en flujos administrados por
-  Rewards.
-- `customers.rewards_id` y `customers.curp` son únicos.
-- `customer_intake_requests(source, external_request_id)` y
-  `customer_services(customer_id, service_id)` son únicos.
-- Las llaves foráneas usan `ON DELETE RESTRICT`.
-
-Las pruebas de integración PostgreSQL viven bajo
-`tests/modules/customer_intake/test_postgres_persistence.py` y se ejecutan solo
-si `TEST_DATABASE_URL` está configurada.
-
-## Verificación de conexión a Neon
-
-La validación de conectividad no corre en el conjunto unitario. Ejecuta:
-
-```bash
-uv run carobra-rewards-verify-neon
-```
-
-Si `DATABASE_URL` no está configurada, el comando falla con un mensaje claro. La verificación abre una conexión, ejecuta `SELECT 1` y cierra la sesión.
-
-## Demo de evidencia de API
-
-Además de la demo tecnica simple, el repositorio incluye una suite demostrable
-de escenarios para probar la API y dejar evidencia visible en Neon. La guia
-esta en `docs/customer-intake-api-proof-demo.md` y se ejecuta con:
-
-```bash
-PYTHONPATH=src APP_ENV=test TEST_DATABASE_URL="<test_database_url>" DATABASE_URL="<otra_url_o_vacio>" .venv/bin/python scripts/demo_customer_intake.py --suite api-proof --keep-data
-```
-
-## Material de reunión sugerido
-
-Para presentar el avance con narrativa funcional y evidencia verificable, usa:
-
-- `docs/customer-intake-meeting-playbook.md`
-- `docs/sisca-excel-preliminary-classification.md`
-- `docs/customer-intake-work-evidence-matrix.md`
-
-## Documentación funcional vigente
-
-Antes de tocar implementación, la referencia funcional vigente es:
-
-- `docs/sisca-rewards-initial-integration-contract.md`
-- `docs/customer-intake-business-rules.md`
-
-Esos documentos fijan el criterio actual:
-
-- Rewards registra al cliente.
-- Rewards captura CURP sin hash.
-- SISCA solo devuelve `tipo_movimiento`, `estatus_sf` y `fecha_traspaso`.
-- Rewards consulta a las 24, 72 y 120 horas transcurridas desde el registro.
-
-## Funcionalidad pendiente
-
-El endpoint provisional `/api/v1/customers/intake` permanece en código solo para
-rollback y evidencia histórica, pero está deshabilitado por defecto y ausente de
-OpenAPI. El flujo vigente usa validaciones SISCA creadas por el registro Rewards.
-
-Todavía no están implementados:
-
-- registro y login final de Rewards;
-- validación real con SISCA por CURP;
-- reglas de activación y cancelación del nuevo flujo documental;
-- onboarding, campañas, puntos o recompensas.
+Consulta [api/README.md](api/README.md),
+[site-backend/README.md](site-backend/README.md) y
+[site-frontend/README.md](site-frontend/README.md) para el detalle de cada
+aplicación.
