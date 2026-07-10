@@ -7,6 +7,8 @@ import pytest
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from carobra_rewards.modules.customer_auth.application.models import RegisterCustomerCommand
+from carobra_rewards.modules.customer_auth.application.service import CustomerAuthService
 from carobra_rewards.modules.customer_intake.infrastructure.persistence.models import (
     CustomerModel,
     ServiceModel,
@@ -14,11 +16,9 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.models i
 from carobra_rewards.modules.sisca_validation.application.models import (
     AforeServiceNotConfiguredError,
     ExecuteValidationCheckCommand,
-    RegisterCustomerForValidationCommand,
 )
 from carobra_rewards.modules.sisca_validation.application.service import (
     ExecuteSiscaValidationCheck,
-    RegisterCustomerForSiscaValidation,
 )
 from carobra_rewards.modules.sisca_validation.domain.models import (
     FoundSiscaValidation,
@@ -62,6 +62,14 @@ class ControlledGateway(CountingGateway):
         return self.result
 
 
+class FixedRewardsIdGenerator:
+    def __init__(self, registered_at: datetime) -> None:
+        self._rewards_id = f"RWD-{registered_at.timestamp()}"
+
+    def generate(self) -> str:
+        return self._rewards_id
+
+
 def _execution_service(session_factory, gateway, *, clock=lambda: NOW):
     return ExecuteSiscaValidationCheck(
         unit_of_work=SqlAlchemySiscaValidationUnitOfWork(session_factory),
@@ -75,18 +83,25 @@ def _execution_service(session_factory, gateway, *, clock=lambda: NOW):
 
 
 async def _register(session_factory, *, registered_at=NOW - timedelta(hours=24)):
-    return await RegisterCustomerForSiscaValidation(
-        SqlAlchemySiscaValidationUnitOfWork(session_factory)
-    )(
-        RegisterCustomerForValidationCommand(
-            rewards_id=f"RWD-{registered_at.timestamp()}",
+    return await CustomerAuthService(
+        session_factory,
+        session_ttl=timedelta(days=7),
+        rewards_id_generator=FixedRewardsIdGenerator(registered_at),
+        clock=lambda: registered_at,
+    ).register(
+        RegisterCustomerCommand(
             curp=CURP,
-            nss="0012345678901234",
-            name="Ada Lovelace",
+            first_name="Ada",
+            last_name="Lovelace",
             email="ada@example.test",
-            phone=None,
-            postal_code=None,
-            registered_at=registered_at,
+            phone="5551234567",
+            password="correct-horse-7",
+            confirm_password="correct-horse-7",
+            postal_code="01010",
+            state="CDMX",
+            city="Ciudad de Mexico",
+            terms_accepted=True,
+            terms_version="2026-07",
         )
     )
 
@@ -99,7 +114,7 @@ async def test_registration_persists_customer_and_schedule_atomically(
     result = await _register(postgres_session_factory)
 
     async with postgres_session_factory() as session:
-        customer = await session.get(CustomerModel, result.customer_id)
+        customer = await session.get(CustomerModel, result.customer.id)
         validation = await session.get(SiscaValidationModel, result.validation_id)
 
     assert customer is not None
@@ -184,7 +199,7 @@ async def test_h24_d3_d5_end_to_end_finishes_cancelled(
     )(ExecuteValidationCheckCommand(registered.validation_id, ValidationCheckpoint.D5))
 
     async with postgres_session_factory() as session:
-        customer = await session.get(CustomerModel, registered.customer_id)
+        customer = await session.get(CustomerModel, registered.customer.id)
         validation = await session.get(SiscaValidationModel, registered.validation_id)
     assert h24.status is ValidationStatus.PENDING
     assert d3.status is ValidationStatus.PENDING
@@ -216,7 +231,7 @@ async def test_activation_failure_rolls_back_check_and_customer_transition(
         )
 
     async with postgres_session_factory() as session:
-        customer = await session.get(CustomerModel, registered.customer_id)
+        customer = await session.get(CustomerModel, registered.customer.id)
         validation = await session.get(SiscaValidationModel, registered.validation_id)
         check_count = await session.scalar(
             select(func.count())

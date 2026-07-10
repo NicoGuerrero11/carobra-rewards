@@ -7,9 +7,7 @@ from carobra_rewards.modules.customer_intake.domain.entities import CustomerStat
 from carobra_rewards.modules.customer_intake.domain.value_objects import normalize_curp
 from carobra_rewards.modules.sisca_validation.application.models import (
     ExecuteValidationCheckCommand,
-    RegisterCustomerForValidationCommand,
     RegisteredCustomerNotFoundError,
-    RegisteredValidationResult,
     ValidationCheckpointMismatchError,
     ValidationCheckpointNotDueError,
     ValidationExecutionResult,
@@ -35,42 +33,6 @@ from carobra_rewards.modules.sisca_validation.ports.persistence import SiscaVali
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
-
-
-class RegisterCustomerForSiscaValidation:
-    def __init__(self, unit_of_work: SiscaValidationUnitOfWork) -> None:
-        self._unit_of_work = unit_of_work
-
-    async def __call__(
-        self,
-        command: RegisterCustomerForValidationCommand,
-    ) -> RegisteredValidationResult:
-        registered_at = require_utc(command.registered_at)
-        customer_id = uuid4()
-        validation = SiscaValidation.create(
-            customer_id=customer_id,
-            registered_at=registered_at,
-        )
-        async with self._unit_of_work as uow:
-            await uow.validations.create_registered_customer_and_validation(
-                customer_id=customer_id,
-                rewards_id=command.rewards_id,
-                curp=normalize_curp(command.curp),
-                nss=command.nss.strip(),
-                name=command.name.strip(),
-                email=command.email.strip(),
-                phone=None if command.phone is None else command.phone.strip(),
-                postal_code=(None if command.postal_code is None else command.postal_code.strip()),
-                validation=validation,
-            )
-            await uow.commit()
-        assert validation.next_checkpoint_at is not None
-        return RegisteredValidationResult(
-            customer_id=customer_id,
-            validation_id=validation.id,
-            status=validation.status,
-            next_checkpoint_at=validation.next_checkpoint_at,
-        )
 
 
 class ExecuteSiscaValidationCheck:

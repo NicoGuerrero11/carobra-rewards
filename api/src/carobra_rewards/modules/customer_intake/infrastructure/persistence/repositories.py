@@ -25,6 +25,8 @@ from carobra_rewards.modules.customer_intake.domain.entities import (
     Service,
 )
 from carobra_rewards.modules.customer_intake.domain.errors import (
+    DuplicateAuthUserEmailError,
+    DuplicateCustomerConsentError,
     DuplicateCustomerCurpError,
     DuplicateCustomerNssError,
     DuplicateCustomerRewardsIdError,
@@ -85,8 +87,8 @@ def _to_customer_entity(model: CustomerModel) -> Customer:
         id=model.id,
         rewards_id=model.rewards_id,
         curp=model.curp,
-        nss=model.nss,
-        name=model.name,
+        nss="",
+        name=" ".join(part for part in (model.first_name, model.last_name) if part),
         email=model.email,
         phone=model.phone,
         postal_code=model.postal_code,
@@ -145,9 +147,11 @@ def _constraint_name(error: IntegrityError) -> str | None:
         message = str(candidate)
         for known_name in (
             "uq_intake_source_external",
+            "uq_auth_users_email",
             "uq_customers_curp",
             "uq_customers_nss",
             "uq_customers_rewards_id",
+            "uq_customer_consents_customer_type_version",
             "uq_customer_service_pair",
         ):
             if known_name in message:
@@ -159,12 +163,16 @@ def _map_integrity_error(error: IntegrityError) -> Exception:
     match _constraint_name(error):
         case "uq_intake_source_external":
             return DuplicateExternalRequestError()
+        case "uq_auth_users_email":
+            return DuplicateAuthUserEmailError()
         case "uq_customers_curp":
             return DuplicateCustomerCurpError()
         case "uq_customers_nss":
             return DuplicateCustomerNssError()
         case "uq_customers_rewards_id":
             return DuplicateCustomerRewardsIdError()
+        case "uq_customer_consents_customer_type_version":
+            return DuplicateCustomerConsentError()
         case "uq_customer_service_pair":
             return DuplicateCustomerServiceError()
         case _:
@@ -509,15 +517,21 @@ class SqlAlchemyCustomerRepository:
         self._session = session
 
     async def create(self, customer: Customer) -> None:
+        first_name, separator, last_name = customer.name.strip().partition(" ")
+        if not separator:
+            last_name = ""
         model = CustomerModel(
             id=customer.id,
+            auth_user_id=None,
             rewards_id=customer.rewards_id,
             curp=normalize_curp(customer.curp),
-            nss=normalize_nss(customer.nss),
-            name=customer.name,
+            first_name=first_name,
+            last_name=last_name,
             email=customer.email,
-            phone=customer.phone,
-            postal_code=customer.postal_code,
+            phone=customer.phone or "",
+            postal_code=customer.postal_code or "",
+            state="",
+            city="",
             customer_status=customer.customer_status.value,
             onboarding_status=customer.onboarding_status.value,
             created_at=customer.created_at,
@@ -561,14 +575,10 @@ class SqlAlchemyCustomerRepository:
         return _to_customer_entity(model)
 
     async def get_by_nss(self, nss: str) -> Customer | None:
-        statement = select(CustomerModel).where(CustomerModel.nss == normalize_nss(nss))
-        try:
-            model = (await self._session.execute(statement)).scalar_one_or_none()
-        except SQLAlchemyError as exc:
-            raise UnexpectedPersistenceError() from exc
-        if model is None:
-            return None
-        return _to_customer_entity(model)
+        # NSS is intentionally absent from the customer persistence model. This
+        # legacy lookup remains only to satisfy the provisional intake port until
+        # that flow is retired by a later phase.
+        return None
 
 
 class SqlAlchemyServiceRepository:

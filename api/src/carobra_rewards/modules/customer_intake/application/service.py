@@ -186,7 +186,10 @@ class ProcessSimulatedCustomerIntake:
         assert customer is not None
         if customer.curp != normalize_curp(command.curp):
             return customer, _CURP_NSS_CONFLICT_REASON
-        if customer.nss != normalize_nss(command.nss):
+        # PostgreSQL customers created after the onboarding persistence migration
+        # no longer store NSS. Keep validating it only for legacy/in-memory records
+        # that still carry the old value during the provisional intake transition.
+        if customer.nss and customer.nss != normalize_nss(command.nss):
             return customer, _CURP_NSS_CONFLICT_REASON
         return customer, None
 

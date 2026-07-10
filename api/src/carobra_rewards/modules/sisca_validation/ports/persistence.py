@@ -8,26 +8,12 @@ from carobra_rewards.modules.customer_intake.domain.entities import CustomerStat
 from carobra_rewards.modules.sisca_validation.domain.models import (
     SiscaValidation,
     SiscaValidationCheck,
-    ValidationCheckType,
     ValidationCheckpoint,
+    ValidationCheckType,
 )
 
 
 class SiscaValidationRepository(Protocol):
-    async def create_registered_customer_and_validation(
-        self,
-        *,
-        customer_id: UUID,
-        rewards_id: str,
-        curp: str,
-        nss: str,
-        name: str,
-        email: str,
-        phone: str | None,
-        postal_code: str | None,
-        validation: SiscaValidation,
-    ) -> None: ...
-
     async def get_by_id(
         self,
         validation_id: UUID,

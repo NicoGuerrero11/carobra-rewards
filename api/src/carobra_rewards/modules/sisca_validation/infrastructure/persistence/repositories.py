@@ -94,38 +94,6 @@ class SqlAlchemySiscaValidationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create_registered_customer_and_validation(
-        self,
-        *,
-        customer_id: UUID,
-        rewards_id: str,
-        curp: str,
-        nss: str,
-        name: str,
-        email: str,
-        phone: str | None,
-        postal_code: str | None,
-        validation: SiscaValidation,
-    ) -> None:
-        self._session.add(
-            CustomerModel(
-                id=customer_id,
-                rewards_id=rewards_id,
-                curp=curp,
-                nss=nss,
-                name=name,
-                email=email,
-                phone=phone,
-                postal_code=postal_code,
-                customer_status=CustomerStatus.PENDING_VALIDATION.value,
-                onboarding_status="PENDING",
-                created_at=validation.registered_at,
-                updated_at=validation.registered_at,
-            )
-        )
-        self._session.add(self._validation_model(validation))
-        await self._flush()
-
     async def get_by_id(
         self,
         validation_id: UUID,

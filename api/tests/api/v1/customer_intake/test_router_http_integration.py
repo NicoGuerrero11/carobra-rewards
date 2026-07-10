@@ -161,7 +161,8 @@ async def test_http_flow_accepts_valid_full_payload(
     assert stored_relation is not None
     assert stored_intake.processing_status == IntakeProcessingStatus.ACCEPTED.value
     assert stored_intake.original_payload == payload
-    assert stored_customer.name == "Ada Lovelace Byron"
+    assert stored_customer.first_name == "Ada"
+    assert stored_customer.last_name == "Lovelace Byron"
     assert stored_customer.email == payload["correo_electronico"]
 
 

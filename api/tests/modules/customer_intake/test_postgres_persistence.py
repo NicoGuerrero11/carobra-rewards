@@ -187,10 +187,10 @@ async def test_customer_intake_request_persistence_keeps_source_external_request
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_customers_table_enforces_unique_nss(
+async def test_customer_repository_persists_split_name_without_nss(
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    first = Customer.create(
+    customer = Customer.create(
         rewards_id="RWD-1",
         curp="ABCD123456HMNLRS09",
         nss="0012345678901234",
@@ -203,42 +203,16 @@ async def test_customers_table_enforces_unique_nss(
         created_at=_now(),
         updated_at=_now(),
     )
-    second = Customer.create(
-        rewards_id="RWD-2",
-        curp="ZXCV123456HMNLRS11",
-        nss="0012345678901234",
-        name="Second Customer",
-        email="second@example.com",
-        phone="5552222222",
-        postal_code="02020",
-        customer_status=CustomerStatus.PENDING_ONBOARDING,
-        onboarding_status=OnboardingStatus.PENDING,
-        created_at=_now(),
-        updated_at=_now(),
-    )
-
     async with SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory) as uow:
-        await uow.customers.create(first)
+        await uow.customers.create(customer)
 
     async with postgres_session_factory() as session:
-        session.add(
-            CustomerModel(
-                id=second.id,
-                rewards_id=second.rewards_id,
-                curp=second.curp,
-                nss=second.nss,
-                name=second.name,
-                email=second.email,
-                phone=second.phone,
-                postal_code=second.postal_code,
-                customer_status=second.customer_status.value,
-                onboarding_status=second.onboarding_status.value,
-                created_at=second.created_at,
-                updated_at=second.updated_at,
-            )
-        )
-        with pytest.raises(IntegrityError):
-            await session.commit()
+        stored = await session.get(CustomerModel, customer.id)
+
+    assert stored is not None
+    assert stored.first_name == "First"
+    assert stored.last_name == "Customer"
+    assert "nss" not in CustomerModel.__table__.c
 
 
 @pytest.mark.integration

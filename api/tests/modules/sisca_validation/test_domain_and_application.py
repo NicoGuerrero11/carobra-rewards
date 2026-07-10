@@ -8,12 +8,11 @@ import pytest
 from carobra_rewards.modules.customer_intake.domain.entities import CustomerStatus
 from carobra_rewards.modules.sisca_validation.application.models import (
     ExecuteValidationCheckCommand,
-    RegisterCustomerForValidationCommand,
+    RegisteredCustomerNotFoundError,
 )
 from carobra_rewards.modules.sisca_validation.application.scheduler import RunDueSiscaValidations
 from carobra_rewards.modules.sisca_validation.application.service import (
     ExecuteSiscaValidationCheck,
-    RegisterCustomerForSiscaValidation,
 )
 from carobra_rewards.modules.sisca_validation.domain.models import (
     FoundSiscaValidation,
@@ -52,12 +51,6 @@ class FakeRepository:
         self.checks: list[SiscaValidationCheck] = []
         self.customer_statuses: dict[UUID, CustomerStatus] = {}
         self.afore_activated: set[UUID] = set()
-
-    async def create_registered_customer_and_validation(self, **values) -> None:
-        validation = values["validation"]
-        self.validations[validation.id] = validation
-        self.curps[validation.customer_id] = values["curp"]
-        self.customer_statuses[validation.customer_id] = CustomerStatus.PENDING_VALIDATION
 
     async def get_by_id(self, validation_id, *, for_update=False):
         return self.validations.get(validation_id)
@@ -207,24 +200,18 @@ def test_known_but_disallowed_movement_is_not_eligible() -> None:
 
 
 @pytest.mark.asyncio
-async def test_registration_creates_customer_and_pending_validation() -> None:
+async def test_validation_rejects_an_orphan_customer_without_calling_sisca() -> None:
     repo = FakeRepository()
-    result = await RegisterCustomerForSiscaValidation(FakeUnitOfWork(repo))(
-        RegisterCustomerForValidationCommand(
-            rewards_id="RWD-test",
-            curp="abcd123456hmnlrs09",
-            nss="0012345678901234",
-            name="Ada Lovelace",
-            email="ada@example.test",
-            phone=None,
-            postal_code=None,
-            registered_at=NOW,
-        )
-    )
+    validation = _pending_validation(checkpoint=ValidationCheckpoint.H24)
+    repo.validations[validation.id] = validation
+    gateway = SequenceGateway([SiscaNoInformation()])
 
-    assert result.status is ValidationStatus.PENDING
-    assert repo.curps[result.customer_id] == "ABCD123456HMNLRS09"
-    assert result.next_checkpoint_at == NOW + timedelta(hours=24)
+    with pytest.raises(RegisteredCustomerNotFoundError):
+        await _service(repo, gateway)(
+            ExecuteValidationCheckCommand(validation.id, ValidationCheckpoint.H24)
+        )
+
+    assert gateway.calls == 0
 
 
 @pytest.mark.asyncio

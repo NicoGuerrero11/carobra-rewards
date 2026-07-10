@@ -12,26 +12,6 @@ from carobra_rewards.modules.sisca_validation.domain.models import (
 
 
 @dataclass(slots=True, frozen=True)
-class RegisterCustomerForValidationCommand:
-    rewards_id: str
-    curp: str
-    nss: str
-    name: str
-    email: str
-    phone: str | None
-    postal_code: str | None
-    registered_at: datetime
-
-
-@dataclass(slots=True, frozen=True)
-class RegisteredValidationResult:
-    customer_id: UUID
-    validation_id: UUID
-    status: ValidationStatus
-    next_checkpoint_at: datetime
-
-
-@dataclass(slots=True, frozen=True)
 class ExecuteValidationCheckCommand:
     validation_id: UUID
     checkpoint: ValidationCheckpoint | None

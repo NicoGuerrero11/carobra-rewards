@@ -13,12 +13,20 @@ class DuplicateCustomerCurpError(CustomerIntakeError):
     """Raised when the normalized CURP already belongs to another customer."""
 
 
+class DuplicateAuthUserEmailError(CustomerIntakeError):
+    """Raised when the normalized email already belongs to an auth user."""
+
+
 class DuplicateCustomerNssError(CustomerIntakeError):
-    """Raised when the NSS already belongs to another customer."""
+    """Legacy intake error retained until the provisional SISCA flow is removed."""
 
 
 class DuplicateCustomerRewardsIdError(CustomerIntakeError):
     """Raised when a generated Rewards ID already exists."""
+
+
+class DuplicateCustomerConsentError(CustomerIntakeError):
+    """Raised when a customer consent version was already recorded."""
 
 
 class DuplicateCustomerServiceError(CustomerIntakeError):
