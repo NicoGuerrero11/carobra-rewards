@@ -1,0 +1,241 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const user = Astro.locals.user;
+
+const adminUser = {
+  id: user?.id ?? "admin-demo-user",
+  firstName: user?.firstName ?? "Administrador",
+  lastName: user?.lastName ?? "Demo",
+  email: user?.email ?? "admin.demo@carobra.test",
+};
+
+const adminDisplayName = `${adminUser.firstName} ${adminUser.lastName}`.trim();
+const adminInitial = adminDisplayName.charAt(0).toUpperCase() || "A";
+---
+
+<BaseLayout title="Beneficios | Carobra" description="Gestión operativa de beneficios para demo Carobra Rewards.">
+  <main id="admin-benefits-root" data-user={JSON.stringify(adminUser)} class="admin-home shell py-10 md:py-12">
+    <section class="admin-home__topbar" aria-label="Barra superior admin">
+      <a href="/admin" class="admin-home__brand-link" aria-label="Inicio admin Carobra">
+        <img
+          src="/images/carobra-logo-horizontal-cropped.png"
+          alt="Carobra Consultores Especializados"
+          class="admin-home__brand-logo"
+          loading="eager"
+          decoding="async"
+        />
+      </a>
+      <nav class="admin-home__topbar-nav" aria-label="Módulos admin">
+        <a href="/admin" class="admin-home__topbar-link">Inicio</a>
+        <a href="/admin/clientes" class="admin-home__topbar-link">Clientes</a>
+        <a href="/admin/beneficios" class="admin-home__topbar-link is-active" aria-current="page">Beneficios</a>
+        <a href="/admin/redenciones" class="admin-home__topbar-link">Redenciones</a>
+      </nav>
+      <div id="admin-profile-menu" class="admin-home__profile-menu-root">
+        <button
+          id="admin-profile-toggle"
+          class="admin-home__profile-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-label="Abrir menú de perfil admin"
+        >
+          <span class="admin-home__avatar" aria-hidden="true">{adminInitial}</span>
+          <span class="admin-home__profile-copy">
+            <span class="admin-home__profile-name">{adminDisplayName}</span>
+            <span class="admin-home__profile-email">{adminUser.email}</span>
+          </span>
+        </button>
+        <div id="admin-profile-dropdown" class="admin-home__profile-menu" hidden>
+          <a href="/admin/perfil" class="admin-home__profile-menu-link">Ver perfil</a>
+          <button id="logout" class="admin-home__profile-menu-button" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </section>
+
+    <header class="admin-home__header">
+      <div>
+        <h1 class="admin-home__title">Gestión de beneficios</h1>
+        <p id="benefits-session" class="admin-home__session"></p>
+      </div>
+    </header>
+
+    <p id="benefits-feedback" class="admin-home__feedback hidden"></p>
+
+    <section class="admin-home__panel">
+      <div class="admin-home__panel-head">
+        <h2 class="admin-home__panel-title admin-home__panel-title--section">Listado operativo de beneficios</h2>
+      </div>
+      <ul id="benefits-list" class="admin-home__list"></ul>
+    </section>
+  </main>
+
+  <script>
+    import type { AdminBenefitLifecycleState } from "../../lib/admin-demo-state";
+    import {
+      getBenefitLifecycleLabel,
+      loadAdminDemoState,
+      markAdminRouteVisited,
+      setBenefitLifecycleState,
+    } from "../../lib/admin-demo-state";
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#admin-benefits-root");
+    const listEl = requireElement<HTMLUListElement>("#benefits-list");
+    const feedbackEl = requireElement<HTMLParagraphElement>("#benefits-feedback");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const profileMenuRoot = requireElement<HTMLElement>("#admin-profile-menu");
+    const profileMenuToggle = requireElement<HTMLButtonElement>("#admin-profile-toggle");
+    const profileMenu = requireElement<HTMLElement>("#admin-profile-dropdown");
+
+    const parsedUser = JSON.parse(root.getAttribute("data-user") ?? "{}") as Partial<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    }>;
+
+    const user = {
+      id: parsedUser.id ?? "admin-demo-user",
+      firstName: parsedUser.firstName ?? "Administrador",
+      lastName: parsedUser.lastName ?? "Demo",
+      email: parsedUser.email ?? "admin.demo@carobra.test",
+    };
+
+    const focusBenefitId = new URLSearchParams(window.location.search).get("focus") ?? "";
+
+    function closeProfileMenu() {
+      profileMenu.hidden = true;
+      profileMenuToggle.setAttribute("aria-expanded", "false");
+    }
+
+    function getStateBadgeStyles(stateLabel: string) {
+      if (stateLabel === "Pausado") {
+        return "admin-home__badge admin-home__badge--warning";
+      }
+
+      if (stateLabel === "Borrador") {
+        return "admin-home__badge admin-home__badge--info";
+      }
+
+      return "admin-home__badge admin-home__badge--ok";
+    }
+
+    function setFeedback(message: string, isError = false) {
+      feedbackEl.textContent = message;
+      feedbackEl.classList.remove("hidden", "is-error", "is-ok");
+      feedbackEl.classList.add(isError ? "is-error" : "is-ok");
+    }
+
+    function render() {
+      const state = loadAdminDemoState(user);
+      const sessionEl = document.querySelector("#benefits-session");
+
+      if (sessionEl) {
+        sessionEl.textContent = `Sesión activa: ${user.firstName} ${user.lastName} (${user.email})`;
+      }
+
+      listEl.innerHTML = state.benefits
+        .map((benefit) => {
+          const stateLabel = getBenefitLifecycleLabel(benefit.state);
+          const pendingForBenefit = state.redemptions.filter(
+            (redemption) => redemption.benefitId === benefit.id && redemption.status !== "completada",
+          ).length;
+          const cardFocus = focusBenefitId && focusBenefitId === benefit.id ? "admin-home__module-card--focus" : "";
+
+          return `
+            <li class="admin-home__module-card ${cardFocus}">
+              <div class="admin-home__module-card-head">
+                <div>
+                  <p class="admin-home__module-card-title">${benefit.title}</p>
+                  <p class="admin-home__module-card-meta">${benefit.category}</p>
+                  <p class="admin-home__module-card-meta">Redenciones abiertas vinculadas: ${pendingForBenefit}</p>
+                </div>
+                <span class="${getStateBadgeStyles(stateLabel)}">${stateLabel}</span>
+              </div>
+
+              <p class="admin-home__module-card-meta">Última actualización: ${new Date(benefit.updatedAt).toLocaleString("es-MX")}</p>
+
+              <div class="admin-home__module-actions">
+                <button type="button" data-benefit-id="${benefit.id}" data-next-state="activo" class="admin-home__action-btn">Activar</button>
+                <button type="button" data-benefit-id="${benefit.id}" data-next-state="pausado" class="admin-home__action-btn">Pausar</button>
+                <button type="button" data-benefit-id="${benefit.id}" data-next-state="borrador" class="admin-home__action-btn">Borrador</button>
+              </div>
+            </li>
+          `;
+        })
+        .join("");
+    }
+
+    listEl.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const actionButton = target.closest("[data-benefit-id][data-next-state]");
+      if (!(actionButton instanceof HTMLElement)) {
+        return;
+      }
+
+      const benefitId = actionButton.getAttribute("data-benefit-id") ?? "";
+      const nextState = actionButton.getAttribute("data-next-state") as AdminBenefitLifecycleState | null;
+
+      if (!benefitId || !nextState) {
+        return;
+      }
+
+      const result = setBenefitLifecycleState(user, benefitId, nextState);
+      setFeedback(result.message, !result.ok);
+      render();
+    });
+
+    attachLogoutHandler(logoutButton, API_BASE_URL, "/login");
+
+    profileMenuToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const shouldOpen = profileMenu.hidden;
+      if (!shouldOpen) {
+        closeProfileMenu();
+        return;
+      }
+
+      profileMenu.hidden = false;
+      profileMenuToggle.setAttribute("aria-expanded", "true");
+    });
+
+    profileMenu.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.closest("a")) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!profileMenuRoot.contains(target)) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeProfileMenu();
+      }
+    });
+
+    markAdminRouteVisited(user, "beneficios");
+    render();
+  </script>
+</BaseLayout>

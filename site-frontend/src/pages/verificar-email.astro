@@ -1,0 +1,63 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Verificar correo | Carobra" description="Confirma tu correo para activar tu cuenta de Carobra Rewards.">
+  <main class="auth-page">
+    <section class="auth-card mx-auto max-w-md rounded-3xl border border-[#c8d8e8] bg-[#f8fbff] p-6 shadow-[0_18px_38px_rgba(14,40,74,0.12)]">
+      <a class="auth-back-link btn-secondary btn-compact" href="/login">Volver a login</a>
+      <h1 class="mt-4 text-3xl font-extrabold text-[#102745]">Verificar correo</h1>
+      <p class="mt-2 text-sm text-[#4c637f]">Estamos validando tu enlace de activación.</p>
+
+      <div class="mt-6 space-y-4">
+        <p id="verification-feedback" class="text-sm font-semibold text-[#0c3d75]">Validando...</p>
+        <a class="btn-primary w-full" href="/login">Ir a iniciar sesión</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const feedback = document.querySelector<HTMLParagraphElement>("#verification-feedback");
+
+    if (!feedback) {
+      throw new Error("Verification feedback element is missing.");
+    }
+
+    const feedbackEl = feedback;
+
+    async function verifyEmail() {
+        const token = new URLSearchParams(window.location.search).get("token");
+
+        if (!token) {
+        feedbackEl.textContent = "El enlace de verificación es inválido o está incompleto.";
+        feedbackEl.classList.remove("text-[#0c3d75]");
+        feedbackEl.classList.add("text-[#8a2f2f]");
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        feedbackEl.textContent = data.error ?? "No se pudo verificar tu correo.";
+        feedbackEl.classList.remove("text-[#0c3d75]");
+        feedbackEl.classList.add("text-[#8a2f2f]");
+        return;
+      }
+
+      feedbackEl.textContent = data.message ?? "Correo verificado correctamente.";
+      feedbackEl.classList.remove("text-[#8a2f2f]");
+      feedbackEl.classList.add("text-[#0c3d75]");
+    }
+
+    verifyEmail();
+  </script>
+</BaseLayout>

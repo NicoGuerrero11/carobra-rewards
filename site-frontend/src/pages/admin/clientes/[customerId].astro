@@ -1,0 +1,292 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+
+const user = Astro.locals.user;
+const customerId = Astro.params.customerId ?? "";
+
+const adminUser = {
+  id: user?.id ?? "admin-demo-user",
+  firstName: user?.firstName ?? "Administrador",
+  lastName: user?.lastName ?? "Demo",
+  email: user?.email ?? "admin.demo@carobra.test",
+};
+
+const adminDisplayName = `${adminUser.firstName} ${adminUser.lastName}`.trim();
+const adminInitial = adminDisplayName.charAt(0).toUpperCase() || "A";
+---
+
+<BaseLayout title="Detalle de Cliente | Carobra" description="Detalle operativo de cliente en Carobra Rewards.">
+  <main
+    id="admin-customer-detail-root"
+    data-user={JSON.stringify(adminUser)}
+    data-customer-id={customerId}
+    class="admin-home shell py-10 md:py-12"
+  >
+    <section class="admin-home__topbar" aria-label="Barra superior admin">
+      <a href="/admin" class="admin-home__brand-link" aria-label="Inicio admin Carobra">
+        <img
+          src="/images/carobra-logo-horizontal-cropped.png"
+          alt="Carobra Consultores Especializados"
+          class="admin-home__brand-logo"
+          loading="eager"
+          decoding="async"
+        />
+      </a>
+      <nav class="admin-home__topbar-nav" aria-label="Módulos admin">
+        <a href="/admin" class="admin-home__topbar-link">Inicio</a>
+        <a href="/admin/clientes" class="admin-home__topbar-link is-active" aria-current="page">Clientes</a>
+        <a href="/admin/beneficios" class="admin-home__topbar-link">Beneficios</a>
+        <a href="/admin/redenciones" class="admin-home__topbar-link">Redenciones</a>
+      </nav>
+      <div id="admin-profile-menu" class="admin-home__profile-menu-root">
+        <button
+          id="admin-profile-toggle"
+          class="admin-home__profile-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-label="Abrir menú de perfil admin"
+        >
+          <span class="admin-home__avatar" aria-hidden="true">{adminInitial}</span>
+          <span class="admin-home__profile-copy">
+            <span class="admin-home__profile-name">{adminDisplayName}</span>
+            <span class="admin-home__profile-email">{adminUser.email}</span>
+          </span>
+        </button>
+        <div id="admin-profile-dropdown" class="admin-home__profile-menu" hidden>
+          <a href="/admin/perfil" class="admin-home__profile-menu-link">Ver perfil</a>
+          <button id="logout" class="admin-home__profile-menu-button" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </section>
+
+    <header class="admin-home__header">
+      <div>
+        <h1 id="customer-name" class="admin-home__title"></h1>
+        <p id="customer-email" class="admin-home__session"></p>
+      </div>
+    </header>
+
+    <section id="not-found" class="admin-home__feedback is-error hidden">
+      Cliente no encontrado para este identificador. Regresa al listado para seleccionar un registro válido.
+    </section>
+
+    <section id="detail-content" class="admin-home__core-grid">
+      <article class="admin-home__panel">
+        <p class="admin-home__subhead">Contexto del programa</p>
+        <p id="customer-status" class="admin-home__module-card-title mt-2"></p>
+        <p id="customer-tier" class="admin-home__module-card-meta"></p>
+        <p id="customer-participation" class="admin-home__module-card-copy"></p>
+        <p id="customer-next-action" class="admin-home__empty mt-3"></p>
+      </article>
+
+      <article class="admin-home__panel">
+        <div class="admin-home__panel-head">
+          <h2 class="admin-home__panel-title admin-home__panel-title--section">Actividad reciente del cliente</h2>
+        </div>
+        <ul id="customer-activity" class="admin-home__list"></ul>
+      </article>
+    </section>
+
+    <section id="redemptions-section" class="admin-home__panel">
+      <div class="admin-home__panel-head">
+        <h2 class="admin-home__panel-title admin-home__panel-title--section">Participación reciente (redenciones)</h2>
+        <a href="/admin/redenciones" class="admin-home__panel-link">Ir a redenciones</a>
+      </div>
+      <ul id="customer-redemptions" class="admin-home__list"></ul>
+    </section>
+  </main>
+
+  <script>
+    import {
+      fetchAdminRealCustomerById,
+      fetchAdminRealCustomers,
+      isLikelyUuid,
+      mergeAdminDashboardStateWithRealCustomers,
+      resolveMergedCustomerId,
+    } from "../../../lib/admin-customers";
+    import {
+      getCustomerDetailContext,
+      getCustomerStatusLabel,
+      getRedemptionStatusLabel,
+      loadAdminDemoState,
+      markAdminRouteVisited,
+    } from "../../../lib/admin-demo-state";
+    import { attachLogoutHandler, requireElement } from "../../../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#admin-customer-detail-root");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const profileMenuRoot = requireElement<HTMLElement>("#admin-profile-menu");
+    const profileMenuToggle = requireElement<HTMLButtonElement>("#admin-profile-toggle");
+    const profileMenu = requireElement<HTMLElement>("#admin-profile-dropdown");
+
+    const parsedUser = JSON.parse(root.getAttribute("data-user") ?? "{}") as Partial<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    }>;
+
+    const user = {
+      id: parsedUser.id ?? "admin-demo-user",
+      firstName: parsedUser.firstName ?? "Administrador",
+      lastName: parsedUser.lastName ?? "Demo",
+      email: parsedUser.email ?? "admin.demo@carobra.test",
+    };
+
+    const selectedCustomerId = root.getAttribute("data-customer-id") ?? "";
+
+    function closeProfileMenu() {
+      profileMenu.hidden = true;
+      profileMenuToggle.setAttribute("aria-expanded", "false");
+    }
+
+    async function render() {
+      const state = loadAdminDemoState(user);
+      let realCustomers = await fetchAdminRealCustomers(API_BASE_URL);
+
+      if (isLikelyUuid(selectedCustomerId) && !realCustomers.some((customer) => customer.id === selectedCustomerId)) {
+        const customerById = await fetchAdminRealCustomerById(API_BASE_URL, selectedCustomerId);
+        if (customerById) {
+          realCustomers = [customerById, ...realCustomers];
+        }
+      }
+
+      const merged = mergeAdminDashboardStateWithRealCustomers(state, realCustomers);
+      const resolvedCustomerId = resolveMergedCustomerId(
+        selectedCustomerId,
+        merged.state,
+        merged.replacedCustomerIdMap,
+      );
+      const context = getCustomerDetailContext(merged.state, resolvedCustomerId);
+
+      const nameEl = document.querySelector("#customer-name");
+      const emailEl = document.querySelector("#customer-email");
+      const statusEl = document.querySelector("#customer-status");
+      const tierEl = document.querySelector("#customer-tier");
+      const participationEl = document.querySelector("#customer-participation");
+      const nextActionEl = document.querySelector("#customer-next-action");
+      const activityEl = document.querySelector("#customer-activity");
+      const redemptionsEl = document.querySelector("#customer-redemptions");
+      const notFoundEl = document.querySelector("#not-found");
+      const contentEl = document.querySelector("#detail-content");
+      const redemptionsSection = document.querySelector("#redemptions-section");
+
+      if (
+        !nameEl ||
+        !emailEl ||
+        !statusEl ||
+        !tierEl ||
+        !participationEl ||
+        !nextActionEl ||
+        !activityEl ||
+        !redemptionsEl ||
+        !notFoundEl ||
+        !contentEl ||
+        !redemptionsSection
+      ) {
+        return;
+      }
+
+      if (!context) {
+        nameEl.textContent = "Cliente no encontrado";
+        emailEl.textContent = "Revisa el listado para continuar el flujo demo.";
+        notFoundEl.classList.remove("hidden");
+        contentEl.classList.add("hidden");
+        redemptionsSection.classList.add("hidden");
+        return;
+      }
+
+      notFoundEl.classList.add("hidden");
+      contentEl.classList.remove("hidden");
+      redemptionsSection.classList.remove("hidden");
+
+      nameEl.textContent = `${context.customer.firstName} ${context.customer.lastName}`;
+      emailEl.textContent = context.customer.email;
+      statusEl.textContent = `Estado: ${getCustomerStatusLabel(context.customer.status)}`;
+      tierEl.textContent = `Nivel ${context.customer.tier} · Alta ${new Date(context.customer.enrolledAt).toLocaleDateString("es-MX")}`;
+      participationEl.textContent = context.customer.participationNote;
+      nextActionEl.textContent = context.nextActionHint;
+
+      activityEl.innerHTML =
+        context.activity.length === 0
+          ? '<li class="admin-home__empty">Sin actividad registrada para este cliente.</li>'
+          : context.activity
+              .map((entry) => {
+                return `
+                  <li class="admin-home__module-card">
+                    <p class="admin-home__module-card-title">${entry.title}</p>
+                    <p class="admin-home__module-card-copy">${entry.description}</p>
+                    <p class="admin-home__module-card-meta">${entry.module} · ${new Date(entry.createdAt).toLocaleString("es-MX")}</p>
+                  </li>
+                `;
+              })
+              .join("");
+
+      redemptionsEl.innerHTML =
+        context.redemptions.length === 0
+          ? '<li class="admin-home__empty">Este cliente no registra redenciones en la muestra demo.</li>'
+          : context.redemptions
+              .map((entry) => {
+                return `
+                  <li class="admin-home__module-card">
+                    <div class="admin-home__module-card-head">
+                      <p class="admin-home__module-card-title">${entry.reference} · ${entry.benefitTitle}</p>
+                      <span class="admin-home__badge admin-home__badge--info">${getRedemptionStatusLabel(entry.status)}</span>
+                    </div>
+                    <p class="admin-home__module-card-meta">Solicitada: ${new Date(entry.requestedAt).toLocaleDateString("es-MX")} · Canal: ${entry.channel}</p>
+                    <a href="/admin/redenciones?focus=${entry.id}" class="admin-home__inline-link">Continuar en redenciones</a>
+                  </li>
+                `;
+              })
+              .join("");
+    }
+
+    attachLogoutHandler(logoutButton, API_BASE_URL, "/login");
+
+    profileMenuToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const shouldOpen = profileMenu.hidden;
+      if (!shouldOpen) {
+        closeProfileMenu();
+        return;
+      }
+
+      profileMenu.hidden = false;
+      profileMenuToggle.setAttribute("aria-expanded", "true");
+    });
+
+    profileMenu.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.closest("a")) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!profileMenuRoot.contains(target)) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeProfileMenu();
+      }
+    });
+
+    markAdminRouteVisited(user, "clienteDetalle");
+    await render();
+  </script>
+</BaseLayout>

@@ -1,0 +1,132 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+
+const user = Astro.locals.user;
+
+const clientUser = {
+  id: user?.id ?? "",
+  firstName: user?.firstName ?? "",
+  lastName: user?.lastName ?? "",
+  email: user?.email ?? "",
+};
+---
+
+<ClientShellLayout
+  title="Actividades | Carobra"
+  description="Historial de actividad del cliente en Carobra Rewards."
+  currentPath="/cliente/activities"
+  sectionLabel="Actividades"
+>
+  <main
+    id="activities-root"
+    data-user={JSON.stringify(clientUser)}
+    class="client-page client-page--soft-separators client-activities-page"
+  >
+    <section class="client-card client-activities-hero client-section--roomy">
+      <h1 class="client-section-title">Historial de actividades</h1>
+      <p class="client-activities-hero__description">
+        Aquí puedes revisar en detalle los movimientos recientes de tu cuenta:
+        redenciones, actualizaciones de perfil y eventos operativos validados.
+      </p>
+    </section>
+
+    <section class="client-card client-activities-timeline-wrap client-section--roomy">
+      <div class="client-activities-timeline-head">
+        <h2 class="text-2xl font-extrabold text-[#14355f]">Timeline</h2>
+        <a href="/cliente" class="client-section-link">Volver al dashboard</a>
+      </div>
+      <ul id="activities-list" class="client-activities-timeline"></ul>
+    </section>
+  </main>
+
+  <script>
+    import { getActivityHistory, loadClientDemoState } from "../../lib/client-demo-state";
+    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#activities-root");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const activitiesList = requireElement<HTMLUListElement>("#activities-list");
+
+    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
+
+    const formatDateTime = new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    function getTypeLabel(type: string) {
+      if (type === "redencion") {
+        return "Redención";
+      }
+
+      if (type === "perfil") {
+        return "Perfil";
+      }
+
+      if (type === "notificacion") {
+        return "Notificación";
+      }
+
+      return "Actividad";
+    }
+
+    function getTypeClass(type: string) {
+      if (type === "redencion") {
+        return "is-redencion";
+      }
+
+      if (type === "perfil") {
+        return "is-perfil";
+      }
+
+      if (type === "notificacion") {
+        return "is-notificacion";
+      }
+
+      return "is-actividad";
+    }
+
+    function render() {
+      const state = loadClientDemoState(user);
+      const history = getActivityHistory(state);
+
+      activitiesList.innerHTML =
+        history.length === 0
+          ? `
+              <li class="client-activities-empty">
+                Aún no hay actividad registrada en esta sesión.
+              </li>
+            `
+          : history
+              .map(
+                (item) => `
+                  <li class="client-activities-item">
+                    <div class="client-activities-item__dot" aria-hidden="true"></div>
+                    <div class="client-activities-item__card">
+                      <div class="client-activities-item__head">
+                        <p class="client-activities-item__title">${item.title}</p>
+                        <div class="client-activities-item__badges">
+                          <span class="client-activities-badge ${getTypeClass(item.type)}">${getTypeLabel(item.type)}</span>
+                          <span class="client-activities-badge is-status">${item.status}</span>
+                        </div>
+                      </div>
+                      <p class="client-activities-item__description">${item.description}</p>
+                      <p class="client-activities-item__timestamp">${formatDateTime.format(new Date(item.createdAt))}</p>
+                    </div>
+                  </li>
+                `,
+              )
+              .join("");
+    }
+
+    attachLogoutHandler(logoutButton, API_BASE_URL);
+
+    void (async () => {
+      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
+      render();
+    })();
+  </script>
+</ClientShellLayout>

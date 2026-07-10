@@ -1,0 +1,176 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Iniciar sesión | Carobra Rewards" description="Accede a tu cuenta y consulta tu validación AFORE.">
+  <main class="auth-page">
+    <section class="auth-card mx-auto max-w-md rounded-3xl border border-[#c8d8e8] bg-[#f8fbff] p-6 shadow-[0_18px_38px_rgba(14,40,74,0.12)] sm:p-8">
+      <a class="auth-back-link btn-secondary btn-compact" href="/">Regresar</a>
+      <h1 class="mt-4 text-3xl font-extrabold text-[#102745]">Iniciar sesión</h1>
+      <p class="mt-2 text-sm text-[#4c637f]">Usa el email y la contraseña de tu registro.</p>
+
+      <form id="login-form" class="mt-6 space-y-4" novalidate>
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Email
+          <input id="email" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="email" name="email" required autocomplete="email" aria-describedby="email-error" />
+          <span id="email-error" data-error-for="email" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Contraseña
+          <input id="password" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="password" name="password" required autocomplete="current-password" aria-describedby="password-error" />
+          <span id="password-error" data-error-for="password" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-xs font-medium text-[#4c637f]">
+          <input id="show-password" type="checkbox" />
+          Mostrar contraseña
+        </label>
+
+        <p id="feedback" class="text-sm font-semibold text-[#0c3d75]" role="status" aria-live="polite" tabindex="-1"></p>
+        <button id="submit-button" class="btn-primary w-full" type="submit">Entrar</button>
+      </form>
+
+      <p class="mt-4 text-sm text-[#4c637f]">
+        ¿No tienes cuenta? <a class="font-bold text-[#0c3d75]" href="/registro">Regístrate aquí</a>
+      </p>
+    </section>
+  </main>
+
+  <script>
+    type StableErrorCode =
+      | "duplicate_email"
+      | "duplicate_curp"
+      | "rewards_id_collision_exhausted"
+      | "password_mismatch"
+      | "terms_not_accepted"
+      | "invalid_credentials"
+      | "unauthenticated"
+      | "api_unavailable";
+
+    function requireElement<T extends Element>(selector: string): T {
+      const element = document.querySelector<T>(selector);
+      if (!element) throw new Error(`Missing login form element: ${selector}`);
+      return element;
+    }
+
+    const form = requireElement<HTMLFormElement>("#login-form");
+    const feedback = requireElement<HTMLParagraphElement>("#feedback");
+    const submitButton = requireElement<HTMLButtonElement>("#submit-button");
+    const emailInput = requireElement<HTMLInputElement>("#email");
+    const passwordInput = requireElement<HTMLInputElement>("#password");
+    const showPassword = requireElement<HTMLInputElement>("#show-password");
+
+    const stableMessages: Record<StableErrorCode, string> = {
+      duplicate_email: "No se pudo iniciar sesión.",
+      duplicate_curp: "No se pudo iniciar sesión.",
+      rewards_id_collision_exhausted: "No se pudo iniciar sesión.",
+      password_mismatch: "No se pudo iniciar sesión.",
+      terms_not_accepted: "No se pudo iniciar sesión.",
+      invalid_credentials: "El email o la contraseña no son correctos.",
+      unauthenticated: "Tu sesión terminó. Inicia sesión nuevamente.",
+      api_unavailable: "El servicio no está disponible por el momento. Intenta más tarde.",
+    };
+
+    function setFeedback(message: string, isError: boolean) {
+      feedback.textContent = message;
+      feedback.classList.remove("text-[#8a2f2f]", "text-[#0c3d75]");
+      feedback.classList.add(isError ? "text-[#8a2f2f]" : "text-[#0c3d75]");
+    }
+
+    function clearErrors() {
+      form.querySelectorAll<HTMLElement>("[data-error-for]").forEach((element) => {
+        element.textContent = "";
+        element.hidden = true;
+      });
+      emailInput.removeAttribute("aria-invalid");
+      passwordInput.removeAttribute("aria-invalid");
+      setFeedback("", false);
+    }
+
+    function setFieldError(name: "email" | "password", message: string) {
+      const field = name === "email" ? emailInput : passwordInput;
+      const error = form.querySelector<HTMLElement>(`[data-error-for="${name}"]`);
+      field.setAttribute("aria-invalid", "true");
+      if (error) {
+        error.textContent = message;
+        error.hidden = false;
+      }
+    }
+
+    const query = new URLSearchParams(window.location.search);
+    if (query.get("registered") === "1") {
+      setFeedback("Tu cuenta fue creada. Inicia sesión para consultar tu validación AFORE.", false);
+      window.history.replaceState({}, "", "/login");
+    } else if (query.get("error") === "unauthenticated") {
+      setFeedback(stableMessages.unauthenticated, true);
+      window.history.replaceState({}, "", "/login");
+    }
+
+    showPassword.addEventListener("change", () => {
+      passwordInput.type = showPassword.checked ? "text" : "password";
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearErrors();
+      const formData = new FormData(form);
+      const payload = {
+        email: String(formData.get("email") ?? "").trim(),
+        password: String(formData.get("password") ?? ""),
+      };
+
+      let valid = true;
+      if (!payload.email) {
+        setFieldError("email", "Ingresa tu email.");
+        valid = false;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        setFieldError("email", "Ingresa un email válido.");
+        valid = false;
+      }
+      if (!payload.password) {
+        setFieldError("password", "Ingresa tu contraseña.");
+        valid = false;
+      }
+      if (!valid) {
+        setFeedback("Revisa los campos marcados antes de continuar.", true);
+        form.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.setAttribute("aria-busy", "true");
+      setFeedback("Iniciando sesión...", false);
+
+      try {
+        const response = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: { code?: StableErrorCode };
+        };
+
+        if (!response.ok) {
+          const code = data.error?.code ?? "api_unavailable";
+          if (code === "invalid_credentials") {
+            setFieldError("password", stableMessages.invalid_credentials);
+          }
+          setFeedback(stableMessages[code], true);
+          if (code === "invalid_credentials") passwordInput.focus();
+          return;
+        }
+
+        setFeedback("Acceso correcto. Redirigiendo...", false);
+        window.location.href = "/cliente";
+      } catch {
+        setFeedback(stableMessages.api_unavailable, true);
+      } finally {
+        submitButton.disabled = false;
+        submitButton.removeAttribute("aria-busy");
+      }
+    });
+  </script>
+</BaseLayout>

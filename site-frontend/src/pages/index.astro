@@ -1,0 +1,263 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const navLinks = [
+  { label: "Registro", href: "#beneficios" },
+  { label: "Validación", href: "#experiencia" },
+  { label: "Confianza", href: "#confianza" },
+];
+
+const soporteLinks = [
+  { label: "Términos", href: "#terminos" },
+  { label: "Privacidad", href: "#privacidad" },
+  { label: "Ayuda", href: "#ayuda" },
+  { label: "Contacto", href: "#contacto" },
+];
+
+const timelineSteps = [
+  {
+    number: "01",
+    title: "Crea tu cuenta",
+    text: "Registra tus datos de identidad y contacto con email y contraseña, sin solicitar NSS.",
+  },
+  {
+    number: "02",
+    title: "Acepta los términos",
+    text: "Tu aceptación queda asociada al registro antes de iniciar el proceso de validación.",
+  },
+  {
+    number: "03",
+    title: "Consulta tu validación",
+    text: "Después de iniciar sesión puedes consultar el estado pendiente de validación de tu AFORE.",
+  },
+];
+
+---
+
+<BaseLayout>
+  <div class="landing-page">
+    <header id="inicio" class="landing-header">
+      <div class="shell landing-header__inner">
+        <a href="/" class="brand">
+          <img
+            src="/images/carobra-logo-horizontal-cropped.png"
+            alt="Carobra Consultores Especializados"
+            class="brand__logo"
+            loading="eager"
+            decoding="async"
+          />
+        </a>
+        <nav class="landing-nav" aria-label="Navegación principal">
+          {navLinks.map((link) => (
+            <a href={link.href}>{link.label}</a>
+          ))}
+        </nav>
+        <div class="landing-header__actions">
+          <a href="/login" class="landing-header__signin">Iniciar sesión</a>
+          <a href="/registro" class="btn-primary btn-compact">Abrir cuenta</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="landing-hero">
+        <div class="shell landing-hero__grid">
+          <div class="landing-hero__copy">
+            <span class="pill">Carobra Rewards Program</span>
+            <h1>
+              Registra tu cuenta Carobra Rewards
+              <span>e inicia tu validación AFORE.</span>
+            </h1>
+            <p>
+              Completa tus datos, acepta los términos e inicia sesión para consultar
+              el estado real de tu proceso de validación.
+            </p>
+            <div class="landing-hero__actions">
+              <a href="/registro" class="btn-primary">
+                Comenzar ahora <span aria-hidden="true">→</span>
+              </a>
+              <a href="#experiencia" class="btn-secondary">Cómo funciona</a>
+            </div>
+          </div>
+
+          <aside class="hero-preview" aria-label="Vista de estado del cliente">
+            <div class="hero-preview__badge">Proceso de registro</div>
+            <h2>Validación AFORE</h2>
+            <div class="hero-preview__points">
+              <p>Estado inicial</p>
+              <strong>Pendiente</strong>
+            </div>
+            <div class="hero-preview__meta">
+              <span>Cuenta</span>
+              <span>Registrada</span>
+            </div>
+            <div class="hero-preview__track" role="presentation">
+              <span style="width: 66%"></span>
+            </div>
+            <div class="hero-preview__foot">
+              <span>Siguiente paso</span>
+              <span>Resultado AFORE</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="beneficios" class="capabilities">
+        <div class="shell">
+          <header class="section-heading">
+            <h2>Lo que puedes hacer en esta versión</h2>
+            <p>Registro, acceso seguro y consulta del estado de validación desde una interfaz clara.</p>
+          </header>
+
+          <div class="capabilities-grid">
+            <article class="capability-card capability-card--wide">
+              <div class="capability-card__content">
+                <div class="capability-card__icon">▣</div>
+                <h3>Registro con datos del MVP</h3>
+                <p>
+                  Capturamos CURP, identidad, contacto y ubicación para crear tu cuenta e iniciar la validación.
+                </p>
+                <a href="/registro" class="capability-card__link">Crear mi cuenta</a>
+              </div>
+              <div class="capability-visual" aria-hidden="true">
+                <div class="capability-visual__head">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="capability-visual__bars">
+                  <span style="height: 35%"></span>
+                  <span style="height: 52%"></span>
+                  <span style="height: 72%"></span>
+                  <span style="height: 63%"></span>
+                  <span style="height: 84%"></span>
+                  <span style="height: 58%"></span>
+                </div>
+                <div class="capability-visual__line"></div>
+              </div>
+            </article>
+
+            <article class="capability-card capability-card--dark">
+              <div class="capability-card__icon">◉</div>
+              <h3>Privacidad y control</h3>
+              <p>Tus datos se gestionan con protección y visibilidad clara de cada interacción relevante.</p>
+            </article>
+
+            <article class="capability-card">
+              <div class="capability-card__icon">◌</div>
+              <h3>Estado con contexto</h3>
+              <p>Consulta si la validación asociada a tu cuenta continúa pendiente o recibió una actualización.</p>
+              <div class="capability-chips" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span class="is-active">MVP</span>
+              </div>
+            </article>
+
+            <article class="capability-card capability-card--split">
+              <div class="capability-control">
+                <div class="capability-card__icon">⛨</div>
+                <h3>Acceso a tu cuenta</h3>
+                <p>Inicia sesión con email y contraseña para revisar el estado de tu registro.</p>
+                <a href="/login" class="btn-primary btn-compact capability-control__button">Consultar estado</a>
+              </div>
+              <div class="split-stats">
+                <div class="split-stats__block">
+                  <span>Registro</span>
+                  <strong>Completo</strong>
+                </div>
+                <div class="split-stats__block">
+                  <span>Validación</span>
+                  <strong>Pendiente</strong>
+                </div>
+                <div class="split-stats__status">
+                  <span>Consulta</span>
+                  <strong>Disponible al iniciar sesión</strong>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="experiencia" class="experience">
+        <div class="shell experience-grid">
+          <aside class="experience-intro">
+            <h2>
+              Cómo avanza tu
+              <span>experiencia</span>
+            </h2>
+            <p>Un proceso claro desde el registro hasta la consulta de la validación.</p>
+            <blockquote>
+              "Tu cuenta se crea primero y la validación AFORE comienza con estado pendiente."
+            </blockquote>
+          </aside>
+
+          <div class="experience-timeline">
+            {timelineSteps.map((step, index) => (
+              <article class="experience-step">
+                <span class="experience-step__dot" data-variant={index}></span>
+                <p class="experience-step__number">{step.number}</p>
+                <h3>{step.title}</h3>
+                <p>{step.text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="confianza" class="trust">
+        <div class="shell trust__inner">
+          <h2>Confianza antes de cada acción</h2>
+          <p>
+            Diseñada para registrar tu cuenta y mostrar el estado de validación sin presentar funciones futuras como disponibles.
+          </p>
+          <div class="trust__actions">
+            <a href="/registro" class="btn-primary trust__cta">Comienza tu viaje</a>
+            <a href="/login" class="btn-secondary btn-secondary--dark trust__cta-secondary">Iniciar sesión</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="landing-footer">
+      <div class="shell landing-footer__grid">
+        <section>
+          <a href="/" class="landing-footer__brand" aria-label="Carobra inicio">
+            <img
+              src="/images/carobra-logo-horizontal-cropped.png"
+              alt="Carobra Consultores Especializados"
+              class="landing-footer__logo"
+              loading="lazy"
+              decoding="async"
+            />
+          </a>
+          <p>Registro y seguimiento de validación para clientes de Carobra Rewards.</p>
+          <p class="landing-footer__copy">© 2026 Carobra Rewards. Todos los derechos reservados.</p>
+        </section>
+
+        <section>
+          <h3>Legal</h3>
+          <a href="#terminos">Términos de uso</a>
+          <a href="#privacidad">Política de privacidad</a>
+          <p id="terminos" class="landing-footer__meta">Consulta las condiciones del programa antes de registrarte.</p>
+          <p id="privacidad" class="landing-footer__meta">Privacidad y control de datos visibles en toda la experiencia.</p>
+        </section>
+
+        <section id="ayuda">
+          <h3>Soporte</h3>
+          <a href="/login">Acceso a cuenta</a>
+          <a id="contacto" href="mailto:soporte@carobra.mx">Contacto</a>
+        </section>
+
+        <section>
+          <h3>Explorar</h3>
+          {soporteLinks.map((link) => (
+            <a href={link.href}>{link.label}</a>
+          ))}
+        </section>
+      </div>
+    </footer>
+  </div>
+</BaseLayout>

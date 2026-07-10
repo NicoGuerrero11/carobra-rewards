@@ -1,0 +1,264 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+const user = Astro.locals.user;
+
+const adminUser = {
+  id: user?.id ?? "admin-demo-user",
+  firstName: user?.firstName ?? "Administrador",
+  lastName: user?.lastName ?? "Demo",
+  email: user?.email ?? "admin.demo@carobra.test",
+};
+
+const adminDisplayName = `${adminUser.firstName} ${adminUser.lastName}`.trim();
+const adminInitial = adminDisplayName.charAt(0).toUpperCase() || "A";
+---
+
+<BaseLayout title="Redenciones | Carobra" description="Operación de redenciones para demo Carobra Rewards.">
+  <main id="admin-redemptions-root" data-user={JSON.stringify(adminUser)} class="admin-home shell py-10 md:py-12">
+    <section class="admin-home__topbar" aria-label="Barra superior admin">
+      <a href="/admin" class="admin-home__brand-link" aria-label="Inicio admin Carobra">
+        <img
+          src="/images/carobra-logo-horizontal-cropped.png"
+          alt="Carobra Consultores Especializados"
+          class="admin-home__brand-logo"
+          loading="eager"
+          decoding="async"
+        />
+      </a>
+      <nav class="admin-home__topbar-nav" aria-label="Módulos admin">
+        <a href="/admin" class="admin-home__topbar-link">Inicio</a>
+        <a href="/admin/clientes" class="admin-home__topbar-link">Clientes</a>
+        <a href="/admin/beneficios" class="admin-home__topbar-link">Beneficios</a>
+        <a href="/admin/redenciones" class="admin-home__topbar-link is-active" aria-current="page">Redenciones</a>
+      </nav>
+      <div id="admin-profile-menu" class="admin-home__profile-menu-root">
+        <button
+          id="admin-profile-toggle"
+          class="admin-home__profile-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-label="Abrir menú de perfil admin"
+        >
+          <span class="admin-home__avatar" aria-hidden="true">{adminInitial}</span>
+          <span class="admin-home__profile-copy">
+            <span class="admin-home__profile-name">{adminDisplayName}</span>
+            <span class="admin-home__profile-email">{adminUser.email}</span>
+          </span>
+        </button>
+        <div id="admin-profile-dropdown" class="admin-home__profile-menu" hidden>
+          <a href="/admin/perfil" class="admin-home__profile-menu-link">Ver perfil</a>
+          <button id="logout" class="admin-home__profile-menu-button" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </section>
+
+    <header class="admin-home__header">
+      <div>
+        <h1 class="admin-home__title">Gestión de redenciones</h1>
+        <p id="redemptions-session" class="admin-home__session"></p>
+      </div>
+    </header>
+
+    <p id="redemptions-feedback" class="admin-home__feedback hidden"></p>
+
+    <section class="admin-home__panel">
+      <div class="admin-home__panel-head">
+        <h2 class="admin-home__panel-title admin-home__panel-title--section">Listado de redenciones</h2>
+      </div>
+      <ul id="redemptions-list" class="admin-home__list"></ul>
+    </section>
+  </main>
+
+  <script>
+    import {
+      advanceRedemptionStatus,
+      getRedemptionNextStatus,
+      getRedemptionStatusLabel,
+      loadAdminDemoState,
+      markAdminRouteVisited,
+    } from "../../lib/admin-demo-state";
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#admin-redemptions-root");
+    const listEl = requireElement<HTMLUListElement>("#redemptions-list");
+    const feedbackEl = requireElement<HTMLParagraphElement>("#redemptions-feedback");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const profileMenuRoot = requireElement<HTMLElement>("#admin-profile-menu");
+    const profileMenuToggle = requireElement<HTMLButtonElement>("#admin-profile-toggle");
+    const profileMenu = requireElement<HTMLElement>("#admin-profile-dropdown");
+
+    const parsedUser = JSON.parse(root.getAttribute("data-user") ?? "{}") as Partial<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    }>;
+
+    const user = {
+      id: parsedUser.id ?? "admin-demo-user",
+      firstName: parsedUser.firstName ?? "Administrador",
+      lastName: parsedUser.lastName ?? "Demo",
+      email: parsedUser.email ?? "admin.demo@carobra.test",
+    };
+
+    const focusRedemptionId = new URLSearchParams(window.location.search).get("focus") ?? "";
+
+    function closeProfileMenu() {
+      profileMenu.hidden = true;
+      profileMenuToggle.setAttribute("aria-expanded", "false");
+    }
+
+    function getStatusStyles(statusLabel: string) {
+      if (statusLabel === "Pendiente") {
+        return "admin-home__badge admin-home__badge--danger";
+      }
+
+      if (statusLabel === "En revisión") {
+        return "admin-home__badge admin-home__badge--warning";
+      }
+
+      if (statusLabel === "Atendida") {
+        return "admin-home__badge admin-home__badge--info";
+      }
+
+      return "admin-home__badge admin-home__badge--ok";
+    }
+
+    function getNextActionLabel(nextStatus: ReturnType<typeof getRedemptionNextStatus>) {
+      if (nextStatus === "en_revision") {
+        return "Tomar en revisión";
+      }
+
+      if (nextStatus === "atendida") {
+        return "Marcar atendida";
+      }
+
+      if (nextStatus === "completada") {
+        return "Completar redención";
+      }
+
+      return "Sin acciones";
+    }
+
+    function setFeedback(message: string, isError = false) {
+      feedbackEl.textContent = message;
+      feedbackEl.classList.remove("hidden", "is-error", "is-ok");
+      feedbackEl.classList.add(isError ? "is-error" : "is-ok");
+    }
+
+    function render() {
+      const state = loadAdminDemoState(user);
+      const sessionEl = document.querySelector("#redemptions-session");
+
+      if (sessionEl) {
+        sessionEl.textContent = `Sesión activa: ${user.firstName} ${user.lastName} (${user.email})`;
+      }
+
+      const redemptions = [...state.redemptions].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+
+      listEl.innerHTML = redemptions
+        .map((redemption) => {
+          const customer = state.customers.find((entry) => entry.id === redemption.customerId);
+          const benefit = state.benefits.find((entry) => entry.id === redemption.benefitId);
+          const statusLabel = getRedemptionStatusLabel(redemption.status);
+          const nextStatus = getRedemptionNextStatus(redemption.status);
+          const isFocused = focusRedemptionId && focusRedemptionId === redemption.id;
+
+          return `
+            <li class="admin-home__module-card ${isFocused ? "admin-home__module-card--focus" : ""}">
+              <div class="admin-home__module-card-head">
+                <div>
+                  <p class="admin-home__module-card-title">${redemption.reference} · ${customer ? `${customer.firstName} ${customer.lastName}` : "Cliente"}</p>
+                  <p class="admin-home__module-card-meta">${benefit?.title ?? "Beneficio"} · Canal ${redemption.channel}</p>
+                  <p class="admin-home__module-card-meta">Último cambio: ${new Date(redemption.updatedAt).toLocaleString("es-MX")}</p>
+                </div>
+                <span class="${getStatusStyles(statusLabel)}">${statusLabel}</span>
+              </div>
+
+              <div class="admin-home__module-actions">
+                ${
+                  nextStatus
+                    ? `<button type="button" data-redemption-id="${redemption.id}" class="admin-home__action-btn">${getNextActionLabel(nextStatus)}</button>`
+                    : '<span class="admin-home__module-card-meta">Proceso completado</span>'
+                }
+                <a href="/admin/clientes/${redemption.customerId}" class="admin-home__action-btn admin-home__action-btn--link">Ver cliente</a>
+              </div>
+            </li>
+          `;
+        })
+        .join("");
+    }
+
+    listEl.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const actionButton = target.closest("[data-redemption-id]");
+      if (!(actionButton instanceof HTMLElement)) {
+        return;
+      }
+
+      const redemptionId = actionButton.getAttribute("data-redemption-id") ?? "";
+      if (!redemptionId) {
+        return;
+      }
+
+      const result = advanceRedemptionStatus(user, redemptionId);
+      setFeedback(result.message, !result.ok);
+      render();
+    });
+
+    attachLogoutHandler(logoutButton, API_BASE_URL, "/login");
+
+    profileMenuToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const shouldOpen = profileMenu.hidden;
+      if (!shouldOpen) {
+        closeProfileMenu();
+        return;
+      }
+
+      profileMenu.hidden = false;
+      profileMenuToggle.setAttribute("aria-expanded", "true");
+    });
+
+    profileMenu.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.closest("a")) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!profileMenuRoot.contains(target)) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeProfileMenu();
+      }
+    });
+
+    markAdminRouteVisited(user, "redenciones");
+    render();
+  </script>
+</BaseLayout>

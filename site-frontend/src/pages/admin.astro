@@ -1,0 +1,345 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+const user = Astro.locals.user;
+
+const adminUser = {
+  id: user?.id ?? "admin-demo-user",
+  firstName: user?.firstName ?? "Administrador",
+  lastName: user?.lastName ?? "Demo",
+  email: user?.email ?? "admin.demo@carobra.test",
+};
+
+const adminDisplayName = `${adminUser.firstName} ${adminUser.lastName}`.trim();
+const adminInitial = adminDisplayName.charAt(0).toUpperCase() || "A";
+---
+
+<BaseLayout title="Inicio Administrador | Carobra" description="Panel operativo administrativo para demo de Carobra Rewards.">
+  <main id="admin-home-root" data-user={JSON.stringify(adminUser)} class="admin-home shell py-10 md:py-12">
+    <section class="admin-home__topbar" aria-label="Barra superior admin">
+      <a href="/admin" class="admin-home__brand-link" aria-label="Inicio admin Carobra">
+        <img
+          src="/images/carobra-logo-horizontal-cropped.png"
+          alt="Carobra Consultores Especializados"
+          class="admin-home__brand-logo"
+          loading="eager"
+          decoding="async"
+        />
+      </a>
+      <nav class="admin-home__topbar-nav" aria-label="Módulos admin">
+        <a href="/admin" class="admin-home__topbar-link is-active" aria-current="page">Inicio</a>
+        <a href="/admin/clientes" class="admin-home__topbar-link">Clientes</a>
+        <a href="/admin/beneficios" class="admin-home__topbar-link">Beneficios</a>
+        <a href="/admin/redenciones" class="admin-home__topbar-link">Redenciones</a>
+      </nav>
+      <div id="admin-profile-menu" class="admin-home__profile-menu-root">
+        <button
+          id="admin-profile-toggle"
+          class="admin-home__profile-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-label="Abrir menú de perfil admin"
+        >
+          <span class="admin-home__avatar" aria-hidden="true">{adminInitial}</span>
+          <span class="admin-home__profile-copy">
+            <span class="admin-home__profile-name">{adminDisplayName}</span>
+            <span class="admin-home__profile-email">{adminUser.email}</span>
+          </span>
+        </button>
+        <div id="admin-profile-dropdown" class="admin-home__profile-menu" hidden>
+          <a href="/admin/perfil" class="admin-home__profile-menu-link">Ver perfil</a>
+          <button id="logout" class="admin-home__profile-menu-button" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+    </section>
+
+    <header class="admin-home__header">
+      <div>
+        <h1 class="admin-home__title">Inicio de operaciones</h1>
+        <p id="admin-session" class="admin-home__session"></p>
+      </div>
+    </header>
+
+    <section class="admin-home__kpi-grid" aria-label="Resumen operativo">
+      <article class="admin-home__kpi-card">
+        <div class="admin-home__kpi-head">
+          <p class="admin-home__kpi-label">Clientes activos</p>
+          <span class="admin-home__kpi-icon" aria-hidden="true"></span>
+        </div>
+        <p id="summary-customers" class="admin-home__kpi-value"></p>
+      </article>
+      <article class="admin-home__kpi-card">
+        <div class="admin-home__kpi-head">
+          <p class="admin-home__kpi-label">Beneficios activos</p>
+          <span class="admin-home__kpi-icon" aria-hidden="true"></span>
+        </div>
+        <p id="summary-benefits" class="admin-home__kpi-value"></p>
+      </article>
+      <article class="admin-home__kpi-card">
+        <div class="admin-home__kpi-head">
+          <p class="admin-home__kpi-label">Redenciones recientes</p>
+          <span class="admin-home__kpi-icon" aria-hidden="true"></span>
+        </div>
+        <p id="summary-recent-redemptions" class="admin-home__kpi-value"></p>
+      </article>
+      <article class="admin-home__kpi-card">
+        <div class="admin-home__kpi-head">
+          <p class="admin-home__kpi-label">Nuevas altas (30d)</p>
+          <span class="admin-home__kpi-icon" aria-hidden="true"></span>
+        </div>
+        <p id="summary-new-enrollments" class="admin-home__kpi-value"></p>
+      </article>
+      <article class="admin-home__kpi-card admin-home__kpi-card--emphasis">
+        <div class="admin-home__kpi-head">
+          <p class="admin-home__kpi-label">Pendientes abiertos</p>
+          <span class="admin-home__kpi-icon" aria-hidden="true"></span>
+        </div>
+        <p id="summary-pending-redemptions" class="admin-home__kpi-value"></p>
+      </article>
+    </section>
+
+    <section class="admin-home__core-grid">
+      <article class="admin-home__panel">
+        <div class="admin-home__panel-head">
+          <h2 class="admin-home__panel-title">Pendientes accionables</h2>
+          <a href="/admin/redenciones" class="admin-home__panel-link">Resolver</a>
+        </div>
+        <ul id="pending-items" class="admin-home__list"></ul>
+      </article>
+
+      <article class="admin-home__panel">
+        <div class="admin-home__panel-head">
+          <h2 class="admin-home__panel-title">Actividad reciente</h2>
+        </div>
+        <ul id="recent-activity" class="admin-home__list"></ul>
+      </article>
+    </section>
+
+    <section class="admin-home__support-grid">
+      <article class="admin-home__panel">
+        <div class="admin-home__panel-head">
+          <h2 class="admin-home__panel-title">Atajos operativos</h2>
+        </div>
+        <ul id="quick-actions" class="admin-home__list admin-home__list--compact"></ul>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    import { fetchAdminRealCustomers, mergeAdminDashboardStateWithRealCustomers } from "../lib/admin-customers";
+    import {
+      getOperationalSnapshot,
+      getPendingOperationalItems,
+      getRecentActivity,
+      loadAdminDemoState,
+      markAdminRouteVisited,
+    } from "../lib/admin-demo-state";
+    import { attachLogoutHandler, requireElement } from "../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#admin-home-root");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const profileMenuRoot = requireElement<HTMLElement>("#admin-profile-menu");
+    const profileMenuToggle = requireElement<HTMLButtonElement>("#admin-profile-toggle");
+    const profileMenu = requireElement<HTMLElement>("#admin-profile-dropdown");
+
+    const parsedUser = JSON.parse(root.getAttribute("data-user") ?? "{}") as Partial<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    }>;
+
+    const user = {
+      id: parsedUser.id ?? "admin-demo-user",
+      firstName: parsedUser.firstName ?? "Administrador",
+      lastName: parsedUser.lastName ?? "Demo",
+      email: parsedUser.email ?? "admin.demo@carobra.test",
+    };
+    let resolvedState = loadAdminDemoState(user);
+    let hybridStateLoaded = false;
+
+    async function hydrateHomeState() {
+      const mockState = loadAdminDemoState(user);
+      const realCustomers = await fetchAdminRealCustomers(API_BASE_URL);
+      const merged = mergeAdminDashboardStateWithRealCustomers(mockState, realCustomers);
+
+      resolvedState = merged.state;
+      hybridStateLoaded = true;
+    }
+
+    const formatDate = new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    function closeProfileMenu() {
+      profileMenu.hidden = true;
+      profileMenuToggle.setAttribute("aria-expanded", "false");
+    }
+
+    function render() {
+      const state = hybridStateLoaded ? resolvedState : loadAdminDemoState(user);
+      const snapshot = getOperationalSnapshot(state);
+      const pendingItems = getPendingOperationalItems(state);
+      const activity = getRecentActivity(state);
+      const customersAtRisk = state.customers.filter((entry) => entry.status === "en_riesgo").length;
+      const pausedBenefits = state.benefits.filter((entry) => entry.state === "pausado").length;
+
+      const sessionEl = document.querySelector("#admin-session");
+      const summaryCustomers = document.querySelector("#summary-customers");
+      const summaryBenefits = document.querySelector("#summary-benefits");
+      const summaryRecentRedemptions = document.querySelector("#summary-recent-redemptions");
+      const summaryNewEnrollments = document.querySelector("#summary-new-enrollments");
+      const summaryPendingRedemptions = document.querySelector("#summary-pending-redemptions");
+      const pendingList = document.querySelector("#pending-items");
+      const recentActivity = document.querySelector("#recent-activity");
+      const quickActions = document.querySelector("#quick-actions");
+
+      if (
+        !sessionEl ||
+        !summaryCustomers ||
+        !summaryBenefits ||
+        !summaryRecentRedemptions ||
+        !summaryNewEnrollments ||
+        !summaryPendingRedemptions ||
+        !pendingList ||
+        !recentActivity ||
+        !quickActions
+      ) {
+        return;
+      }
+
+      sessionEl.textContent = `Sesión activa: ${user.firstName} ${user.lastName} (${user.email})`;
+      summaryCustomers.textContent = snapshot.customers.toLocaleString("es-MX");
+      summaryBenefits.textContent = snapshot.activeBenefits.toLocaleString("es-MX");
+      summaryRecentRedemptions.textContent = snapshot.recentRedemptions.toLocaleString("es-MX");
+      summaryNewEnrollments.textContent = snapshot.newEnrollments.toLocaleString("es-MX");
+      summaryPendingRedemptions.textContent = snapshot.pendingRedemptions.toLocaleString("es-MX");
+
+      pendingList.innerHTML =
+        pendingItems.length === 0
+          ? '<li class="admin-home__empty">No hay pendientes operativos para esta sesión.</li>'
+          : pendingItems
+              .map((item) => {
+                const reference = item.title.split(" ")[0] ?? "Caso";
+                const title = item.title.replace(`${reference} `, "");
+                const severityLabel =
+                  item.severity === "alta"
+                    ? "requiere seguimiento"
+                    : item.severity === "media"
+                      ? "en riesgo"
+                      : "en monitoreo";
+                return `
+                  <li class="admin-home__pending-card admin-home__pending-card--${item.severity}">
+                    <p class="admin-home__pending-tag">${severityLabel}</p>
+                    <p class="admin-home__pending-ref">${reference}</p>
+                    <p class="admin-home__pending-title">${title}</p>
+                    <a href="${item.href}" class="admin-home__pending-action">Resolver</a>
+                  </li>
+                `;
+              })
+              .join("");
+
+      recentActivity.innerHTML =
+        activity.length === 0
+          ? '<li class="admin-home__empty">Sin actividad reciente registrada.</li>'
+          : activity
+              .map((entry) => {
+                return `
+                  <li class="admin-home__activity-item">
+                    <span class="admin-home__activity-dot" aria-hidden="true"></span>
+                    <div>
+                      <p class="admin-home__activity-title">${entry.title}</p>
+                      <p class="admin-home__activity-meta">${entry.status} · ${formatDate.format(new Date(entry.createdAt))}</p>
+                    </div>
+                  </li>
+                `;
+              })
+              .join("");
+
+      quickActions.innerHTML = `
+        <li class="admin-home__quick-item">
+          <div>
+            <p class="admin-home__quick-title">Clientes en riesgo</p>
+            <p class="admin-home__quick-desc">Atiende clientes con posible abandono.</p>
+          </div>
+          <div class="admin-home__quick-meta">
+            <span class="admin-home__quick-count">${customersAtRisk.toLocaleString("es-MX")}</span>
+            <a href="/admin/clientes?search=En%20riesgo" class="admin-home__quick-link">Abrir módulo</a>
+          </div>
+        </li>
+        <li class="admin-home__quick-item">
+          <div>
+            <p class="admin-home__quick-title">Beneficios pausados</p>
+            <p class="admin-home__quick-desc">Revisa beneficios que necesitan reactivación.</p>
+          </div>
+          <div class="admin-home__quick-meta">
+            <span class="admin-home__quick-count">${pausedBenefits.toLocaleString("es-MX")}</span>
+            <a href="/admin/beneficios" class="admin-home__quick-link">Abrir módulo</a>
+          </div>
+        </li>
+        <li class="admin-home__quick-item">
+          <div>
+            <p class="admin-home__quick-title">Redenciones pendientes</p>
+            <p class="admin-home__quick-desc">Prioriza casos abiertos con impacto inmediato.</p>
+          </div>
+          <div class="admin-home__quick-meta">
+            <span class="admin-home__quick-count">${snapshot.pendingRedemptions.toLocaleString("es-MX")}</span>
+            <a href="/admin/redenciones" class="admin-home__quick-link">Abrir módulo</a>
+          </div>
+        </li>
+      `;
+    }
+
+    attachLogoutHandler(logoutButton, API_BASE_URL, "/login");
+
+    profileMenuToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const shouldOpen = profileMenu.hidden;
+      if (!shouldOpen) {
+        closeProfileMenu();
+        return;
+      }
+
+      profileMenu.hidden = false;
+      profileMenuToggle.setAttribute("aria-expanded", "true");
+    });
+
+    profileMenu.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      if (target.closest("a")) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!profileMenuRoot.contains(target)) {
+        closeProfileMenu();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeProfileMenu();
+      }
+    });
+
+    markAdminRouteVisited(user, "home");
+    await hydrateHomeState();
+    render();
+  </script>
+</BaseLayout>

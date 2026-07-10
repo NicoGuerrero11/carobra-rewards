@@ -1,0 +1,279 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Registro | Carobra Rewards" description="Crea tu cuenta e inicia tu validación AFORE.">
+  <main class="auth-page">
+    <section class="auth-card mx-auto max-w-2xl rounded-3xl border border-[#c8d8e8] bg-[#f8fbff] p-6 shadow-[0_18px_38px_rgba(14,40,74,0.12)] sm:p-8">
+      <a class="auth-back-link btn-secondary btn-compact" href="/">Regresar</a>
+      <h1 class="mt-4 text-3xl font-extrabold text-[#102745]">Crea tu cuenta</h1>
+      <p class="mt-2 text-sm text-[#4c637f]">
+        Completa tus datos para registrar tu cuenta e iniciar la validación de tu AFORE.
+      </p>
+
+      <form id="register-form" class="mt-6 grid gap-4 sm:grid-cols-2" novalidate>
+        <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
+          CURP
+          <input id="curp" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm uppercase text-[#102745]" type="text" name="curp" required minlength="18" maxlength="18" autocomplete="off" aria-describedby="curp-error" />
+          <span id="curp-error" data-error-for="curp" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Nombre
+          <input id="first_name" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" name="first_name" required autocomplete="given-name" aria-describedby="first-name-error" />
+          <span id="first-name-error" data-error-for="first_name" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Apellidos
+          <input id="last_name" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" name="last_name" required autocomplete="family-name" aria-describedby="last-name-error" />
+          <span id="last-name-error" data-error-for="last_name" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
+          Email
+          <input id="email" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="email" name="email" required autocomplete="email" aria-describedby="email-error" />
+          <span id="email-error" data-error-for="email" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Teléfono
+          <input id="phone" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="tel" name="phone" required autocomplete="tel" aria-describedby="phone-error" />
+          <span id="phone-error" data-error-for="phone" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Código postal
+          <input id="postal_code" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" name="postal_code" required autocomplete="postal-code" inputmode="numeric" aria-describedby="postal-code-error" />
+          <span id="postal-code-error" data-error-for="postal_code" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Estado
+          <input id="state" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" name="state" required autocomplete="address-level1" aria-describedby="state-error" />
+          <span id="state-error" data-error-for="state" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73]">
+          Ciudad o municipio
+          <input id="city" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" name="city" required autocomplete="address-level2" aria-describedby="city-error" />
+          <span id="city-error" data-error-for="city" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
+          Contraseña
+          <input id="password" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="password" name="password" required autocomplete="new-password" aria-describedby="password-error" />
+          <span id="password-error" data-error-for="password" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
+          Confirma tu contraseña
+          <input id="confirm_password" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="password" name="confirm_password" required autocomplete="new-password" aria-describedby="confirm-password-error" />
+          <span id="confirm-password-error" data-error-for="confirm_password" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-xs font-medium text-[#4c637f] sm:col-span-2">
+          <input id="show-password" type="checkbox" />
+          Mostrar contraseñas
+        </label>
+
+        <div class="rounded-xl border border-[#c7d7e7] bg-white p-3 sm:col-span-2">
+          <label class="flex items-start gap-3 text-sm font-medium text-[#244b73]">
+            <input id="terms_accepted" class="mt-1" type="checkbox" name="terms_accepted" required aria-describedby="terms-error" />
+            <span>Acepto los términos y condiciones de Carobra Rewards (versión 2026-07).</span>
+          </label>
+          <span id="terms-error" data-error-for="terms_accepted" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+          <input type="hidden" name="terms_version" value="2026-07" />
+        </div>
+
+        <p id="feedback" class="text-sm font-semibold text-[#0c3d75] sm:col-span-2" role="status" aria-live="polite" tabindex="-1"></p>
+        <button id="submit-button" class="btn-primary w-full sm:col-span-2" type="submit">Crear cuenta</button>
+      </form>
+
+      <p class="mt-4 text-sm text-[#4c637f]">
+        ¿Ya tienes cuenta? <a class="font-bold text-[#0c3d75]" href="/login">Inicia sesión</a>
+      </p>
+    </section>
+  </main>
+
+  <script>
+    type StableErrorCode =
+      | "duplicate_email"
+      | "duplicate_curp"
+      | "rewards_id_collision_exhausted"
+      | "password_mismatch"
+      | "terms_not_accepted"
+      | "invalid_credentials"
+      | "unauthenticated"
+      | "api_unavailable";
+
+    function requireElement<T extends Element>(selector: string): T {
+      const element = document.querySelector<T>(selector);
+      if (!element) throw new Error(`Missing register form element: ${selector}`);
+      return element;
+    }
+
+    const form = requireElement<HTMLFormElement>("#register-form");
+    const feedback = requireElement<HTMLParagraphElement>("#feedback");
+    const submitButton = requireElement<HTMLButtonElement>("#submit-button");
+    const passwordInput = requireElement<HTMLInputElement>("#password");
+    const confirmInput = requireElement<HTMLInputElement>("#confirm_password");
+    const showPassword = requireElement<HTMLInputElement>("#show-password");
+
+    const fieldMessages: Record<string, string> = {
+      curp: "Ingresa tu CURP.",
+      first_name: "Ingresa tu nombre.",
+      last_name: "Ingresa tus apellidos.",
+      email: "Ingresa tu email.",
+      phone: "Ingresa tu teléfono.",
+      postal_code: "Ingresa tu código postal.",
+      state: "Ingresa tu estado.",
+      city: "Ingresa tu ciudad o municipio.",
+      password: "Ingresa una contraseña.",
+      confirm_password: "Confirma tu contraseña.",
+      terms_accepted: "Debes aceptar los términos y condiciones.",
+    };
+
+    function setFeedback(message: string, isError: boolean) {
+      feedback.textContent = message;
+      feedback.classList.remove("text-[#8a2f2f]", "text-[#0c3d75]");
+      feedback.classList.add(isError ? "text-[#8a2f2f]" : "text-[#0c3d75]");
+    }
+
+    function clearErrors() {
+      form.querySelectorAll<HTMLElement>("[data-error-for]").forEach((element) => {
+        element.textContent = "";
+        element.hidden = true;
+      });
+      form.querySelectorAll<HTMLElement>("[aria-invalid='true']").forEach((element) => {
+        element.removeAttribute("aria-invalid");
+      });
+      setFeedback("", false);
+    }
+
+    function setFieldError(name: string, message: string) {
+      const field = form.elements.namedItem(name);
+      const error = form.querySelector<HTMLElement>(`[data-error-for="${name}"]`);
+      if (field instanceof HTMLElement) {
+        field.setAttribute("aria-invalid", "true");
+      }
+      if (error) {
+        error.textContent = message;
+        error.hidden = false;
+      }
+    }
+
+    function focusFirstInvalid() {
+      form.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+    }
+
+    function validate(payload: Record<string, string | boolean>) {
+      let valid = true;
+      Object.entries(fieldMessages).forEach(([name, message]) => {
+        const value = payload[name];
+        if (value === false || (typeof value === "string" && !value.trim())) {
+          setFieldError(name, message);
+          valid = false;
+        }
+      });
+
+      const email = String(payload.email);
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFieldError("email", "Ingresa un email válido.");
+        valid = false;
+      }
+
+      const curp = String(payload.curp);
+      if (curp && !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp)) {
+        setFieldError("curp", "Ingresa una CURP válida de 18 caracteres.");
+        valid = false;
+      }
+
+      if (payload.password && payload.confirm_password && payload.password !== payload.confirm_password) {
+        setFieldError("confirm_password", "Las contraseñas no coinciden.");
+        valid = false;
+      }
+      return valid;
+    }
+
+    const stableMessages: Record<StableErrorCode, string> = {
+      duplicate_email: "Ya existe una cuenta registrada con este email.",
+      duplicate_curp: "Ya existe una cuenta registrada con esta CURP.",
+      rewards_id_collision_exhausted: "No pudimos generar tu Rewards ID. Intenta nuevamente.",
+      password_mismatch: "Las contraseñas no coinciden.",
+      terms_not_accepted: "Debes aceptar los términos y condiciones.",
+      invalid_credentials: "No pudimos validar los datos enviados.",
+      unauthenticated: "Tu sesión no está autenticada.",
+      api_unavailable: "El servicio no está disponible por el momento. Intenta más tarde.",
+    };
+
+    showPassword.addEventListener("change", () => {
+      const nextType = showPassword.checked ? "text" : "password";
+      passwordInput.type = nextType;
+      confirmInput.type = nextType;
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearErrors();
+      const formData = new FormData(form);
+      const payload = {
+        curp: String(formData.get("curp") ?? "").trim().toUpperCase(),
+        first_name: String(formData.get("first_name") ?? "").trim(),
+        last_name: String(formData.get("last_name") ?? "").trim(),
+        email: String(formData.get("email") ?? "").trim(),
+        phone: String(formData.get("phone") ?? "").trim(),
+        password: String(formData.get("password") ?? ""),
+        confirm_password: String(formData.get("confirm_password") ?? ""),
+        postal_code: String(formData.get("postal_code") ?? "").trim(),
+        state: String(formData.get("state") ?? "").trim(),
+        city: String(formData.get("city") ?? "").trim(),
+        terms_accepted: formData.get("terms_accepted") === "on",
+        terms_version: String(formData.get("terms_version") ?? ""),
+      };
+
+      if (!validate(payload)) {
+        setFeedback("Revisa los campos marcados antes de continuar.", true);
+        focusFirstInvalid();
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.setAttribute("aria-busy", "true");
+      setFeedback("Enviando registro...", false);
+
+      try {
+        const response = await fetch("/api/v1/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: { code?: StableErrorCode };
+        };
+
+        if (!response.ok) {
+          const code = data.error?.code ?? "api_unavailable";
+          if (code === "duplicate_email") setFieldError("email", stableMessages[code]);
+          if (code === "duplicate_curp") setFieldError("curp", stableMessages[code]);
+          if (code === "password_mismatch") setFieldError("confirm_password", stableMessages[code]);
+          if (code === "terms_not_accepted") setFieldError("terms_accepted", stableMessages[code]);
+          setFeedback(stableMessages[code], true);
+          focusFirstInvalid();
+          return;
+        }
+
+        setFeedback("Cuenta creada. Tu validación AFORE quedó pendiente; inicia sesión para consultar el estado.", false);
+        window.setTimeout(() => {
+          window.location.href = "/login?registered=1";
+        }, 900);
+      } catch {
+        setFeedback(stableMessages.api_unavailable, true);
+      } finally {
+        submitButton.disabled = false;
+        submitButton.removeAttribute("aria-busy");
+      }
+    });
+  </script>
+</BaseLayout>

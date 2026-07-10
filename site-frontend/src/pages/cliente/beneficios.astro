@@ -1,0 +1,200 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+
+const user = Astro.locals.user;
+
+const clientUser = {
+  id: user?.id ?? "",
+  firstName: user?.firstName ?? "",
+  lastName: user?.lastName ?? "",
+  email: user?.email ?? "",
+};
+---
+
+<ClientShellLayout title="Beneficios | Carobra" description="Beneficios y redenciones en Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Rewards">
+  <main
+    id="benefits-root"
+    data-user={JSON.stringify(clientUser)}
+    class="client-page client-page--soft-separators client-benefits-page"
+  >
+    <section class="client-benefits-hero client-section--roomy">
+      <h1 class="client-section-title mt-4">Beneficios para ti</h1>
+      <p class="client-benefits-hero__description">
+        Explora el catálogo, revisa estado y vigencia, y ejecuta redenciones
+        simuladas desde un flujo unificado.
+      </p>
+    </section>
+
+    <section class="client-benefits-layout client-section--roomy">
+      <article class="client-card client-benefits-catalog">
+        <div class="client-benefits-catalog__head">
+          <h2 class="text-2xl font-extrabold text-[#14355f]">Catálogo</h2>
+          <p class="client-benefits-catalog__hint">
+            Selecciona un beneficio para ver su detalle.
+          </p>
+        </div>
+        <ul id="benefits-list" class="client-benefits-list"></ul>
+      </article>
+
+      <article class="client-card client-benefits-detail">
+        <p class="client-benefits-detail__kicker">Detalle seleccionado</p>
+        <h2 id="benefit-title" class="text-2xl font-extrabold text-[#14355f]"></h2>
+        <p id="benefit-category" class="client-benefits-detail__category"></p>
+
+        <div class="client-benefits-detail__meta">
+          <div class="client-benefits-meta-box">
+            <p class="client-benefits-meta-box__label">Estado</p>
+            <p id="benefit-state" class="client-benefits-meta-box__value"></p>
+          </div>
+          <div class="client-benefits-meta-box">
+            <p class="client-benefits-meta-box__label">Vigencia</p>
+            <p id="benefit-validity" class="client-benefits-meta-box__value"></p>
+          </div>
+        </div>
+
+        <p id="benefit-description" class="client-benefits-detail__description"></p>
+
+        <p id="redemption-feedback" class="client-benefits-feedback hidden"></p>
+
+        <div class="client-benefits-detail__actions">
+          <button id="redeem-button" type="button" class="btn-primary">Iniciar redención simulada</button>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    import type { BenefitState } from "../../lib/client-demo-state";
+    import { getBenefitStateLabel, loadClientDemoState, redeemBenefit } from "../../lib/client-demo-state";
+    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
+
+    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+    const root = requireElement<HTMLElement>("#benefits-root");
+    const logoutButton = requireElement<HTMLButtonElement>("#logout");
+    const listContainer = requireElement<HTMLUListElement>("#benefits-list");
+    const titleEl = requireElement<HTMLElement>("#benefit-title");
+    const categoryEl = requireElement<HTMLElement>("#benefit-category");
+    const stateEl = requireElement<HTMLElement>("#benefit-state");
+    const validityEl = requireElement<HTMLElement>("#benefit-validity");
+    const descriptionEl = requireElement<HTMLElement>("#benefit-description");
+    const redeemButton = requireElement<HTMLButtonElement>("#redeem-button");
+    const feedbackEl = requireElement<HTMLParagraphElement>("#redemption-feedback");
+
+    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
+    const params = new URLSearchParams(window.location.search);
+    let selectedBenefitId = params.get("id") ?? "";
+
+    function getStatusTone(state: BenefitState) {
+      if (state === "disponible") {
+        return {
+          cardStatusClass: "is-available",
+          detailStatusClass: "is-available",
+        };
+      }
+
+      if (state === "proximo") {
+        return {
+          cardStatusClass: "is-upcoming",
+          detailStatusClass: "is-upcoming",
+        };
+      }
+
+      return {
+        cardStatusClass: "is-redeemed",
+        detailStatusClass: "is-redeemed",
+      };
+    }
+
+    function render() {
+      const state = loadClientDemoState(user);
+      const benefits = state.benefits;
+
+      if (!selectedBenefitId || !benefits.some((benefit) => benefit.id === selectedBenefitId)) {
+        selectedBenefitId = benefits[0]?.id ?? "";
+      }
+
+      listContainer.innerHTML = benefits
+        .map((benefit) => {
+          const isSelected = benefit.id === selectedBenefitId;
+          const stateTone = getStatusTone(benefit.state);
+
+          return `
+            <li>
+              <button
+                data-benefit-id="${benefit.id}"
+                class="client-benefit-card ${isSelected ? "is-selected" : ""}"
+                type="button"
+              >
+                <div class="client-benefit-card__main">
+                  <p class="client-benefit-card__title">${benefit.title}</p>
+                  <p class="client-benefit-card__category">${benefit.category}</p>
+                </div>
+                <div class="client-benefit-card__meta">
+                  <span class="client-benefit-card__status ${stateTone.cardStatusClass}">${getBenefitStateLabel(benefit.state)}</span>
+                  <span class="client-benefit-card__validity">Vigencia ${benefit.validUntil}</span>
+                </div>
+              </button>
+            </li>
+          `;
+        })
+        .join("");
+
+      const selected = benefits.find((benefit) => benefit.id === selectedBenefitId);
+      if (!selected) {
+        return;
+      }
+      const selectedStateTone = getStatusTone(selected.state);
+
+      titleEl.textContent = selected.title;
+      categoryEl.textContent = `${selected.category} · ${getBenefitStateLabel(selected.state)}`;
+      stateEl.textContent = getBenefitStateLabel(selected.state);
+      stateEl.className = `client-benefits-meta-box__value client-benefits-meta-box__value--status ${selectedStateTone.detailStatusClass}`;
+      validityEl.textContent = selected.validUntil;
+      descriptionEl.textContent = selected.description;
+      redeemButton.toggleAttribute("disabled", selected.state !== "disponible");
+      redeemButton.classList.toggle("is-disabled", selected.state !== "disponible");
+      redeemButton.textContent = selected.state === "disponible" ? "Iniciar redención simulada" : "No disponible para redención";
+    }
+
+    function setFeedback(message: string, isError = false) {
+      feedbackEl.textContent = message;
+      feedbackEl.classList.remove("hidden");
+      feedbackEl.classList.toggle("is-error", isError);
+    }
+
+    listContainer.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const button = target.closest("[data-benefit-id]");
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+
+      selectedBenefitId = button.getAttribute("data-benefit-id") ?? "";
+      const query = new URLSearchParams(window.location.search);
+      query.set("id", selectedBenefitId);
+      window.history.replaceState({}, "", `${window.location.pathname}?${query.toString()}`);
+      render();
+    });
+
+    redeemButton.addEventListener("click", () => {
+      if (!selectedBenefitId) {
+        return;
+      }
+
+      const result = redeemBenefit(user, selectedBenefitId);
+      setFeedback(result.message, !result.ok);
+      render();
+    });
+
+    attachLogoutHandler(logoutButton, API_BASE_URL);
+
+    void (async () => {
+      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
+      render();
+    })();
+  </script>
+</ClientShellLayout>

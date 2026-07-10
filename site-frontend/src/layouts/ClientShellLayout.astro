@@ -1,0 +1,221 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+interface NavItem {
+  id: "dashboard";
+  label: string;
+  href: string;
+}
+
+interface Props {
+  title?: string;
+  description?: string;
+  currentPath?: string;
+  sectionLabel?: string;
+}
+
+const {
+  title = "Dashboard Cliente | Carobra",
+  description = "Experiencia cliente con navegación lateral y flujo operativo claro.",
+  currentPath = "/cliente",
+  sectionLabel = "Cliente",
+} = Astro.props as Props;
+
+const navItems: NavItem[] = [
+  { id: "dashboard", label: "Estado de mi cuenta", href: "/cliente" },
+];
+
+function isActive(item: NavItem) {
+  return item.id === "dashboard" && currentPath === "/cliente";
+}
+---
+
+<BaseLayout title={title} description={description}>
+  <div id="client-shell" class="client-shell">
+    <header class="client-shell__topnav">
+      <div class="client-shell__topnav-inner">
+        <div class="client-shell__left">
+          <a href="/cliente" class="client-shell__brand-link" aria-label="Carobra inicio cliente">
+            <img
+              src="/images/carobra-logo-horizontal-cropped.png"
+              alt="Carobra Consultores Especializados"
+              class="client-shell__brand-logo"
+              loading="eager"
+              decoding="async"
+            />
+          </a>
+        </div>
+
+        <button
+          id="client-shell-menu-toggle"
+          class="client-shell__menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-label="Abrir menú de navegación"
+        >
+          <span aria-hidden="true">☰</span>
+          <span>Menú</span>
+        </button>
+
+        <nav class:list={["client-shell__nav", "client-shell__nav--center"]} aria-label={`Navegación cliente · ${sectionLabel}`}>
+          {
+            navItems.map((item) =>
+              isActive(item) ? (
+                <span class:list={["client-shell__nav-link", "is-active"]} aria-current="page">
+                  <span>{item.label}</span>
+                </span>
+              ) : (
+                <a href={item.href} class="client-shell__nav-link">
+                  <span>{item.label}</span>
+                </a>
+              ),
+            )
+          }
+        </nav>
+
+        <div class="client-shell__right">
+          <div id="client-shell-user" class="client-shell__user">
+            <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
+              <span class="client-shell__user-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" role="presentation">
+                  <circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.7"></circle>
+                  <path d="M5.6 18.2C6.9 15.8 9.2 14.6 12 14.6C14.8 14.6 17.1 15.8 18.4 18.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+                </svg>
+              </span>
+              <span class="client-shell__user-label">Cuenta</span>
+            </button>
+
+            <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
+              <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="client-shell-mobile-menu" class="client-shell__mobile-menu" hidden>
+        <nav class="client-shell__mobile-nav" aria-label={`Navegación móvil cliente · ${sectionLabel}`}>
+          {
+            navItems.map((item) =>
+              isActive(item) ? (
+                <span class:list={["client-shell__mobile-link", "is-active"]} aria-current="page">
+                  <span>{item.label}</span>
+                </span>
+              ) : (
+                <a href={item.href} class="client-shell__mobile-link">
+                  <span>{item.label}</span>
+                </a>
+              ),
+            )
+          }
+        </nav>
+      </div>
+    </header>
+
+    <div class="client-shell__content">
+      <slot />
+    </div>
+  </div>
+
+  <script>
+    const topNav = document.querySelector<HTMLElement>(".client-shell__topnav");
+    const userMenuRoot = document.querySelector<HTMLElement>("#client-shell-user");
+    const userMenuToggle = document.querySelector<HTMLButtonElement>("#client-shell-user-toggle");
+    const userMenu = document.querySelector<HTMLElement>("#client-shell-user-menu");
+    const mobileMenuToggle = document.querySelector<HTMLButtonElement>("#client-shell-menu-toggle");
+    const mobileMenu = document.querySelector<HTMLElement>("#client-shell-mobile-menu");
+
+    const closeUserMenu = () => {
+      if (!userMenu || !userMenuToggle) {
+        return;
+      }
+
+      userMenu.hidden = true;
+      userMenuToggle.setAttribute("aria-expanded", "false");
+    };
+
+    const closeMobileMenu = () => {
+      if (!mobileMenu || !mobileMenuToggle) {
+        return;
+      }
+
+      mobileMenu.hidden = true;
+      mobileMenuToggle.setAttribute("aria-expanded", "false");
+    };
+
+    if (userMenuRoot && userMenuToggle && userMenu) {
+      userMenuToggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const shouldOpen = userMenu.hidden;
+        if (!shouldOpen) {
+          closeUserMenu();
+          return;
+        }
+
+        closeMobileMenu();
+        userMenu.hidden = false;
+        userMenuToggle.setAttribute("aria-expanded", "true");
+      });
+
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Node)) {
+          return;
+        }
+
+        if (!userMenuRoot.contains(target)) {
+          closeUserMenu();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeUserMenu();
+          closeMobileMenu();
+        }
+      });
+    }
+
+    if (mobileMenuToggle && mobileMenu) {
+      mobileMenuToggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const shouldOpen = mobileMenu.hidden;
+        if (!shouldOpen) {
+          closeMobileMenu();
+          return;
+        }
+
+        closeUserMenu();
+        mobileMenu.hidden = false;
+        mobileMenuToggle.setAttribute("aria-expanded", "true");
+      });
+
+      mobileMenu.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        if (target.closest("a")) {
+          closeMobileMenu();
+        }
+      });
+    }
+
+    if (topNav) {
+      document.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Node)) {
+          return;
+        }
+
+        if (!topNav.contains(target)) {
+          closeMobileMenu();
+        }
+      });
+    }
+  </script>
+</BaseLayout>
