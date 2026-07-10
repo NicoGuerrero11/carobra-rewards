@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "test", "production"]
 SiscaAdapter = Literal["simulated", "http"]
+CookieSameSite = Literal["lax", "strict", "none"]
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,32 @@ class Settings(BaseSettings):
     legacy_customer_intake_enabled: bool = Field(
         default=False,
         alias="LEGACY_CUSTOMER_INTAKE_ENABLED",
+    )
+    auth_session_cookie_name: str = Field(
+        default="carobra_session",
+        alias="AUTH_SESSION_COOKIE_NAME",
+    )
+    auth_session_ttl_hours: int = Field(
+        default=168,
+        ge=1,
+        le=24 * 90,
+        alias="AUTH_SESSION_TTL_HOURS",
+    )
+    auth_session_cookie_secure: bool = Field(
+        default=False,
+        alias="AUTH_SESSION_COOKIE_SECURE",
+    )
+    auth_session_cookie_samesite: CookieSameSite = Field(
+        default="lax",
+        alias="AUTH_SESSION_COOKIE_SAME_SITE",
+    )
+    auth_session_cookie_domain: str | None = Field(
+        default=None,
+        alias="AUTH_SESSION_COOKIE_DOMAIN",
+    )
+    cors_allowed_origins: str = Field(
+        default="http://127.0.0.1:4321,http://localhost:4321",
+        alias="CORS_ALLOWED_ORIGINS",
     )
     sisca_adapter: SiscaAdapter = Field(default="simulated", alias="SISCA_ADAPTER")
     sisca_base_url: str | None = Field(default=None, alias="SISCA_BASE_URL")
@@ -71,6 +98,17 @@ class Settings(BaseSettings):
     @property
     def parsed_sisca_allowed_movement_types(self) -> frozenset[str]:
         return _parse_csv_set(self.sisca_allowed_movement_types)
+
+    @property
+    def parsed_cors_allowed_origins(self) -> tuple[str, ...]:
+        origins = tuple(
+            origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()
+        )
+        if not origins:
+            raise ValueError("CORS_ALLOWED_ORIGINS cannot be empty")
+        if "*" in origins:
+            raise ValueError("CORS_ALLOWED_ORIGINS cannot contain '*' when credentials are enabled")
+        return origins
 
 
 @lru_cache(maxsize=1)

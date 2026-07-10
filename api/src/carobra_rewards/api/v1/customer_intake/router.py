@@ -24,7 +24,7 @@ from carobra_rewards.modules.customer_intake.application.service import (
     ProcessSimulatedCustomerIntake,
 )
 
-router = APIRouter(prefix="/customers/intake", tags=["customer-intake"])
+router = APIRouter(prefix="/customers/intake", tags=["legacy-customer-intake"])
 
 _REQUEST_ID_RESPONSE_HEADER = {
     "description": "Opaque Rewards-generated UUID v4 for this HTTP execution.",
