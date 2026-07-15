@@ -2,9 +2,11 @@ export type CookieSameSite = "lax" | "strict" | "none";
 
 export interface SiteBackendConfig {
   apiBaseUrl: string;
+  databaseUrl?: string;
   host: string;
   port: number;
   apiRequestTimeoutMs: number;
+  referralIdentityHmacSecret?: string;
   sessionCookie: {
     name: string;
     secure: boolean;
@@ -43,7 +45,7 @@ export function loadConfig(
     sessionCookie.domain = domain;
   }
 
-  return {
+  const config: SiteBackendConfig = {
     apiBaseUrl: parseBaseUrl(environment.API_BASE_URL ?? "http://127.0.0.1:8000"),
     host: requiredValue(
       "SITE_BACKEND_HOST",
@@ -58,6 +60,16 @@ export function loadConfig(
     ),
     sessionCookie,
   };
+  const databaseUrl = environment.DATABASE_URL?.trim();
+  if (databaseUrl) config.databaseUrl = databaseUrl;
+  const referralIdentityHmacSecret = environment.REFERRAL_IDENTITY_HMAC_SECRET?.trim();
+  if (referralIdentityHmacSecret) {
+    if (Buffer.byteLength(referralIdentityHmacSecret, "utf8") < 32) {
+      throw new Error("REFERRAL_IDENTITY_HMAC_SECRET must contain at least 32 bytes");
+    }
+    config.referralIdentityHmacSecret = referralIdentityHmacSecret;
+  }
+  return config;
 }
 
 function parseBaseUrl(value: string): string {
