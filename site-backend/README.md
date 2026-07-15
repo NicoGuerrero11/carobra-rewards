@@ -20,6 +20,8 @@ Use `.env.example` as a reference and export the variables before starting:
 | `SESSION_COOKIE_PATH` | `/` | Browser cookie path |
 | `SESSION_COOKIE_DOMAIN` | unset | Optional browser cookie domain |
 | `API_REQUEST_TIMEOUT_MS` | `5000` | FastAPI request timeout |
+| `DATABASE_URL` | unset | Carobra PostgreSQL database used by site-backend Rewards migrations |
+| `TEST_DATABASE_URL` | unset | Dedicated PostgreSQL database for isolated migration/integration tests |
 
 `SESSION_COOKIE_NAME` must match FastAPI's `AUTH_SESSION_COOKIE_NAME`.
 The BFF never reads the session value beyond isolating the configured cookie,
@@ -35,6 +37,11 @@ npm test
 npm run build
 npm start
 ```
+
+When `TEST_DATABASE_URL` is configured, `npm test` creates an isolated schema,
+round-trips every site-backend migration, exercises database constraints and
+relationships, verifies baseline configuration, and drops the schema. The test
+refuses to run if `TEST_DATABASE_URL` is the same as `DATABASE_URL`.
 
 `npm start` serves the BFF at `http://127.0.0.1:3001` with the example
 configuration. Start FastAPI at `http://127.0.0.1:8000` first. Node does not
@@ -56,3 +63,10 @@ Errors are returned as `{ "error": { "code", "message" } }`. The stable form
 codes are `duplicate_email`, `duplicate_curp`, `password_mismatch`,
 `terms_not_accepted`, `invalid_credentials`, `unauthenticated`, and
 `api_unavailable`.
+
+Rewards resource error and cursor-pagination contracts are documented in
+[`docs/rewards-http-contracts.md`](../docs/rewards-http-contracts.md). They apply only to
+`/api/v1/rewards/*`; the existing authentication and SISCA proxy envelopes remain unchanged.
+
+Release gates, rule/catalog/partner activation, rollback, backfill, and finance reconciliation
+are documented in [`docs/rewards-operations-runbook.md`](../docs/rewards-operations-runbook.md).
