@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 
+import { rewardsMonthlyInteractions } from "./migrations/007-rewards-monthly-interactions.ts";
+
 import { rewardsOnboardingEvidence } from "./migrations/006-rewards-onboarding-evidence.ts";
 
 import { rewardsBaselineConfiguration } from "./migrations/005-rewards-baseline-configuration.ts";
@@ -19,6 +21,7 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
+  rewardsMonthlyInteractions,
   rewardsOnboardingEvidence,
   rewardsBaselineConfiguration,
   rewardsReferralsProductsAdvisors,
