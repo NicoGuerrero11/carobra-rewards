@@ -12,6 +12,14 @@ declare namespace App {
       customerStatus: string;
       onboardingStatus: string;
     };
+    rewardsEligibility?: {
+      customer_id: string;
+      eligible: boolean;
+      reason: string | null;
+      customer_status: string | null;
+      sisca_validation_status: string | null;
+      afore_relation_status: string | null;
+    };
   }
 }
 
