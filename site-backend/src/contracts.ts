@@ -13,6 +13,10 @@ export interface RegisterRequest {
   terms_version: string;
 }
 
+export interface SiteRegisterRequest extends RegisterRequest {
+  referral_token?: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -55,6 +59,13 @@ export interface ValidationStatusResponse {
   last_check_outcome: string | null;
 }
 
+export interface RewardsIdentityEvidence {
+  customer_id: string;
+  customer_status: string;
+  validation_id: string;
+  validation_status: string;
+}
+
 export type SiteErrorCode =
   | "duplicate_email"
   | "duplicate_curp"
@@ -63,6 +74,7 @@ export type SiteErrorCode =
   | "terms_not_accepted"
   | "invalid_credentials"
   | "unauthenticated"
+  | "rewards_not_eligible"
   | "api_unavailable";
 
 export interface SiteErrorEnvelope {
