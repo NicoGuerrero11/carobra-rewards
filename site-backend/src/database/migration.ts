@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 
+import { rewardsJobManualRetries } from "./migrations/017-rewards-job-manual-retries.ts";
+
 import { expectedRedemptionAssumptions } from "./migrations/016-expected-redemption-assumptions.ts";
 
 import { expirationNotificationDeliveries } from "./migrations/015-expiration-notification-deliveries.ts";
@@ -39,6 +41,7 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
+  rewardsJobManualRetries,
   expectedRedemptionAssumptions,
   expirationNotificationDeliveries,
   referralInvitationLinks,
