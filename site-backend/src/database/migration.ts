@@ -1,12 +1,16 @@
 import type { PoolClient } from "pg";
 
+import { rewardsLedgerFoundation } from "./migrations/001-rewards-ledger-foundation.ts";
+
 export interface Migration {
   id: string;
   up: string;
   down: string;
 }
 
-export const migrations: readonly Migration[] = [];
+export const migrations: readonly Migration[] = [
+  rewardsLedgerFoundation,
+];
 
 export async function migrate(client: PoolClient): Promise<void> {
   await client.query("SELECT pg_advisory_lock(724_202_607_14)");
