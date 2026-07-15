@@ -11,6 +11,16 @@ test("registers a customer and redirects to login", async ({ page }) => {
   await expect(page.locator("#feedback")).toContainText("Tu cuenta fue creada");
 });
 
+test("captures an opaque referral link without showing the referrer", async ({ page }) => {
+  await page.goto("/registro?ref=abcdefghijklmnopqrstuvwxyzABCDEFG_123456789");
+
+  await expect(page.getByText("Llegaste mediante una invitación de Carobra Rewards")).toBeVisible();
+  await expect(page.locator("[name='referral_token']")).toHaveValue(
+    "abcdefghijklmnopqrstuvwxyzABCDEFG_123456789",
+  );
+  await expect(page.getByText(/Lovelace|eligible@example.com/)).toHaveCount(0);
+});
+
 test("renders a stable registration API error on the matching field", async ({ page }) => {
   await page.goto("/registro");
   await fillRegistration(page, "duplicate@example.com");
@@ -47,7 +57,7 @@ test("logs in and renders the authenticated dashboard validation status", async 
 
   await page.locator("#submit-button").click();
 
-  await expect(page).toHaveURL(/\/cliente$/);
+  await expect(page).toHaveURL(/\/cliente\/validacion$/);
   await expect(page.getByRole("heading", { name: "Hola, Ada" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Validación AFORE pendiente" })).toBeVisible();
   await expect(page.getByText("Rewards ID: RWD-e2e")).toBeVisible();

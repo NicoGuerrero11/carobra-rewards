@@ -1,5 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+const referralCandidate = Astro.url.searchParams.get("ref")?.trim() ?? "";
+const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
+  ? referralCandidate
+  : "";
 ---
 
 <BaseLayout title="Registro | Carobra Rewards" description="Crea tu cuenta e inicia tu validación AFORE.">
@@ -10,8 +15,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <p class="mt-2 text-sm text-[#4c637f]">
         Completa tus datos para registrar tu cuenta e iniciar la validación de tu AFORE.
       </p>
+      {referralToken && (
+        <p class="mt-4 rounded-xl border border-[#bdd5ea] bg-[#eef6fd] p-3 text-sm font-semibold text-[#244b73]" role="status">
+          Llegaste mediante una invitación de Carobra Rewards. La aplicaremos de forma segura al completar tu registro.
+        </p>
+      )}
 
       <form id="register-form" class="mt-6 grid gap-4 sm:grid-cols-2" novalidate>
+        <input type="hidden" name="referral_token" value={referralToken} />
         <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
           CURP
           <input id="curp" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm uppercase text-[#102745]" type="text" name="curp" required minlength="18" maxlength="18" autocomplete="off" aria-describedby="curp-error" />
@@ -230,6 +241,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         city: String(formData.get("city") ?? "").trim(),
         terms_accepted: formData.get("terms_accepted") === "on",
         terms_version: String(formData.get("terms_version") ?? ""),
+        referral_token: String(formData.get("referral_token") ?? ""),
       };
 
       if (!validate(payload)) {
