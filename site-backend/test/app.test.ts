@@ -5,6 +5,12 @@ import test from "node:test";
 
 import { createSiteBackendServer } from "../src/app.js";
 import type { SiteBackendConfig } from "../src/config.js";
+import type {
+  CaptureReferralRegistrationCommand,
+  ReferralDashboardHttpResponse,
+  ReferralHttpApplication,
+} from "../src/rewards/referrals/http-application.js";
+import type { CustomerId } from "../src/rewards/shared/identifiers.js";
 
 const runningServers = new Set<Server>();
 
@@ -63,6 +69,56 @@ test("proxies successful registration without changing the payload", async (t) =
 
   assert.equal(response.status, 201);
   assert.equal((await response.json() as { validation_status: string }).validation_status, "PENDING");
+});
+
+test("captures a referral token after registration without forwarding it to FastAPI", async (t) => {
+  const token = "abcdefghijklmnopqrstuvwxyzABCDEFG_123456789";
+  const upstream = await startServer(async (request, response) => {
+    assert.deepEqual(await readJson(request), registrationPayload);
+    json(response, 201, {
+      customer: profile,
+      validation_id: "00000000-0000-0000-0000-000000000302",
+      validation_status: "PENDING",
+    });
+  });
+  const referrals = new CapturingReferralApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, referrals);
+
+  const response = await fetch(`${bff.url}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...registrationPayload, referral_token: token }),
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(referrals.capture?.token, token);
+  assert.equal(referrals.capture?.referredCustomerId, profile.id);
+});
+
+test("returns authenticated referral progress without another customer's identity", async (t) => {
+  const upstream = await startServer((request, response) => {
+    if (request.url === "/api/v1/me") return json(response, 200, profile);
+    if (request.url === "/api/v1/me/validation-status") {
+      return json(response, 200, {
+        validation_id: "00000000-0000-0000-0000-000000000302",
+        customer_id: profile.id,
+        status: "VALIDATED",
+      });
+    }
+    return json(response, 404, {});
+  });
+  const referrals = new CapturingReferralApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, referrals);
+
+  const response = await fetch(`${bff.url}/api/v1/rewards/referrals`, {
+    headers: { cookie: "carobra_session=api-secret" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(referrals.dashboardCustomerId, profile.id);
+  const body = await response.text();
+  assert.match(body, /\/registro\?ref=/);
+  assert.doesNotMatch(body, /referred@example|CURP|first_name/i);
 });
 
 test("proxies successful login and adapts the API session cookie", async (t) => {
@@ -248,6 +304,7 @@ async function startBff(
   apiBaseUrl: string,
   cookieOverrides?: Partial<SiteBackendConfig["sessionCookie"]>,
   timeout = 1_000,
+  referralApplication?: ReferralHttpApplication,
 ): Promise<RunningServer> {
   const config: SiteBackendConfig = {
     apiBaseUrl,
@@ -262,9 +319,40 @@ async function startBff(
       ...cookieOverrides,
     },
   };
-  const running = await listen(createSiteBackendServer(config));
+  const running = await listen(
+    createSiteBackendServer(config, undefined, undefined, undefined, referralApplication),
+  );
   t.after(() => close(running.server));
   return running;
+}
+
+class CapturingReferralApplication implements ReferralHttpApplication {
+  capture: CaptureReferralRegistrationCommand | null = null;
+  dashboardCustomerId: CustomerId | null = null;
+
+  async captureRegistration(
+    command: CaptureReferralRegistrationCommand,
+  ): Promise<{ status: "REGISTERED" }> {
+    this.capture = command;
+    return { status: "REGISTERED" };
+  }
+
+  async getDashboard(customerId: CustomerId): Promise<ReferralDashboardHttpResponse> {
+    this.dashboardCustomerId = customerId;
+    return {
+      invite_path: "/registro?ref=abcdefghijklmnopqrstuvwxyzABCDEFG_123456789",
+      accepting_referrals: true,
+      unavailable_reason: null,
+      totals: { invited: 1, registered: 1, active: 0, earned_points: "3000" },
+      referrals: [{
+        position: 1,
+        status: "REGISTERED",
+        registration_completed: true,
+        six_month_completed: false,
+        twelve_month_completed: false,
+      }],
+    };
+  }
 }
 
 async function startServer(
