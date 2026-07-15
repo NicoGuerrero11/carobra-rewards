@@ -1,38 +1,22 @@
 import type { PoolClient } from "pg";
 
-import { rewardsJobManualRetries } from "./migrations/017-rewards-job-manual-retries.ts";
-
-import { expectedRedemptionAssumptions } from "./migrations/016-expected-redemption-assumptions.ts";
-
-import { expirationNotificationDeliveries } from "./migrations/015-expiration-notification-deliveries.ts";
-
-import { referralInvitationLinks } from "./migrations/014-referral-invitation-links.ts";
-
-import { referralAttributionPolicies } from "./migrations/013-referral-attribution-policies.ts";
-
-import { redemptionLimitPolicies } from "./migrations/012-redemption-limit-policies.ts";
-
-import { rewardsEntitlementUse } from "./migrations/011-rewards-entitlement-use.ts";
-
-import { rewardsCatalogAdministration } from "./migrations/010-rewards-catalog-administration.ts";
-
-import { rewardsMvpCatalog } from "./migrations/009-rewards-mvp-catalog.ts";
-
-import { rewardsVerifiedBirthDates } from "./migrations/008-rewards-verified-birth-dates.ts";
-
-import { rewardsMonthlyInteractions } from "./migrations/007-rewards-monthly-interactions.ts";
-
-import { rewardsOnboardingEvidence } from "./migrations/006-rewards-onboarding-evidence.ts";
-
-import { rewardsBaselineConfiguration } from "./migrations/005-rewards-baseline-configuration.ts";
-
-import { rewardsReferralsProductsAdvisors } from "./migrations/004-rewards-referrals-products-advisors.ts";
-
-import { rewardsCatalogRedemptions } from "./migrations/003-rewards-catalog-redemptions.ts";
-
-import { rewardsJobFoundation } from "./migrations/002-rewards-jobs.ts";
-
-import { rewardsLedgerFoundation } from "./migrations/001-rewards-ledger-foundation.ts";
+import { rewardsLedgerFoundation } from "./migrations/001-rewards-ledger-foundation.js";
+import { rewardsJobFoundation } from "./migrations/002-rewards-jobs.js";
+import { rewardsCatalogRedemptions } from "./migrations/003-rewards-catalog-redemptions.js";
+import { rewardsReferralsProductsAdvisors } from "./migrations/004-rewards-referrals-products-advisors.js";
+import { rewardsBaselineConfiguration } from "./migrations/005-rewards-baseline-configuration.js";
+import { rewardsOnboardingEvidence } from "./migrations/006-rewards-onboarding-evidence.js";
+import { rewardsMonthlyInteractions } from "./migrations/007-rewards-monthly-interactions.js";
+import { rewardsVerifiedBirthDates } from "./migrations/008-rewards-verified-birth-dates.js";
+import { rewardsMvpCatalog } from "./migrations/009-rewards-mvp-catalog.js";
+import { rewardsCatalogAdministration } from "./migrations/010-rewards-catalog-administration.js";
+import { rewardsEntitlementUse } from "./migrations/011-rewards-entitlement-use.js";
+import { redemptionLimitPolicies } from "./migrations/012-redemption-limit-policies.js";
+import { referralAttributionPolicies } from "./migrations/013-referral-attribution-policies.js";
+import { referralInvitationLinks } from "./migrations/014-referral-invitation-links.js";
+import { expirationNotificationDeliveries } from "./migrations/015-expiration-notification-deliveries.js";
+import { expectedRedemptionAssumptions } from "./migrations/016-expected-redemption-assumptions.js";
+import { rewardsJobManualRetries } from "./migrations/017-rewards-job-manual-retries.js";
 
 export interface Migration {
   id: string;
@@ -41,23 +25,23 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
-  rewardsJobManualRetries,
-  expectedRedemptionAssumptions,
-  expirationNotificationDeliveries,
-  referralInvitationLinks,
-  referralAttributionPolicies,
-  redemptionLimitPolicies,
-  rewardsEntitlementUse,
-  rewardsCatalogAdministration,
-  rewardsMvpCatalog,
-  rewardsVerifiedBirthDates,
-  rewardsMonthlyInteractions,
-  rewardsOnboardingEvidence,
-  rewardsBaselineConfiguration,
-  rewardsReferralsProductsAdvisors,
-  rewardsCatalogRedemptions,
-  rewardsJobFoundation,
   rewardsLedgerFoundation,
+  rewardsJobFoundation,
+  rewardsCatalogRedemptions,
+  rewardsReferralsProductsAdvisors,
+  rewardsBaselineConfiguration,
+  rewardsOnboardingEvidence,
+  rewardsMonthlyInteractions,
+  rewardsVerifiedBirthDates,
+  rewardsMvpCatalog,
+  rewardsCatalogAdministration,
+  rewardsEntitlementUse,
+  redemptionLimitPolicies,
+  referralAttributionPolicies,
+  referralInvitationLinks,
+  expirationNotificationDeliveries,
+  expectedRedemptionAssumptions,
+  rewardsJobManualRetries,
 ];
 
 export async function migrate(client: PoolClient): Promise<void> {
