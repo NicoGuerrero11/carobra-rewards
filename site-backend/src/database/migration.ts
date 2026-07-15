@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 
+import { referralAttributionPolicies } from "./migrations/013-referral-attribution-policies.ts";
+
 import { redemptionLimitPolicies } from "./migrations/012-redemption-limit-policies.ts";
 
 import { rewardsEntitlementUse } from "./migrations/011-rewards-entitlement-use.ts";
@@ -31,6 +33,7 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
+  referralAttributionPolicies,
   redemptionLimitPolicies,
   rewardsEntitlementUse,
   rewardsCatalogAdministration,
