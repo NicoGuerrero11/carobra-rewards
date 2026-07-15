@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
 
 from carobra_rewards.core.config import get_settings, reset_settings_cache
 from carobra_rewards.infrastructure.database.session import reset_engine_cache
+from carobra_rewards.infrastructure.database.url import normalize_async_database_url
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,25 +24,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 def get_test_database_url() -> str | None:
     from_environment = os.getenv("TEST_DATABASE_URL")
     if from_environment:
-        return from_environment
+        return normalize_async_database_url(from_environment)
 
     settings = get_settings()
     if settings.test_database_url is None:
         return None
 
-    return settings.test_database_url.get_secret_value()
+    return normalize_async_database_url(settings.test_database_url.get_secret_value())
 
 
 def get_primary_database_url() -> str | None:
     from_environment = os.getenv("DATABASE_URL")
     if from_environment:
-        return from_environment
+        return normalize_async_database_url(from_environment)
 
     settings = get_settings()
     if settings.database_url is None:
         return None
 
-    return settings.database_url.get_secret_value()
+    return normalize_async_database_url(settings.database_url.get_secret_value())
 
 
 def _build_alembic_config(database_url: str) -> Config:

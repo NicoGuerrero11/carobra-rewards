@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from carobra_rewards.core.config import get_settings
 from carobra_rewards.infrastructure.database.base import Base
+from carobra_rewards.infrastructure.database.url import normalize_async_database_url
 from carobra_rewards.modules.customer_intake.infrastructure.persistence import (
     models as _customer_intake_models,  # noqa: F401
 )
@@ -26,7 +27,10 @@ database_url = settings.database_url
 if database_url is None:
     raise RuntimeError("DATABASE_URL is required to run Alembic commands.")
 
-config.set_main_option("sqlalchemy.url", database_url.get_secret_value())
+config.set_main_option(
+    "sqlalchemy.url",
+    normalize_async_database_url(database_url.get_secret_value()),
+)
 
 target_metadata = Base.metadata
 
