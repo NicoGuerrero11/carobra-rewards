@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 
+import { rewardsJobFoundation } from "./migrations/002-rewards-jobs.ts";
+
 import { rewardsLedgerFoundation } from "./migrations/001-rewards-ledger-foundation.ts";
 
 export interface Migration {
@@ -9,6 +11,7 @@ export interface Migration {
 }
 
 export const migrations: readonly Migration[] = [
+  rewardsJobFoundation,
   rewardsLedgerFoundation,
 ];
 
