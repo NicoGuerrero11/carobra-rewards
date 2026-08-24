@@ -1,0 +1,374 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getSiteBackendBaseUrl } from "../lib/api";
+import {
+  journeyStateLabel,
+  levelLabel,
+  type RewardsJourneySummary,
+  type RewardsV2ScenarioListItem,
+} from "../lib/rewards-v2-contract";
+import { isRewardsV2PreviewAuthorized } from "../lib/rewards-v2-preview-auth";
+
+const previewEnabled = process.env.REWARDS_V2_PREVIEW_ENABLED
+  ?? import.meta.env.REWARDS_V2_PREVIEW_ENABLED;
+const previewUsername = process.env.REWARDS_V2_PREVIEW_USERNAME
+  ?? import.meta.env.REWARDS_V2_PREVIEW_USERNAME;
+const previewPassword = process.env.REWARDS_V2_PREVIEW_PASSWORD
+  ?? import.meta.env.REWARDS_V2_PREVIEW_PASSWORD;
+const testAccessKey = process.env.REWARDS_V2_TEST_ACCESS_KEY
+  ?? import.meta.env.REWARDS_V2_TEST_ACCESS_KEY;
+
+if (previewEnabled !== "true") {
+  return new Response("Not found", { status: 404 });
+}
+if (!isRewardsV2PreviewAuthorized({
+  authorizationHeader: Astro.request.headers.get("authorization"),
+  expectedUsername: previewUsername,
+  expectedPassword: previewPassword,
+})) {
+  return new Response("Authorization required", {
+    status: 401,
+    headers: {
+      "www-authenticate": 'Basic realm="Carobra Rewards V2 Preview", charset="UTF-8"',
+      "cache-control": "no-store",
+    },
+  });
+}
+
+if (!testAccessKey) {
+  return new Response("Rewards V2 preview is not configured", { status: 503 });
+}
+const headers = {
+  accept: "application/json",
+  "x-rewards-v2-test-key": testAccessKey,
+};
+let scenarios: RewardsV2ScenarioListItem[] = [];
+let summary: RewardsJourneySummary | null = null;
+let loadError = false;
+let selectedCode = Astro.url.searchParams.get("scenario") ?? "invited";
+try {
+  const listResponse = await fetch(
+    `${getSiteBackendBaseUrl()}/api/v1/rewards/test/scenarios`,
+    { headers },
+  );
+  if (!listResponse.ok) throw new Error("Scenario list unavailable");
+  scenarios = ((await listResponse.json()) as { scenarios: RewardsV2ScenarioListItem[] }).scenarios;
+  if (!scenarios.some((scenario) => scenario.code === selectedCode)) {
+    selectedCode = scenarios[0]?.code ?? "invited";
+  }
+  const summaryResponse = await fetch(
+    `${getSiteBackendBaseUrl()}/api/v1/rewards/test/scenarios/${encodeURIComponent(selectedCode)}`,
+    { headers },
+  );
+  if (!summaryResponse.ok) throw new Error("Scenario unavailable");
+  summary = (await summaryResponse.json()) as RewardsJourneySummary;
+} catch {
+  loadError = true;
+}
+
+const selectedScenario = scenarios.find((scenario) => scenario.code === selectedCode);
+const points = (value: string | undefined) => new Intl.NumberFormat("es-MX").format(BigInt(value ?? "0"));
+const date = (value: string | null) => value
+  ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value))
+  : "Pendiente";
+const movementName = (code: string) => ({
+  V2_INVITED_REGISTRATION: "Registro completado",
+  V2_INITIAL_PRODUCT_ACTIVE: "Primer producto validado",
+}[code] ?? code.replaceAll("_", " "));
+const statusMessage = summary?.journey.state === "INVITED"
+  ? "Estamos validando tu primer producto. Puedes consultar tus puntos, pero el canje seguirá bloqueado hasta recibir la confirmación."
+  : summary?.journey.state === "INACTIVE"
+    ? "Actualmente no tienes productos activos. Conservamos tu historial y el sistema recalculará tu nivel al recibir nueva evidencia."
+    : "Tu experiencia se actualiza con productos activos, permanencia y actividades de perfilamiento.";
+---
+
+<BaseLayout
+  title={`Rewards V2 · ${selectedScenario?.name ?? "Vista interna"}`}
+  description="Vista interna de Carobra Rewards V2 conectada a escenarios administrados por backend."
+>
+  <div class="v2-preview">
+    <div class="preview-notice" role="status">
+      <span aria-hidden="true"></span>
+      Entorno interno V2 · Contratos reales de backend · Sin datos de clientes
+    </div>
+
+    <header class="preview-header">
+      <a href="/rewards-v2-preview" aria-label="Carobra Rewards V2">
+        <img src="/images/carobra-logo-horizontal-cropped.png" alt="Carobra" />
+      </a>
+      <div>
+        <small>Revisión de producto</small>
+        <strong>Rewards V2</strong>
+      </div>
+    </header>
+
+    <main class="preview-main">
+      <section class="preview-intro">
+        <div>
+          <p class="eyebrow">Journey del cliente</p>
+          <h1>Revisa cada estado del nuevo modelo</h1>
+          <p>Los niveles, productos, puntos y pendientes provienen del contrato V2 administrado por el backend.</p>
+        </div>
+        <aside>
+          <strong>18 meses</strong>
+          <span>Vigencia técnica exclusiva para pruebas</span>
+        </aside>
+      </section>
+
+      {loadError || !summary ? (
+        <section class="error-panel" role="alert">
+          <h2>No pudimos cargar los escenarios V2</h2>
+          <p>Verifica que el site backend tenga habilitado el modo de prueba y que las credenciales coincidan.</p>
+        </section>
+      ) : (
+        <>
+          <nav class="scenario-grid" aria-label="Escenarios Rewards V2">
+            {scenarios.map((scenario) => (
+              <a
+                href={`/rewards-v2-preview?scenario=${scenario.code}`}
+                class:list={["scenario-option", scenario.code === selectedCode && "is-active"]}
+                aria-current={scenario.code === selectedCode ? "page" : undefined}
+              >
+                <span>{scenario.code === selectedCode ? "✓" : ""}</span>
+                <strong>{scenario.name}</strong>
+                <small>{scenario.description}</small>
+              </a>
+            ))}
+          </nav>
+
+          <section class:list={["journey-hero", `is-${summary.journey.state.toLowerCase()}`]}>
+            <div class="journey-copy">
+              <p class="eyebrow">{journeyStateLabel(summary.journey.state)}</p>
+              <h2>{levelLabel(summary.journey.current_level)}</h2>
+              <p>{statusMessage}</p>
+              <div class="journey-tags">
+                <span>Validación: {summary.journey.validation_status.replaceAll("_", " ")}</span>
+                <span>{summary.products.filter((product) => product.status === "ACTIVE").length} productos activos</span>
+                <span>Desde {date(summary.journey.registered_at)}</span>
+              </div>
+            </div>
+            <article class="balance-panel" aria-label="Saldo del escenario">
+              <span>Saldo disponible</span>
+              <strong>{points(summary.points.available)} <small>pts</small></strong>
+              <p>{summary.redemption.eligible ? "Canje disponible" : "Canje todavía no disponible"}</p>
+            </article>
+          </section>
+
+          <section class="journey-steps" aria-label="Etapas del journey">
+            <article class="is-complete">
+              <span>1</span>
+              <div><strong>Registro</strong><small>Invitado · +45 pts</small></div>
+            </article>
+            <article class:list={[summary.products.length > 0 && "is-complete"]}>
+              <span>2</span>
+              <div><strong>Producto validado</strong><small>SISCA u otra fuente aprobada</small></div>
+            </article>
+            <article class:list={[summary.journey.current_level && "is-complete"]}>
+              <span>3</span>
+              <div><strong>Nivel calculado</strong><small>Productos, permanencia y actividad</small></div>
+            </article>
+          </section>
+
+          <section class="summary-grid">
+            <article class="summary-card progress-card">
+              <header>
+                <div>
+                  <p class="eyebrow">Progreso</p>
+                  <h2>{summary.progress.target_level ? "Siguiente nivel" : "Nivel máximo"}</h2>
+                </div>
+                <span>{summary.progress.target_level
+                  ? levelLabel(summary.progress.target_level)
+                  : levelLabel(summary.journey.current_level)}</span>
+              </header>
+              {summary.progress.rule_available ? (
+                <div class="progress-items">
+                  {summary.progress.remaining_active_products !== null && (
+                    <p><strong>{summary.progress.remaining_active_products}</strong> productos activos faltantes</p>
+                  )}
+                  {summary.progress.remaining_registration_months !== null && (
+                    <p><strong>{summary.progress.remaining_registration_months}</strong> meses de permanencia faltantes</p>
+                  )}
+                  {summary.progress.remaining_qualifying_activities !== null && (
+                    <p><strong>{summary.progress.remaining_qualifying_activities}</strong> actividades de perfilamiento faltantes</p>
+                  )}
+                </div>
+              ) : (
+                <div class="pending-rule">
+                  <strong>{summary.progress.target_level
+                    ? "Regla pendiente de aprobación"
+                    : "No hay un nivel superior"}</strong>
+                  <p>{summary.progress.target_level
+                    ? "El sitio no inventa cantidades ni promete un ascenso mientras el equipo no cierre el criterio."
+                    : "El cliente ya alcanzó el nivel más alto definido en el modelo actual."}</p>
+                </div>
+              )}
+            </article>
+
+            <article class="summary-card">
+              <header><div><p class="eyebrow">Vigencia</p><h2>Puntos de prueba</h2></div></header>
+              <dl class="facts-list">
+                <div><dt>Disponibles</dt><dd>{points(summary.points.available)} pts</dd></div>
+                <div><dt>Reservados</dt><dd>{points(summary.points.reserved)} pts</dd></div>
+                <div><dt>Vencimiento técnico</dt><dd>{date(summary.points.next_expiration_at)}</dd></div>
+              </dl>
+              <p class="test-caveat">La política productiva de 12 o 18 meses sigue pendiente.</p>
+            </article>
+          </section>
+
+          <section class="detail-grid">
+            <article class="summary-card">
+              <header><div><p class="eyebrow">Evidencia</p><h2>Productos</h2></div></header>
+              {summary.products.length ? (
+                <ul class="product-list">
+                  {summary.products.map((product) => (
+                    <li>
+                      <span class:list={["status-dot", `is-${product.status.toLowerCase()}`]} aria-hidden="true"></span>
+                      <div><strong>{product.product_type.replaceAll("_", " ")}</strong><small>{product.provider}</small></div>
+                      <span class="status-pill">{product.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div class="empty-state"><strong>Aún no hay un producto validado</strong><p>El cliente permanece como Invitado.</p></div>
+              )}
+            </article>
+
+            <article class="summary-card">
+              <header><div><p class="eyebrow">Trazabilidad</p><h2>Movimientos</h2></div></header>
+              <ul class="movement-list">
+                {summary.recent_movements.map((movement) => (
+                  <li>
+                    <div><strong>{movementName(movement.code)}</strong><small>{date(movement.occurred_at)}</small></div>
+                    <span>+{points(movement.points_delta)} pts</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </section>
+
+          <section class="disabled-modules" aria-labelledby="pending-modules-title">
+            <div>
+              <p class="eyebrow">Integraciones</p>
+              <h2 id="pending-modules-title">Módulos preparados, todavía deshabilitados</h2>
+              <p>El cliente no verá beneficios simulados ni condiciones comerciales que Bonda y el equipo aún no hayan aprobado.</p>
+            </div>
+            <ul>
+              <li><strong>Beneficios y canje</strong><span>Pendiente Bonda</span></li>
+              <li><strong>Vigencia productiva</strong><span>12 o 18 meses</span></li>
+              <li><strong>AVE</strong><span>Alcance por confirmar</span></li>
+              <li><strong>Referidos y renovaciones</strong><span>Reglas pendientes</span></li>
+            </ul>
+          </section>
+        </>
+      )}
+    </main>
+  </div>
+
+  <style>
+    :global(body) { margin: 0; background: #eef3f8; color: #173b60; }
+    .v2-preview { min-height: 100vh; background: radial-gradient(circle at 12% 0%, rgba(59, 149, 204, .14), transparent 28rem), #eef3f8; }
+    .preview-notice { min-height: 2.25rem; display: flex; align-items: center; justify-content: center; gap: .55rem; padding: .4rem 1rem; background: #e9f5ff; color: #1a537b; font-size: .76rem; font-weight: 800; text-align: center; }
+    .preview-notice span { width: .5rem; height: .5rem; border-radius: 50%; background: #1c9bd1; box-shadow: 0 0 0 4px rgba(28,155,209,.13); }
+    .preview-header { min-height: 4.8rem; padding: .7rem max(1rem, calc((100vw - 1180px)/2)); display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,.94); border-bottom: 1px solid #d7e3ee; }
+    .preview-header img { width: min(13rem, 46vw); height: 3rem; object-fit: contain; object-position: left; }
+    .preview-header div { display: grid; text-align: right; color: #587590; }
+    .preview-header small { text-transform: uppercase; letter-spacing: .1em; font-size: .68rem; }
+    .preview-header strong { color: #173f68; }
+    .preview-main { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; padding: 2.2rem 0 4rem; }
+    .preview-intro { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 2rem; }
+    .preview-intro h1 { margin: .25rem 0 .6rem; color: #123b65; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.04; }
+    .preview-intro > div > p:last-child { max-width: 46rem; margin: 0; color: #587590; }
+    .preview-intro aside { width: 15rem; padding: 1rem; border: 1px solid #cbdcea; border-radius: 1rem; background: #fff; box-shadow: 0 12px 30px rgba(16,51,83,.07); }
+    .preview-intro aside strong, .preview-intro aside span { display: block; }
+    .preview-intro aside strong { color: #0b6eaa; font-size: 1.4rem; }
+    .preview-intro aside span { margin-top: .2rem; color: #688098; font-size: .78rem; }
+    .eyebrow { margin: 0; color: #4380a7; font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .scenario-grid { margin-top: 1.7rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; }
+    .scenario-option { min-height: 6rem; display: grid; grid-template-columns: 1.5rem 1fr; align-content: center; column-gap: .5rem; padding: .85rem; border: 1px solid #cfdeea; border-radius: .9rem; background: rgba(255,255,255,.86); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    .scenario-option:hover { transform: translateY(-2px); border-color: #76a9cd; box-shadow: 0 12px 24px rgba(20,57,89,.08); }
+    .scenario-option.is-active { border-color: #157db4; background: #edf8ff; box-shadow: inset 0 0 0 1px #157db4; }
+    .scenario-option > span { grid-row: 1 / span 2; width: 1.25rem; height: 1.25rem; display: grid; place-items: center; border: 1px solid #aac5d9; border-radius: 50%; color: #fff; font-size: .7rem; }
+    .scenario-option.is-active > span { background: #157db4; border-color: #157db4; }
+    .scenario-option strong { color: #193f65; font-size: .9rem; }
+    .scenario-option small { margin-top: .2rem; color: #647e96; line-height: 1.35; }
+    .journey-hero { margin-top: 1.1rem; min-height: 18rem; display: grid; grid-template-columns: 1fr 18rem; gap: 2rem; align-items: end; padding: clamp(1.5rem, 4vw, 3.2rem); border-radius: 1.35rem; color: #fff; background: radial-gradient(circle at 80% 18%, rgba(77,180,232,.35), transparent 22rem), linear-gradient(120deg,#082b54,#0a4778); overflow: hidden; }
+    .journey-hero.is-inactive { background: radial-gradient(circle at 80% 18%, rgba(183,201,217,.23), transparent 22rem), linear-gradient(120deg,#23394f,#40546a); }
+    .journey-copy .eyebrow { color: #a8d7f2; }
+    .journey-copy h2 { margin: .25rem 0 .6rem; font-size: clamp(2.7rem, 6vw, 5rem); line-height: .95; }
+    .journey-copy > p:not(.eyebrow) { max-width: 42rem; color: #d8e9f5; }
+    .journey-tags { margin-top: 1.2rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+    .journey-tags span { padding: .4rem .65rem; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; background: rgba(255,255,255,.08); font-size: .72rem; font-weight: 700; }
+    .balance-panel { padding: 1.35rem; border-radius: 1rem; background: #fff; color: #163f67; box-shadow: 0 20px 45px rgba(0,20,44,.2); }
+    .balance-panel > span { color: #638099; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .balance-panel strong { display: block; margin-top: .4rem; font-size: 2.45rem; }
+    .balance-panel small { font-size: .9rem; }
+    .balance-panel p { margin: .4rem 0 0; color: #637d94; font-size: .8rem; }
+    .journey-steps { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; margin-top: .8rem; }
+    .journey-steps article { display: flex; align-items: center; gap: .7rem; padding: .9rem 1rem; border: 1px solid #d2e0eb; border-radius: .85rem; background: #f8fbfd; opacity: .66; }
+    .journey-steps article.is-complete { background: #fff; opacity: 1; }
+    .journey-steps article > span { width: 1.8rem; height: 1.8rem; display: grid; place-items: center; flex: 0 0 auto; border-radius: 50%; background: #dbe7f0; color: #315d7c; font-weight: 800; }
+    .journey-steps .is-complete > span { background: #d8f0e5; color: #14714a; }
+    .journey-steps div { display: grid; }
+    .journey-steps small { color: #6a8297; }
+    .summary-grid, .detail-grid { margin-top: 1rem; display: grid; grid-template-columns: repeat(2,1fr); gap: 1rem; }
+    .summary-card { padding: 1.35rem; border: 1px solid #d2e0eb; border-radius: 1rem; background: #fff; box-shadow: 0 14px 30px rgba(16,51,83,.06); }
+    .summary-card header { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+    .summary-card h2 { margin: .2rem 0 0; color: #173f68; font-size: 1.35rem; }
+    .summary-card header > span { padding: .35rem .65rem; border-radius: 999px; background: #e8f4fb; color: #176d9e; font-size: .75rem; font-weight: 800; }
+    .progress-items { margin-top: 1rem; display: grid; gap: .5rem; }
+    .progress-items p { margin: 0; padding: .7rem; border-radius: .65rem; background: #f2f7fb; color: #5a748d; }
+    .progress-items strong { color: #116f9e; font-size: 1.1rem; }
+    .pending-rule, .empty-state { margin-top: 1rem; padding: 1rem; border: 1px dashed #b9ccdb; border-radius: .75rem; background: #f6f9fc; color: #5a748d; }
+    .pending-rule strong, .empty-state strong { color: #284e72; }
+    .pending-rule p, .empty-state p { margin: .3rem 0 0; font-size: .85rem; }
+    .facts-list { margin: 1rem 0 0; display: grid; gap: .65rem; }
+    .facts-list div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .65rem; border-bottom: 1px solid #e5edf3; }
+    .facts-list dt { color: #6a8297; }
+    .facts-list dd { margin: 0; color: #244d72; font-weight: 800; }
+    .test-caveat { margin: .75rem 0 0; color: #88691d; font-size: .78rem; }
+    .product-list, .movement-list { margin: 1rem 0 0; padding: 0; list-style: none; }
+    .product-list li { display: grid; grid-template-columns: auto 1fr auto; gap: .7rem; align-items: center; padding: .8rem 0; border-bottom: 1px solid #e4ecf3; }
+    .product-list div, .movement-list div { display: grid; }
+    .product-list small, .movement-list small { color: #6b8499; }
+    .status-dot { width: .65rem; height: .65rem; border-radius: 50%; background: #8ca2b4; }
+    .status-dot.is-active { background: #24a46a; box-shadow: 0 0 0 4px rgba(36,164,106,.12); }
+    .status-dot.is-cancelled { background: #bf6a61; }
+    .status-pill { color: #536f86; font-size: .68rem; font-weight: 800; }
+    .movement-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .85rem 0; border-bottom: 1px solid #e4ecf3; }
+    .movement-list li > span { color: #14714a; font-weight: 800; }
+    .disabled-modules { margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1.5rem; border: 1px solid #d6e0e9; border-radius: 1rem; background: #f7f9fb; }
+    .disabled-modules h2 { margin: .2rem 0 .5rem; color: #294c6b; }
+    .disabled-modules p { margin-bottom: 0; color: #6a7f91; }
+    .disabled-modules ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .45rem; }
+    .disabled-modules li { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem .75rem; border-radius: .65rem; background: #fff; color: #345673; }
+    .disabled-modules li span { color: #8294a4; font-size: .75rem; }
+    .error-panel { margin-top: 1.5rem; padding: 1.5rem; border: 1px solid #e3b6b2; border-radius: 1rem; background: #fff5f4; color: #7b332e; }
+    @media (max-width: 820px) {
+      .preview-intro, .journey-hero, .disabled-modules { grid-template-columns: 1fr; }
+      .preview-intro aside { width: auto; }
+      .scenario-grid { grid-template-columns: repeat(2,1fr); }
+      .journey-steps, .summary-grid, .detail-grid { grid-template-columns: 1fr; }
+      .balance-panel { width: min(100%, 22rem); }
+    }
+    @media (max-width: 520px) {
+      .preview-main { width: min(100% - 1rem, 1180px); padding-top: 1.2rem; }
+      .scenario-grid {
+        display: flex;
+        gap: .6rem;
+        overflow-x: auto;
+        padding: .15rem .1rem .55rem;
+        scroll-snap-type: x proximity;
+      }
+      .scenario-option {
+        flex: 0 0 min(82vw, 20rem);
+        min-height: 5.8rem;
+        scroll-snap-align: start;
+      }
+      .scenario-option.is-active { order: -1; }
+      .journey-hero { padding: 1.25rem; }
+      .journey-tags { display: grid; }
+      .preview-header div { display: none; }
+      .disabled-modules li { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</BaseLayout>
