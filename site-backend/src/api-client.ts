@@ -81,6 +81,9 @@ export class RewardsApiClient {
         customer_status: profile.data.customer_status,
         validation_id: validation.data.validation_id,
         validation_status: validation.data.status,
+        registered_at: validation.data.registered_at,
+        validated_at: validation.data.validated_at,
+        product_evidence: validation.data.product_evidence,
       },
       setCookies: [...profile.setCookies, ...validation.setCookies],
     };

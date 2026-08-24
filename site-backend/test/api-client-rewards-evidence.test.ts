@@ -20,6 +20,14 @@ test("Rewards evidence keeps only safe customer and SISCA identity facts", async
         next_checkpoint_at: null,
         last_checked_at: "2026-07-14T10:00:00.000Z",
         last_check_outcome: "MATCH_VALIDATED",
+        validated_at: "2026-07-14T10:00:00.000Z",
+        product_evidence: {
+          provider: "SISCA",
+          product_type: "AFORE",
+          status: "ACTIVE",
+          source_id: "sisca-validation:validation-1",
+          validated_at: "2026-07-14T10:00:00.000Z",
+        },
         raw_sisca_payload: "must-not-be-forwarded",
       });
     }
@@ -49,6 +57,15 @@ test("Rewards evidence keeps only safe customer and SISCA identity facts", async
     customer_status: "ACTIVE",
     validation_id: "validation-1",
     validation_status: "VALIDATED",
+    registered_at: "2026-07-13T10:00:00.000Z",
+    validated_at: "2026-07-14T10:00:00.000Z",
+    product_evidence: {
+      provider: "SISCA",
+      product_type: "AFORE",
+      status: "ACTIVE",
+      source_id: "sisca-validation:validation-1",
+      validated_at: "2026-07-14T10:00:00.000Z",
+    },
   });
   assert.doesNotMatch(JSON.stringify(result.data), /curp|email|phone|raw_sisca|credential/i);
 });
@@ -73,6 +90,7 @@ function config(): SiteBackendConfig {
     host: "127.0.0.1",
     port: 0,
     apiRequestTimeoutMs: 1000,
+    rewardsV2LiveFlowEnabled: false,
     sessionCookie: {
       name: "carobra_session",
       secure: false,

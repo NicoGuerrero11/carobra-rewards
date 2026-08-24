@@ -41,6 +41,7 @@ export interface RegistrationResponse {
   customer: CustomerProfile;
   validation_id: string;
   validation_status: string;
+  registered_at: string;
 }
 
 export interface LoginResponse {
@@ -57,6 +58,14 @@ export interface ValidationStatusResponse {
   next_checkpoint_at: string | null;
   last_checked_at: string | null;
   last_check_outcome: string | null;
+  validated_at: string | null;
+  product_evidence: {
+    provider: "SISCA";
+    product_type: "AFORE";
+    status: "ACTIVE";
+    source_id: string;
+    validated_at: string;
+  } | null;
 }
 
 export interface RewardsIdentityEvidence {
@@ -64,6 +73,9 @@ export interface RewardsIdentityEvidence {
   customer_status: string;
   validation_id: string;
   validation_status: string;
+  registered_at: string;
+  validated_at: string | null;
+  product_evidence: ValidationStatusResponse["product_evidence"];
 }
 
 export type SiteErrorCode =

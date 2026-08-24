@@ -311,6 +311,7 @@ async function startBff(
     host: "127.0.0.1",
     port: 0,
     apiRequestTimeoutMs: timeout,
+    rewardsV2LiveFlowEnabled: false,
     sessionCookie: {
       name: "carobra_session",
       secure: false,

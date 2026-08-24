@@ -22,6 +22,7 @@ Use `.env.example` as a reference and export the variables before starting:
 | `API_REQUEST_TIMEOUT_MS` | `5000` | FastAPI request timeout |
 | `DATABASE_URL` | unset | Carobra PostgreSQL database used by site-backend Rewards migrations |
 | `TEST_DATABASE_URL` | unset | Dedicated PostgreSQL database for isolated migration/integration tests |
+| `REWARDS_V2_LIVE_FLOW_ENABLED` | `false` | Enables registration → Invitado → SISCA → Bronce in development/test only |
 
 `SESSION_COOKIE_NAME` must match FastAPI's `AUTH_SESSION_COOKIE_NAME`.
 The BFF never reads the session value beyond isolating the configured cookie,
@@ -47,6 +48,20 @@ refuses to run if `TEST_DATABASE_URL` is the same as `DATABASE_URL`.
 configuration. Start FastAPI at `http://127.0.0.1:8000` first. Node does not
 load `.env` automatically, so export the file in the shell or provide the same
 variables through the process manager before starting outside the defaults.
+
+For the current local V2 integration review, enable the real (non-mock) path
+explicitly before migrations and startup:
+
+```bash
+export REWARDS_V2_LIVE_FLOW_ENABLED=true
+npm run db:migrate
+npm run build
+npm start
+```
+
+The process rejects this internal activation flag when `NODE_ENV=production`.
+Production remains disabled until the unresolved level and commercial rules
+are approved.
 
 ## Web routes
 
