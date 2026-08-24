@@ -27,6 +27,12 @@ export type CompensationPolicyVersionId = Brand<string, "CompensationPolicyVersi
 export type CompensationRecordId = Brand<string, "CompensationRecordId">;
 export type ReviewFlagId = Brand<string, "ReviewFlagId">;
 export type CorrelationId = Brand<string, "CorrelationId">;
+export type RewardsV2RuleVersionId = Brand<string, "RewardsV2RuleVersionId">;
+export type RewardsJourneyId = Brand<string, "RewardsJourneyId">;
+export type ProductFactId = Brand<string, "ProductFactId">;
+export type ProductFactEventId = Brand<string, "ProductFactEventId">;
+export type ProfileActivityId = Brand<string, "ProfileActivityId">;
+export type LevelDecisionId = Brand<string, "LevelDecisionId">;
 
 export function asCustomerId(value: string): CustomerId {
   return requireIdentifier(value) as CustomerId;

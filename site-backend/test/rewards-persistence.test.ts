@@ -15,6 +15,8 @@ import { referralInvitationLinks } from "../src/database/migrations/014-referral
 import { expirationNotificationDeliveries } from "../src/database/migrations/015-expiration-notification-deliveries.js";
 import { expectedRedemptionAssumptions } from "../src/database/migrations/016-expected-redemption-assumptions.js";
 import { rewardsJobManualRetries } from "../src/database/migrations/017-rewards-job-manual-retries.js";
+import { rewardsV2Foundation } from "../src/database/migrations/018-rewards-v2-foundation.js";
+import { rewardsV2LiveJourney } from "../src/database/migrations/019-rewards-v2-live-journey.js";
 
 test("ledger foundation migration declares required tables and business constraints", () => {
   for (const table of [
@@ -245,4 +247,46 @@ test("manual job retries preserve immutable actor and transition audit", () => {
   assert.match(rewardsJobManualRetries.up, /actor_id varchar\(120\) NOT NULL/);
   assert.doesNotMatch(rewardsJobManualRetries.up, /safe_payload|customer_id|account_id/i);
   assert.match(rewardsJobManualRetries.down, /DROP TABLE rewards_job_manual_retries/);
+});
+
+test("Rewards V2 foundation is additive, auditable, and disabled for production", () => {
+  for (const table of [
+    "rewards_v2_rule_versions",
+    "rewards_v2_journeys",
+    "rewards_product_facts",
+    "rewards_product_fact_events",
+    "rewards_profile_activities",
+    "rewards_level_decisions",
+  ]) {
+    assert.match(rewardsV2Foundation.up, new RegExp(`CREATE TABLE ${table}`));
+    assert.match(rewardsV2Foundation.down, new RegExp(`DROP TABLE ${table}`));
+  }
+  for (const constraint of [
+    "uq_rewards_v2_rule_versions_code_version",
+    "ck_rewards_v2_rule_versions_production_approval",
+    "uq_rewards_v2_journeys_customer",
+    "uq_rewards_product_facts_source",
+    "ck_rewards_product_facts_active_evidence",
+    "uq_rewards_product_fact_events_source",
+    "uq_rewards_profile_activities_source",
+    "uq_rewards_level_decisions_idempotency",
+  ]) {
+    assert.match(rewardsV2Foundation.up, new RegExp(constraint));
+  }
+  assert.match(rewardsV2Foundation.up, /'V2_INVITED_REGISTRATION'[\s\S]{0,160}45/);
+  assert.match(rewardsV2Foundation.up, /'V2_INITIAL_PRODUCT_ACTIVE'[\s\S]{0,160}105/);
+  assert.match(rewardsV2Foundation.up, /'V2_REDEMPTION', 1, false, false/);
+  assert.match(rewardsV2Foundation.up, /'V2_EXPIRY', 1, false, false/);
+  assert.match(rewardsV2Foundation.up, /'V2_AVE', 1, false, false/);
+  assert.match(rewardsV2Foundation.up, /'V2_REFERRALS', 1, false, false/);
+  assert.match(rewardsV2Foundation.up, /'V2_RENEWALS', 1, false, false/);
+  assert.doesNotMatch(rewardsV2Foundation.down, /DROP TABLE (?:ledger_entries|point_lots|reward_events)/);
+});
+
+test("Rewards V2 live journey links ledger awards to V2 rules without rewriting history", () => {
+  assert.match(rewardsV2LiveJourney.up, /ADD COLUMN v2_rule_version_id uuid/);
+  assert.match(rewardsV2LiveJourney.up, /ck_reward_events_single_rule_version/);
+  assert.match(rewardsV2LiveJourney.up, /V2_FIRST_ACTIVE_PRODUCT_LEVEL/);
+  assert.match(rewardsV2LiveJourney.up, /INTERNAL_TEST_ONLY/);
+  assert.doesNotMatch(rewardsV2LiveJourney.up, /approved_for_production[\s\S]{0,120}true/);
 });

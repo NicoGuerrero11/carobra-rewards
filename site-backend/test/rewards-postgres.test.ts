@@ -76,6 +76,7 @@ import {
 } from "../src/rewards/operations/job-operations.js";
 import { RewardsError } from "../src/rewards/shared/errors.js";
 import { FixedClock } from "../src/rewards/shared/clock.js";
+import { PostgresRewardsV2LiveJourney } from "../src/rewards/v2/live-journey.js";
 import {
   asCustomerId,
   type CorrelationId,
@@ -178,6 +179,138 @@ test(
         enabled: true,
         expected_redemption_basis_points: 6000,
         approved_by: "MVP_DESIGN_BASELINE",
+      });
+
+      const v2Rules = await client.query<{
+        code: string;
+        enabled: boolean;
+        approved_for_production: boolean;
+        settings: Record<string, unknown>;
+        disabled_reason: string | null;
+      }>(`
+        SELECT code, enabled, approved_for_production, settings, disabled_reason
+        FROM rewards_v2_rule_versions
+        ORDER BY code
+      `);
+      assert.equal(v2Rules.rows.length, 12);
+      assert.deepEqual(
+        v2Rules.rows.find((rule) => rule.code === "V2_INVITED_REGISTRATION"),
+        {
+          code: "V2_INVITED_REGISTRATION",
+          enabled: true,
+          approved_for_production: false,
+          settings: {
+            points: 45,
+            activationScope: "INTERNAL_TEST_ONLY",
+            testValidityMonths: 18,
+            productionValidityMonths: null,
+          },
+          disabled_reason: null,
+        },
+      );
+      assert.equal(
+        v2Rules.rows.find((rule) => rule.code === "V2_INITIAL_PRODUCT_ACTIVE")
+          ?.settings.points,
+        105,
+      );
+      for (const code of [
+        "V2_REDEMPTION",
+        "V2_EXPIRY",
+        "V2_AVE",
+        "V2_REFERRALS",
+        "V2_RENEWALS",
+      ]) {
+        const rule = v2Rules.rows.find((candidate) => candidate.code === code);
+        assert.equal(rule?.enabled, false);
+        assert.equal(rule?.approved_for_production, false);
+        assert.ok(rule?.disabled_reason);
+      }
+
+      const v2Tables = await client.query<{ table_name: string | null }>(`
+        SELECT to_regclass($1)::text AS table_name
+        UNION ALL SELECT to_regclass($2)::text
+        UNION ALL SELECT to_regclass($3)::text
+        UNION ALL SELECT to_regclass($4)::text
+        UNION ALL SELECT to_regclass($5)::text
+      `, [
+        `${schema}.rewards_v2_journeys`,
+        `${schema}.rewards_product_facts`,
+        `${schema}.rewards_product_fact_events`,
+        `${schema}.rewards_profile_activities`,
+        `${schema}.rewards_level_decisions`,
+      ]);
+      assert.ok(v2Tables.rows.every((table) => table.table_name !== null));
+
+      const liveCustomerId = "00000000-0000-4000-8000-000000007850";
+      await client.query("INSERT INTO customers (id) VALUES ($1)", [liveCustomerId]);
+      const liveJourney = new PostgresRewardsV2LiveJourney(
+        new SchemaTransactionalDatabase(database, schema),
+        new FixedClock(new Date("2026-08-24T12:00:00.000Z")),
+      );
+      const invitedCommand = {
+        customerId: asCustomerId(liveCustomerId),
+        registeredAt: new Date("2026-08-24T10:00:00.000Z"),
+      };
+      await liveJourney.ensureInvited(invitedCommand);
+      await liveJourney.ensureInvited(invitedCommand);
+      const invitedState = await client.query<{
+        state: string;
+        current_level: string | null;
+        available_points: string;
+        event_count: string;
+      }>(`
+        SELECT journey.state, journey.current_level, account.available_points::text,
+          (SELECT count(*)::text FROM reward_events WHERE customer_id = $1) AS event_count
+        FROM rewards_v2_journeys AS journey
+        JOIN rewards_accounts AS account ON account.id = journey.account_id
+        WHERE journey.customer_id = $1
+      `, [liveCustomerId]);
+      assert.deepEqual(invitedState.rows[0], {
+        state: "INVITED",
+        current_level: null,
+        available_points: "45",
+        event_count: "1",
+      });
+
+      const validatedCommand = {
+        ...invitedCommand,
+        validationStatus: "VALIDATED",
+        validatedAfore: {
+          provider: "SISCA" as const,
+          productType: "AFORE" as const,
+          sourceId: "sisca-validation:00000000-0000-4000-8000-000000007851",
+          validatedAt: new Date("2026-08-24T11:00:00.000Z"),
+        },
+      };
+      await liveJourney.synchronize(validatedCommand);
+      await liveJourney.synchronize(validatedCommand);
+      const activeState = await client.query<{
+        state: string;
+        current_level: string;
+        redemption_eligible: boolean;
+        available_points: string;
+        product_count: string;
+        event_count: string;
+        decision_count: string;
+      }>(`
+        SELECT journey.state, journey.current_level, journey.redemption_eligible,
+          account.available_points::text,
+          (SELECT count(*)::text FROM rewards_product_facts WHERE customer_id = $1) AS product_count,
+          (SELECT count(*)::text FROM reward_events WHERE customer_id = $1) AS event_count,
+          (SELECT count(*)::text FROM rewards_level_decisions
+            WHERE journey_id = journey.id) AS decision_count
+        FROM rewards_v2_journeys AS journey
+        JOIN rewards_accounts AS account ON account.id = journey.account_id
+        WHERE journey.customer_id = $1
+      `, [liveCustomerId]);
+      assert.deepEqual(activeState.rows[0], {
+        state: "ACTIVE",
+        current_level: "BRONZE",
+        redemption_eligible: false,
+        available_points: "150",
+        product_count: "1",
+        event_count: "2",
+        decision_count: "1",
       });
 
       const catalogItems = await client.query<{
@@ -633,6 +766,37 @@ test(
         SET effective_to = NULL, updated_at = '2026-07-14T12:00:00.000Z'
         WHERE id = '00000000-0000-4000-8000-000000000501'
       `);
+      await client.query(`
+        DELETE FROM scheduled_rewards_jobs
+        WHERE safe_payload->>'accountId' = (
+          SELECT id::text FROM rewards_accounts WHERE customer_id = $1
+        )
+      `, [liveCustomerId]);
+      await client.query(`
+        DELETE FROM point_lots WHERE account_id = (
+          SELECT id FROM rewards_accounts WHERE customer_id = $1
+        )
+      `, [liveCustomerId]);
+      await client.query(`
+        DELETE FROM ledger_entries WHERE account_id = (
+          SELECT id FROM rewards_accounts WHERE customer_id = $1
+        )
+      `, [liveCustomerId]);
+      await client.query("DELETE FROM reward_events WHERE customer_id = $1", [liveCustomerId]);
+      await client.query(`
+        DELETE FROM rewards_product_fact_events WHERE product_fact_id IN (
+          SELECT id FROM rewards_product_facts WHERE customer_id = $1
+        )
+      `, [liveCustomerId]);
+      await client.query("DELETE FROM rewards_product_facts WHERE customer_id = $1", [liveCustomerId]);
+      await client.query(`
+        DELETE FROM rewards_level_decisions WHERE journey_id IN (
+          SELECT id FROM rewards_v2_journeys WHERE customer_id = $1
+        )
+      `, [liveCustomerId]);
+      await client.query("DELETE FROM rewards_v2_journeys WHERE customer_id = $1", [liveCustomerId]);
+      await client.query("DELETE FROM rewards_accounts WHERE customer_id = $1", [liveCustomerId]);
+      await client.query("DELETE FROM customers WHERE id = $1", [liveCustomerId]);
 
       const foreignKeys = await client.query<{ count: string }>(`
         SELECT count(*)::text AS count
@@ -2408,6 +2572,26 @@ async function verifyBusinessConstraints(client: PoolClient): Promise<void> {
         'HELD_FOR_REVIEW', 'invalid-split', $2, $2, $2
       )
     `, [customerId, now]));
+
+    await expectConstraint(client, "ck_rewards_v2_rule_versions_production_approval", () => client.query(`
+      INSERT INTO rewards_v2_rule_versions (
+        id, rule_type, code, version, enabled, approved_for_production,
+        effective_from, created_at, updated_at
+      ) VALUES (
+        '00000000-0000-4000-8000-000000009007', 'FEATURE_FLAG',
+        'INVALID_PRODUCTION_FLAG', 1, true, true, $1, $1, $1
+      )
+    `, [now]));
+
+    await expectConstraint(client, "ck_rewards_product_facts_active_evidence", () => client.query(`
+      INSERT INTO rewards_product_facts (
+        id, account_id, customer_id, provider, product_type, status,
+        source, source_id, created_at, updated_at
+      ) VALUES (
+        '00000000-0000-4000-8000-000000009008', $1, $2, 'SISCA',
+        'AFORE', 'ACTIVE', 'SISCA', 'missing-active-evidence', $3, $3
+      )
+    `, [accountId, customerId, now]));
   } finally {
     await client.query("ROLLBACK");
   }

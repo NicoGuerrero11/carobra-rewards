@@ -72,3 +72,27 @@ export type ReviewFlagStatus = (typeof reviewFlagStatuses)[number];
 
 export const jobStatuses = ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
+
+export const rewardsJourneyStates = ["INVITED", "ACTIVE", "INACTIVE", "BLOCKED"] as const;
+export type RewardsJourneyState = (typeof rewardsJourneyStates)[number];
+
+export const rewardsLevels = ["BRONZE", "SILVER", "GOLD", "PLATINUM", "TITANIUM"] as const;
+export type RewardsLevel = (typeof rewardsLevels)[number];
+
+export const rewardsProductFactStatuses = [
+  "SIGNED",
+  "PENDING",
+  "ACTIVE",
+  "REJECTED",
+  "CANCELLED",
+  "ENDED",
+] as const;
+export type RewardsProductFactStatus = (typeof rewardsProductFactStatuses)[number];
+
+export const rewardsV2RuleTypes = [
+  "POINT_AWARD",
+  "LEVEL_RULE",
+  "PRODUCT_EVIDENCE",
+  "FEATURE_FLAG",
+] as const;
+export type RewardsV2RuleType = (typeof rewardsV2RuleTypes)[number];
