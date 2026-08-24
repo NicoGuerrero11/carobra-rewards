@@ -22,6 +22,7 @@ from carobra_rewards.modules.sisca_validation.infrastructure.persistence.reposit
 from carobra_rewards.modules.sisca_validation.ports.gateway import SiscaValidationGateway
 
 _internal_api_key = APIKeyHeader(name="X-Internal-API-Key", auto_error=False)
+_uat_operator = APIKeyHeader(name="X-SISCA-UAT-Operator", auto_error=False)
 
 
 def require_internal_api_key(
@@ -41,11 +42,36 @@ def require_internal_api_key(
         )
 
 
+def require_uat_control_operator(
+    provided: Annotated[str | None, Security(_uat_operator)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> str:
+    if settings.app_env != "uat" or not settings.sisca_uat_control_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "uat_control_unavailable", "message": "Operation unavailable"},
+        )
+    operator = "" if provided is None else provided.strip()
+    if not operator or operator not in settings.parsed_sisca_uat_authorized_operators:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "uat_operator_unauthorized", "message": "Operation unavailable"},
+        )
+    return operator
+
+
 def get_sisca_gateway(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> SiscaValidationGateway:
     if settings.sisca_adapter == "simulated":
         return SimulatedSiscaValidationGateway()
+    try:
+        settings.validate_sisca_http_configuration()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "sisca_not_configured", "message": "Service unavailable"},
+        ) from exc
     if not settings.sisca_base_url:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -57,9 +83,14 @@ def get_sisca_gateway(
         timeout_seconds=settings.sisca_timeout_seconds,
         api_token=(
             None
-            if settings.sisca_api_token is None
-            else settings.sisca_api_token.get_secret_value()
+            if settings.active_sisca_api_token is None
+            else settings.active_sisca_api_token.get_secret_value()
         ),
+        auth_mode=settings.sisca_auth_mode,
+        api_key_header=settings.sisca_api_key_header,
+        response_format=settings.sisca_response_format,
+        trace_identifier=settings.sisca_trace_identifier,
+        trace_identifier_header=settings.sisca_trace_identifier_header,
     )
 
 

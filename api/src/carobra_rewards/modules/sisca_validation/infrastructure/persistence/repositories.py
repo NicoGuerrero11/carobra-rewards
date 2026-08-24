@@ -87,6 +87,7 @@ def _to_check(model: SiscaValidationCheckModel) -> SiscaValidationCheck:
         ),
         retryable=model.retryable,
         created_at=model.created_at,
+        operator_id=model.operator_id,
     )
 
 
@@ -186,6 +187,7 @@ class SqlAlchemySiscaValidationRepository:
                 ),
                 retryable=check.retryable,
                 created_at=check.created_at,
+                operator_id=check.operator_id,
             )
         )
         await self._flush()

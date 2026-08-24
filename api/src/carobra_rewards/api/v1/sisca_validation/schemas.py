@@ -28,6 +28,14 @@ class ExecuteValidationCheckRequest(BaseModel):
         return self
 
 
+class ExecuteControlledUatCheckpointRequest(BaseModel):
+    """A UAT-only checkpoint that retains normal lifecycle semantics."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    checkpoint: ValidationCheckpoint
+
+
 class ValidationExecutionResponse(BaseModel):
     validation_id: UUID
     status: str

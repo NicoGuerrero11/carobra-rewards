@@ -16,6 +16,8 @@ class ExecuteValidationCheckCommand:
     validation_id: UUID
     checkpoint: ValidationCheckpoint | None
     manual: bool = False
+    controlled_uat: bool = False
+    operator_id: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

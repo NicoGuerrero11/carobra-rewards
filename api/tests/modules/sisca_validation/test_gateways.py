@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import uuid4
 
 import httpx
@@ -26,7 +27,13 @@ def _request() -> SiscaValidationRequest:
     )
 
 
-async def _query(handler):
+async def _query(
+    handler,
+    *,
+    auth_mode: Literal["bearer", "api_key"] = "bearer",
+    response_format: Literal["canonical", "business_envelope"] = "canonical",
+    trace_identifier: str | None = None,
+):
     async with httpx.AsyncClient(
         base_url="https://sisca.test",
         transport=httpx.MockTransport(handler),
@@ -36,6 +43,11 @@ async def _query(handler):
             validation_path="/validations",
             timeout_seconds=1,
             api_token="secret-token",
+            auth_mode=auth_mode,
+            api_key_header="X-SISCA-API-Key",
+            response_format=response_format,
+            trace_identifier=trace_identifier,
+            trace_identifier_header="X-Rewards-ID",
             client=client,
         )
         return await gateway.query(_request())
@@ -85,6 +97,82 @@ async def test_http_gateway_keeps_no_information_distinct() -> None:
     result = await _query(lambda _: httpx.Response(200, json={"found": False}))
 
     assert isinstance(result, SiscaNoInformation)
+
+
+@pytest.mark.asyncio
+async def test_http_gateway_supports_preliminary_sisca_business_envelope() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["x-sisca-api-key"] == "secret-token"
+        assert request.headers["x-rewards-id"] == "rewards-integration"
+        assert "authorization" not in request.headers
+        return httpx.Response(
+            200,
+            json={
+                "success": True,
+                "codigo": "OK",
+                "mensaje": "Consulta realizada correctamente",
+                "data": {
+                    "tipo_movimiento": "Traspaso NAP",
+                    "estatus": "ACEPTADA PROCESAR",
+                    "fecha_traspaso": "02/07/2026",
+                },
+            },
+        )
+
+    result = await _query(
+        handler,
+        auth_mode="api_key",
+        response_format="business_envelope",
+        trace_identifier="rewards-integration",
+    )
+
+    assert isinstance(result, FoundSiscaValidation)
+    assert result.transfer_date.isoformat() == "2026-07-02"
+
+
+@pytest.mark.asyncio
+async def test_http_gateway_maps_sisca_business_no_information() -> None:
+    result = await _query(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "success": True,
+                "codigo": "SIN_INFORMACION",
+                "mensaje": "No existe información para la CURP consultada",
+                "data": None,
+            },
+        ),
+        auth_mode="api_key",
+        response_format="business_envelope",
+    )
+
+    assert isinstance(result, SiscaNoInformation)
+
+
+@pytest.mark.asyncio
+async def test_http_gateway_rejects_multiple_sisca_records() -> None:
+    result = await _query(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "success": True,
+                "codigo": "OK",
+                "mensaje": "Consulta realizada correctamente",
+                "data": [
+                    {
+                        "tipo_movimiento": "Traspaso NAP",
+                        "estatus": "ACEPTADA PROCESAR",
+                        "fecha_traspaso": "02/07/2026",
+                    }
+                ],
+            },
+        ),
+        auth_mode="api_key",
+        response_format="business_envelope",
+    )
+
+    assert isinstance(result, SiscaTechnicalFailure)
+    assert result.category is TechnicalFailureCategory.MALFORMED_RESPONSE
 
 
 @pytest.mark.asyncio

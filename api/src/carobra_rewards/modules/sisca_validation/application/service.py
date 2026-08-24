@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
@@ -29,6 +30,8 @@ from carobra_rewards.modules.sisca_validation.domain.rules import (
 )
 from carobra_rewards.modules.sisca_validation.ports.gateway import SiscaValidationGateway
 from carobra_rewards.modules.sisca_validation.ports.persistence import SiscaValidationUnitOfWork
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> datetime:
@@ -70,13 +73,19 @@ class ExecuteSiscaValidationCheck:
 
             if not command.manual and command.checkpoint is None:
                 raise ValueError("scheduled checks require a checkpoint")
+            if command.controlled_uat and (command.manual or command.operator_id is None):
+                raise ValueError("controlled UAT checks require operator and checkpoint")
 
             now = require_utc(self._clock())
             if not command.manual and command.checkpoint is not None:
                 existing = await uow.validations.find_completed_scheduled_check(
                     validation.id,
                     command.checkpoint,
-                    check_type=ValidationCheckType.SCHEDULED,
+                    check_type=(
+                        ValidationCheckType.CONTROLLED_UAT
+                        if command.controlled_uat
+                        else ValidationCheckType.SCHEDULED
+                    ),
                 )
                 if existing is not None:
                     return self._result(validation, replayed=True, stale=False, attempts=0)
@@ -84,7 +93,7 @@ class ExecuteSiscaValidationCheck:
                     return self._result(validation, replayed=False, stale=True, attempts=0)
                 if command.checkpoint is not validation.next_checkpoint:
                     raise ValidationCheckpointMismatchError()
-                if now < validation.due_at(command.checkpoint):
+                if not command.controlled_uat and now < validation.due_at(command.checkpoint):
                     raise ValidationCheckpointNotDueError()
 
             curp = await uow.validations.get_customer_curp(validation.customer_id)
@@ -121,7 +130,9 @@ class ExecuteSiscaValidationCheck:
                         id=uuid4(),
                         validation_id=validation.id,
                         check_type=(
-                            ValidationCheckType.MANUAL
+                            ValidationCheckType.CONTROLLED_UAT
+                            if command.controlled_uat
+                            else ValidationCheckType.MANUAL
                             if command.manual and retry_offset == 0
                             else ValidationCheckType.RETRY
                             if retry_offset > 0
@@ -140,6 +151,7 @@ class ExecuteSiscaValidationCheck:
                         error_category=normalized.error_category,
                         retryable=normalized.retryable,
                         created_at=completed_at,
+                        operator_id=command.operator_id if command.controlled_uat else None,
                     )
                 )
                 if not (
@@ -173,6 +185,23 @@ class ExecuteSiscaValidationCheck:
                         CustomerStatus.INACTIVE,
                     )
             await uow.commit()
+            if command.controlled_uat:
+                logger.info(
+                    "sisca_uat_controlled_checkpoint_completed",
+                    extra={
+                        "event": "sisca_uat_controlled_checkpoint_completed",
+                        "operator_id": command.operator_id,
+                        "validation_id": str(updated.id),
+                        "checkpoint": command.checkpoint.value if command.checkpoint else None,
+                        "executed_at": now.isoformat(),
+                        "status": updated.status.value,
+                        "outcome": (
+                            None
+                            if updated.last_check_outcome is None
+                            else updated.last_check_outcome.value
+                        ),
+                    },
+                )
             return self._result(updated, replayed=False, stale=False, attempts=attempts)
 
     @staticmethod
