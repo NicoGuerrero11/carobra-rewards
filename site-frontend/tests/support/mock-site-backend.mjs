@@ -54,6 +54,8 @@ const validation = {
   next_checkpoint_at: "2026-07-10T23:30:00Z",
   last_checked_at: null,
   last_check_outcome: null,
+  validated_at: null,
+  product_evidence: null,
 };
 
 const eligibleValidation = {
@@ -65,6 +67,14 @@ const eligibleValidation = {
   next_checkpoint_at: null,
   last_checked_at: "2026-07-14T12:00:00Z",
   last_check_outcome: "MATCH_VALIDATED",
+  validated_at: "2026-07-14T12:00:00Z",
+  product_evidence: {
+    provider: "SISCA",
+    product_type: "AFORE",
+    status: "ACTIVE",
+    source_id: "sisca-validation:00000000-0000-0000-0000-000000000402",
+    validated_at: "2026-07-14T12:00:00Z",
+  },
 };
 
 const inactiveValidation = {
@@ -101,6 +111,7 @@ const server = createServer(async (request, response) => {
       customer: profile,
       validation_id: validation.validation_id,
       validation_status: validation.status,
+      registered_at: validation.registered_at,
     });
   }
 
@@ -152,6 +163,13 @@ const server = createServer(async (request, response) => {
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
+  if (method === "GET" && path === "/api/v1/rewards/journey") {
+    const authenticated = authenticatedProfile(request);
+    return authenticated
+      ? json(response, 200, journeyFor(authenticated))
+      : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
   if (method === "GET" && path === "/api/v1/rewards/account") {
     const authenticated = authenticatedProfile(request);
     if (!authenticated) {
@@ -180,6 +198,36 @@ const server = createServer(async (request, response) => {
         redemption_enabled: false,
         unavailable_reason: "Catalog pending approval",
       },
+    });
+  }
+
+  if (method === "GET" && path === "/api/v1/rewards/activities") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) {
+      return siteError(response, 401, "unauthenticated", "Authentication is required");
+    }
+    return json(response, 200, {
+      activities: authenticated === eligibleProfile
+        ? [{
+            activity_type: "PROFILE_UPDATED",
+            qualifies: true,
+            occurred_at: "2026-07-15T12:00:00.000Z",
+          }]
+        : [],
+    });
+  }
+
+  if (method === "GET" && path === "/api/v1/rewards/movements") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) {
+      return siteError(response, 401, "unauthenticated", "Authentication is required");
+    }
+    const summary = journeyFor(authenticated);
+    return json(response, 200, {
+      movements: summary.recent_movements.map((movement) => ({
+        ...movement,
+        entry_type: "ISSUANCE",
+      })),
     });
   }
 
@@ -266,6 +314,63 @@ function eligibilityFor(candidate) {
     customer_status: candidate.customer_status,
     sisca_validation_status: candidate === attentionProfile ? "REQUIRES_ATTENTION" : "PENDING",
     afore_relation_status: "PENDING",
+  };
+}
+
+function journeyFor(candidate) {
+  const active = candidate === eligibleProfile;
+  const blocked = candidate === attentionProfile;
+  const inactive = candidate === inactiveProfile;
+  return {
+    customer_id: candidate.id,
+    journey: {
+      state: inactive ? "INACTIVE" : blocked ? "BLOCKED" : active ? "ACTIVE" : "INVITED",
+      current_level: active ? "BRONZE" : null,
+      validation_status: validationFor(candidate).status,
+      registered_at: validationFor(candidate).registered_at,
+    },
+    redemption: {
+      eligible: false,
+      reason: active ? "REDEMPTION_DISABLED" : "NO_ACTIVE_PRODUCT",
+    },
+    points: {
+      available: active ? "150" : "45",
+      reserved: "0",
+      next_expiration_at: "2028-01-09T23:30:00.000Z",
+    },
+    progress: {
+      target_level: active ? "SILVER" : "BRONZE",
+      rule_available: false,
+      remaining_active_products: null,
+      remaining_registration_months: null,
+      remaining_qualifying_activities: null,
+    },
+    products: active ? [{
+      provider: "SISCA",
+      product_type: "AFORE",
+      status: "ACTIVE",
+      activated_at: "2026-07-14T12:00:00.000Z",
+    }] : [],
+    recent_movements: active ? [{
+      code: "V2_INITIAL_PRODUCT_ACTIVE",
+      points_delta: "105",
+      occurred_at: "2026-07-14T12:00:00.000Z",
+    }, {
+      code: "V2_INVITED_REGISTRATION",
+      points_delta: "45",
+      occurred_at: "2026-07-09T23:30:00.000Z",
+    }] : [{
+      code: "V2_INVITED_REGISTRATION",
+      points_delta: "45",
+      occurred_at: "2026-07-09T23:30:00.000Z",
+    }],
+    modules: {
+      benefits_enabled: false,
+      expiry_policy_approved: false,
+      ave_enabled: false,
+      referrals_enabled: false,
+      renewals_enabled: false,
+    },
   };
 }
 

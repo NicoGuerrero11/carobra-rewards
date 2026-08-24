@@ -50,17 +50,17 @@ test("renders invalid login without exposing credential details", async ({ page 
   );
 });
 
-test("logs in and renders the authenticated dashboard validation status", async ({ page }) => {
+test("logs in and renders Rewards as the invited customer home", async ({ page }) => {
   await page.goto("/login");
   await page.locator("#email").fill("ada@example.com");
   await page.locator("#password").fill("correct-horse-7");
 
   await page.locator("#submit-button").click();
 
-  await expect(page).toHaveURL(/\/cliente\/validacion$/);
+  await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Hola, Ada" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Validación AFORE pendiente" })).toBeVisible();
-  await expect(page.getByText("Rewards ID: RWD-e2e")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Invitado" })).toBeVisible();
+  await expect(page.getByText(/Rewards ID:/)).toHaveCount(0);
 });
 
 test("redirects an unauthenticated dashboard request to login", async ({ page }) => {

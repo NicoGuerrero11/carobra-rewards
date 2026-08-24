@@ -1,0 +1,32 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+---
+
+<ClientShellLayout title="Cursos | Carobra" description="Cursos y contenidos para clientes Carobra." currentPath="/cliente/cursos" sectionLabel="Cursos">
+  <main class="portal-page">
+    <header class="portal-welcome">
+      <div><p class="portal-eyebrow">Aprende a tu ritmo</p><h1>Cursos</h1><p>Un espacio para entender mejor tus decisiones financieras y aprovechar tus servicios.</p></div>
+      <span>Centro de aprendizaje</span>
+    </header>
+
+    <section class="learning-hero" aria-labelledby="learning-title">
+      <div><p class="portal-eyebrow">Nueva sección</p><h2 id="learning-title">Aquí estará tu sección de cursos</h2><p>La estructura ya forma parte del portal. Cuando el equipo apruebe los contenidos, cada cliente verá su biblioteca, avance y próximos aprendizajes aquí.</p></div>
+      <div class="learning-hero__visual" aria-hidden="true"><span>▶</span><small>Contenido Carobra</small></div>
+    </section>
+
+    <section class="portal-section" aria-labelledby="learning-library-title">
+      <div class="portal-section-heading"><div><p class="portal-eyebrow">Tu biblioteca</p><h2 id="learning-library-title">Contenido pensado para tu camino</h2></div><p>Estos espacios son estados vacíos de producto, no cursos publicados.</p></div>
+      <div class="learning-grid">
+        <article><span>01</span><div><h3>Retiro y AFORE</h3><p>Guías y contenidos relacionados con tu servicio de retiro.</p></div><small>Contenido en preparación</small></article>
+        <article><span>02</span><div><h3>Planeación financiera</h3><p>Recursos para comprender metas, decisiones y próximos pasos.</p></div><small>Contenido en preparación</small></article>
+        <article><span>03</span><div><h3>Protección patrimonial</h3><p>Información para evaluar alternativas de protección y seguros.</p></div><small>Contenido en preparación</small></article>
+      </div>
+    </section>
+
+    <section class="portal-card portal-empty-state"><span aria-hidden="true">+</span><div><p class="portal-eyebrow">Próximamente</p><h2>Aún no tienes cursos asignados</h2><p>Cuando exista contenido aprobado, aquí aparecerán duración, progreso y acciones para continuar.</p></div></section>
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+</ClientShellLayout>

@@ -10,6 +10,9 @@ const allowedPaths = new Set([
   "me/validation-status",
   "rewards/eligibility",
   "rewards/account",
+  "rewards/journey",
+  "rewards/activities",
+  "rewards/movements",
   "rewards/referrals",
 ]);
 

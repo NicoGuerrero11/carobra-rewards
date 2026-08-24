@@ -10,6 +10,9 @@ const e2eUserRoleHeader = "x-e2e-user-role";
 const customerEntryPaths = new Set([
   "/cliente",
   "/cliente/validacion",
+  "/cliente/beneficios",
+  "/cliente/cursos",
+  "/cliente/gift-cards",
   "/cliente/recompensas",
   "/cliente/recompensas/referidos",
 ]);
@@ -43,6 +46,10 @@ interface RewardsEligibilityResponse {
   afore_relation_status: string | null;
 }
 
+interface ValidationStatusResponse {
+  status: string;
+}
+
 async function fetchSession(cookieHeader: string | null) {
   if (!cookieHeader) {
     return null;
@@ -73,15 +80,15 @@ async function fetchSession(cookieHeader: string | null) {
   }
 }
 
-async function fetchRewardsEligibility(cookieHeader: string | null) {
+async function fetchValidationStatus(cookieHeader: string | null) {
   if (!cookieHeader) return null;
   try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/eligibility`, {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/me/validation-status`, {
       method: "GET",
       headers: { cookie: cookieHeader },
     });
     if (!response.ok) return null;
-    return (await response.json()) as RewardsEligibilityResponse;
+    return (await response.json()) as ValidationStatusResponse;
   } catch {
     return null;
   }
@@ -129,7 +136,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.user = user;
   const cookieHeader = context.request.headers.get("cookie");
   const bypassRole = context.request.headers.get(e2eUserRoleHeader)?.toLowerCase();
-  const rewardsEligibility = bypassRequested
+  const validation = bypassRequested ? null : await fetchValidationStatus(cookieHeader);
+  const validated = validation?.status === "VALIDATED";
+  const rewardsEligibility: RewardsEligibilityResponse | null = bypassRequested
     ? {
         customer_id: user.id,
         eligible: bypassRole === "eligible",
@@ -138,18 +147,38 @@ export const onRequest = defineMiddleware(async (context, next) => {
         sisca_validation_status: bypassRole === "eligible" ? "VALIDATED" : "PENDING",
         afore_relation_status: bypassRole === "eligible" ? "ACTIVE" : "PENDING",
       }
-    : await fetchRewardsEligibility(cookieHeader);
+    : validation
+      ? {
+          customer_id: user.id,
+          eligible: validated && user.customerStatus === "ACTIVE",
+          reason: user.customerStatus === "INACTIVE"
+            ? "customer_inactive"
+            : validated
+              ? null
+              : "sisca_not_validated",
+          customer_status: user.customerStatus,
+          sisca_validation_status: validation.status,
+          afore_relation_status: validated ? "ACTIVE" : "PENDING",
+        }
+      : null;
   context.locals.rewardsEligibility = rewardsEligibility ?? undefined;
 
+  const customerInactive = rewardsEligibility?.reason === "customer_inactive"
+    || user.customerStatus === "INACTIVE";
+
   if (pathname === "/cliente") {
-    return context.redirect(
-      rewardsEligibility?.eligible ? "/cliente/recompensas" : "/cliente/validacion",
-    );
+    return context.redirect(customerInactive ? "/cliente/validacion" : "/cliente/recompensas");
   }
-  if (pathname.startsWith("/cliente/recompensas") && !rewardsEligibility?.eligible) {
+  if (
+    (pathname.startsWith("/cliente/recompensas")
+      || pathname === "/cliente/beneficios"
+      || pathname === "/cliente/cursos"
+      || pathname === "/cliente/gift-cards")
+    && customerInactive
+  ) {
     return context.redirect("/cliente/validacion");
   }
-  if (pathname === "/cliente/validacion" && rewardsEligibility?.eligible) {
+  if (pathname === "/cliente/validacion" && !customerInactive) {
     return context.redirect("/cliente/recompensas");
   }
   return next();
