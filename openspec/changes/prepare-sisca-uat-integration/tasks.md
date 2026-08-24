@@ -1,17 +1,17 @@
 ## 1. Decisión conjunta de hosting y operación
 
 - [x] 1.1 Definir con el equipo de Rewards dónde se alojarán la API UAT y la API de producción, comparando las opciones disponibles con los criterios del diseño.
-- [ ] 1.2 Registrar la decisión de hosting con plataforma, región, responsables, presupuesto/propietario, base de datos, secretos, HTTPS, monitoreo, respaldos y reversión.
-- [ ] 1.3 Definir la identidad de salida de red de UAT y producción (IP fija, VPN o red privada) que deberá autorizar SISCA.
+- [x] 1.2 Registrar la decisión de hosting con plataforma, región, responsables, presupuesto/propietario, base de datos, secretos, HTTPS, monitoreo, respaldos y reversión.
+- [ ] 1.3 Confirmar si SISCA exige allowlist de IP, VPN o red privada y, sólo en ese caso, definir la identidad de salida de UAT y producción que deberá autorizar.
 - [ ] 1.4 Aprobar los responsables autorizados para operar UAT, ejecutar checkpoints acelerados y aprobar el paso a producción.
 
 ## 2. Preparación de entornos y despliegue
 
-- [ ] 2.1 Crear la infraestructura aislada de UAT conforme a la decisión de hosting, incluyendo base de datos, dominio HTTPS y acceso operativo.
+- [x] 2.1 Crear la infraestructura aislada de UAT conforme a la decisión de hosting, incluyendo base de datos, dominio HTTPS y acceso operativo.
 - [ ] 2.2 Preparar el entorno de producción separado, sin habilitar aún credenciales ni llamadas SISCA productivas.
 - [ ] 2.3 Configurar endpoint, autenticación, timeout, reintentos y catálogo SISCA de UAT mediante el mecanismo aprobado de secretos.
 - [x] 2.4 Implementar validaciones que impidan usar un endpoint SISCA productivo o secretos productivos desde UAT.
-- [ ] 2.5 Automatizar el despliegue de la API y las migraciones para que UAT y producción usen el mismo artefacto versionado.
+- [x] 2.5 Automatizar el despliegue de la API y las migraciones para que UAT y producción usen el mismo artefacto versionado.
 - [ ] 2.6 Verificar salud, migraciones, HTTPS, registros seguros y conectividad saliente desde UAT antes de solicitar acceso a SISCA.
 
 ## 3. Ejecución controlada de validaciones UAT
