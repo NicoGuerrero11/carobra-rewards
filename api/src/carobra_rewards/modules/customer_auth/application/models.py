@@ -48,6 +48,7 @@ class RegistrationResult:
     customer: CustomerProfile
     validation_id: UUID
     validation_status: str
+    registered_at: datetime
 
 
 @dataclass(slots=True, frozen=True)
@@ -67,6 +68,7 @@ class CustomerValidationStatus:
     next_checkpoint_at: datetime | None
     last_checked_at: datetime | None
     last_check_outcome: str | None
+    validated_at: datetime | None
 
 
 class CustomerAuthError(Exception):
