@@ -12,11 +12,15 @@ The site SHALL resolve the authenticated customer's server-side eligibility and 
 - **THEN** the site presents the validation experience without leaking balance, catalog, or movement data
 
 ### Requirement: Rewards summary must prioritize actionable account information
-The summary SHALL display available points, next-expiring points and date, AFORE eligibility status, selected or suggested goal when configured, recent movements, earning opportunities, and benefit availability from API data.
+The summary SHALL display available points, next-expiring points and date, selected or suggested goal when configured, recent movements, earning opportunities, benefit availability, and the reusable personal referral link when available from API data. It MUST NOT repeat the AFORE relation status after eligibility has already been resolved.
 
 #### Scenario: Render an eligible account summary
 - **WHEN** the eligible customer opens the Rewards summary
 - **THEN** the page renders persisted account values and does not initialize authoritative state from browser storage
+
+#### Scenario: Render the referral action in the summary
+- **WHEN** an eligible customer has an available personal referral link
+- **THEN** the page presents one link-and-copy section without a separate referral points balance, metrics, progress, or navigation destination
 
 ### Requirement: Ways-to-earn content must communicate real conditions
 The customer experience SHALL show enabled behaviors with point values, conditions, progress, and completion state. Disabled or unconfigured partner behaviors MUST NOT be presented as currently earnable.
@@ -45,4 +49,3 @@ The experience SHALL remain usable at desktop and mobile widths, use semantic na
 #### Scenario: Use Rewards on a narrow mobile viewport
 - **WHEN** a customer opens the summary at a 320-pixel viewport width
 - **THEN** navigation and content reflow without clipped controls, hidden essential text, or horizontal scrolling
-

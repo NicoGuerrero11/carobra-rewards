@@ -138,17 +138,19 @@ The validated summary follows this responsive hierarchy:
 
 ```text
 +-----------------------------------------------------------+
-| Carobra Rewards | Resumen | Como ganar | Beneficios | ... |
+| Carobra Rewards | Resumen                                 |
 +-----------------------------------------------------------+
-| Saldo disponible | Estado AFORE | Meta seleccionada       |
+| Saldo disponible | Próximo vencimiento | Meta sugerida    |
 +-----------------------------------------------------------+
 | Como seguir ganando        | Movimientos recientes        |
++-----------------------------------------------------------+
+| Referidos: link personal para copiar y compartir          |
 +-----------------------------------------------------------+
 | Beneficios: disponibilidad, costo, inventario y progreso  |
 +-----------------------------------------------------------+
 ```
 
-The UI displays point expirations by lot, plain-language earning conditions, real inventory states, and product-wallet value separately. It does not use demo `sessionStorage`, fabricate rewards, or expose disabled partner benefits as available. Desktop and mobile behavior use the existing Carobra visual system and accessible semantic controls.
+The validated experience does not repeat the AFORE relation status because eligibility has already been resolved before rendering Rewards. Referral access is a single section in the summary containing only the reusable personal link and its copy action; referral points, totals, and progress are not presented as a separate customer area. The UI displays point expirations by lot, plain-language earning conditions, real inventory states, and product-wallet value separately. It does not use demo `sessionStorage`, fabricate rewards, or expose disabled partner benefits as available. Desktop and mobile behavior use the existing Carobra visual system and accessible semantic controls.
 
 ### 13. Financial and operational reporting is derived from authoritative records
 

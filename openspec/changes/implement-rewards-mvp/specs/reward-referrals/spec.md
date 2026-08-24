@@ -3,7 +3,7 @@
 ### Requirement: Referrals must preserve unique customer attribution
 The system SHALL record the eligible referring customer, referred registration, attribution time, source, and status. A referred customer SHALL have at most one accepted referring customer, and self-referrals MUST be rejected.
 
-Each eligible referring customer SHALL use one personal opaque invitation link that is reusable and does not expire. The link MUST NOT encode or expose customer identity data. Registration SHALL capture a valid link in the site backend without forwarding Rewards data to the existing registration API, and customer-facing referral progress MUST NOT identify referred customers.
+Each eligible referring customer SHALL use one personal opaque invitation link that is reusable and does not expire. The link MUST NOT encode or expose customer identity data. Registration SHALL capture a valid link in the site backend without forwarding Rewards data to the existing registration API. The customer experience SHALL expose the link as a simple section in the Rewards summary without a separate referral-points balance, referral totals, or individual progress.
 
 #### Scenario: Accept a new referral
 - **WHEN** an eligible customer refers a distinct person whose registration has no prior accepted attribution
@@ -16,6 +16,10 @@ Each eligible referring customer SHALL use one personal opaque invitation link t
 #### Scenario: Register from a personal referral link
 - **WHEN** a new customer completes registration from a valid personal invitation link
 - **THEN** the site backend preserves the existing registration API payload, attributes the registration to the referring customer, and exposes no referring-customer data to the new customer
+
+#### Scenario: Eligible customer opens the Rewards summary
+- **WHEN** the customer referral program is available
+- **THEN** the summary shows the reusable personal link and copy action without referral points, totals, individual progress, or separate referral navigation
 
 ### Requirement: Referral registration must award 3,000 points once
 When an attributed referred customer completes the configured valid registration milestone, the system SHALL issue 3,000 points to the eligible referring customer exactly once.

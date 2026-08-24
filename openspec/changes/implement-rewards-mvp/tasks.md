@@ -18,7 +18,7 @@
 - [x] 2.6 Add authenticated site-backend contracts for Rewards eligibility and account summary with stable `rewards_not_eligible` and `unauthenticated` outcomes.
 - [x] 2.7 Extend the existing site-backend API client only for safe identity/SISCA evidence and add contract tests preserving current registration, login, and session behavior.
 - [x] 2.8 Replace the frontend catch-all customer redirect with server-side pending-versus-eligible routing and add `/cliente/validacion` and `/cliente/recompensas` entry pages.
-- [x] 2.9 Implement the responsive Rewards summary shell using persisted balance, expiration, AFORE status, recent movement, earning, and benefit placeholders from site-backend contracts.
+- [x] 2.9 Implement the responsive Rewards summary shell using persisted balance, expiration, recent movement, earning, and benefit placeholders from site-backend contracts without repeating the eligibility-only AFORE status.
 - [x] 2.10 Add desktop and 320-pixel end-to-end tests proving pending customers cannot see Rewards data and eligible customers see the initial 2,000-point account.
 
 ## 3. Immutable point ledger and lifecycle
@@ -63,6 +63,7 @@
 - [x] 6.4 Implement replay-safe 6-month and 12-month referral permanence jobs awarding 3,000 and 5,000 points while eligibility remains valid.
 - [x] 6.5 Add authenticated customer referral site-backend/frontend flows and safe progress/status presentation.
 - [x] 6.6 Add tests for self-referral, competing attribution, monthly limit, service loss, duplicate milestones, and advisor-originated customer referrals.
+- [x] 6.7 Simplify the validated-customer referral UI to a link-only section in the Rewards summary, remove separate referral navigation and point/progress presentation, and cover the result at mobile width.
 
 ## 7. Cross-selling products and restricted wallets
 
