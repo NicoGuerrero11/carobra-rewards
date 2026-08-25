@@ -22,7 +22,6 @@ Use `.env.example` as a reference and export the variables before starting:
 | `API_REQUEST_TIMEOUT_MS` | `5000` | FastAPI request timeout |
 | `DATABASE_URL` | unset | Carobra PostgreSQL database used by site-backend Rewards migrations |
 | `TEST_DATABASE_URL` | unset | Dedicated PostgreSQL database for isolated migration/integration tests |
-| `REWARDS_V2_LIVE_FLOW_ENABLED` | `false` | Enables registration → Invitado → SISCA → Bronce in development/test only |
 
 `SESSION_COOKIE_NAME` must match FastAPI's `AUTH_SESSION_COOKIE_NAME`.
 The BFF never reads the session value beyond isolating the configured cookie,
@@ -53,7 +52,6 @@ For the current local V2 integration review, enable the real (non-mock) path
 explicitly before migrations and startup:
 
 ```bash
-export REWARDS_V2_LIVE_FLOW_ENABLED=true
 npm run db:migrate
 npm run build
 npm start

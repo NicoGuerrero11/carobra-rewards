@@ -2,7 +2,6 @@ import { createSiteBackendServer } from "./app.js";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./database/connection.js";
 import {
-  createRewardsAccountHttpApplication,
   createRewardsBehaviorHttpApplication,
   createReferralHttpApplication,
   createRewardsV2JourneyHttpApplication,
@@ -14,7 +13,6 @@ const database = config.databaseUrl ? createDatabase(config.databaseUrl) : undef
 const server = createSiteBackendServer(
   config,
   undefined,
-  database ? createRewardsAccountHttpApplication(database) : undefined,
   database ? createRewardsBehaviorHttpApplication(database) : undefined,
   database && config.referralIdentityHmacSecret
     ? createReferralHttpApplication(database, config.referralIdentityHmacSecret)

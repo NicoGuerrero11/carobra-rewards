@@ -1,14 +1,7 @@
 import type { Pool } from "pg";
 
 import { SystemClock } from "../shared/clock.js";
-import { ActivateRewardsAccount, PostgresRewardsAccountActivation } from "./activation.js";
-import {
-  DefaultRewardsAccountHttpApplication,
-  type RewardsAccountHttpApplication,
-} from "./http-application.js";
 import { PostgresRewardsEligibilityQuery } from "./eligibility.js";
-import { ObserveValidatedRewardsEvidence } from "./observe-validated-evidence.js";
-import { PostgresRewardsAccountSummaryQuery } from "./summary.js";
 import { PostgresPointIssuance } from "../ledger/issuance.js";
 import { PostgresBehaviorRuleLookup } from "../behaviors/rule-lookup.js";
 import {
@@ -46,23 +39,6 @@ import {
   PostgresRewardsCustomerPortalStore,
   type RewardsCustomerPortalApplication,
 } from "../v2/customer-portal.js";
-
-export function createRewardsAccountHttpApplication(
-  database: Pool,
-): RewardsAccountHttpApplication {
-  const clock = new SystemClock();
-  const observation = new ObserveValidatedRewardsEvidence(
-    new PostgresRewardsEligibilityQuery(database),
-    new ActivateRewardsAccount(
-      new PostgresRewardsAccountActivation(database),
-      clock,
-    ),
-  );
-  return new DefaultRewardsAccountHttpApplication(
-    observation,
-    new PostgresRewardsAccountSummaryQuery(database, clock),
-  );
-}
 
 export function createRewardsBehaviorHttpApplication(
   database: Pool,

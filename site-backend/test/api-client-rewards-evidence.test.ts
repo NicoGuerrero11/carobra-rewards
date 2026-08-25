@@ -90,7 +90,6 @@ function config(): SiteBackendConfig {
     host: "127.0.0.1",
     port: 0,
     apiRequestTimeoutMs: 1000,
-    rewardsV2LiveFlowEnabled: false,
     sessionCookie: {
       name: "carobra_session",
       secure: false,

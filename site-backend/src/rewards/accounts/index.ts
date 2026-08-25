@@ -41,4 +41,3 @@ export {
   type RewardsEarningOpportunitySummary,
   type RewardsMovementSummary,
 } from "./summary.js";
-export { createRewardsAccountHttpApplication } from "./composition.js";

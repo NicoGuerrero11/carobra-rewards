@@ -31,17 +31,6 @@ interface MovementDetailsResponse {
   }>;
 }
 
-interface LegacyAccountSummary {
-  available_points: string;
-  reserved_points: string;
-  recent_movements: Array<{
-    entry_type: string;
-    points_delta: string;
-    rule_code: string | null;
-    occurred_at: string;
-  }>;
-}
-
 interface DisplayProduct {
   productType: string;
   status: RewardsV2ProductStatus;
@@ -58,7 +47,6 @@ interface DisplayMovement {
 
 let journey: RewardsJourneySummary | null = null;
 let portal: RewardsCustomerPortal | null = null;
-let legacyAccount: LegacyAccountSummary | null = null;
 let activityDetails: ActivityDetailsResponse | null = null;
 let movementDetails: MovementDetailsResponse | null = null;
 let unavailable = false;
@@ -85,24 +73,9 @@ try {
   if (portalResponse.ok) portal = (await portalResponse.json()) as RewardsCustomerPortal;
   if (activitiesResponse.ok) activityDetails = (await activitiesResponse.json()) as ActivityDetailsResponse;
   if (movementsResponse.ok) movementDetails = (await movementsResponse.json()) as MovementDetailsResponse;
-  if (!journey && journeyResponse.status !== 404) unavailable = true;
+  if (!journey) unavailable = true;
 } catch {
   unavailable = true;
-}
-
-// Compatibility while pre-V2 accounts are backfilled. Values still come from
-// the authenticated ledger and are never used to infer a level.
-if (!journey && eligibility?.eligible) {
-  try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/account`, {
-      headers: { cookie },
-    });
-    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-    if (response.ok) legacyAccount = (await response.json()) as LegacyAccountSummary;
-    else unavailable = true;
-  } catch {
-    unavailable = true;
-  }
 }
 
 const derivedState: RewardsV2JourneyState = journey?.journey.state
@@ -112,8 +85,8 @@ const derivedState: RewardsV2JourneyState = journey?.journey.state
 const currentLevel: RewardsV2Level | null = journey?.journey.current_level ?? null;
 const validationStatus = journey?.journey.validation_status ?? "PENDING";
 const registeredAt = journey?.journey.registered_at ?? null;
-const availablePoints = journey?.points.available ?? legacyAccount?.available_points ?? null;
-const reservedPoints = journey?.points.reserved ?? legacyAccount?.reserved_points ?? "0";
+const availablePoints = journey?.points.available ?? null;
+const reservedPoints = journey?.points.reserved ?? "0";
 const products: DisplayProduct[] = portal
   ? portal.products.map((product) => ({
       productType: product.product_type,
@@ -124,9 +97,7 @@ const products: DisplayProduct[] = portal
     }))
   : journey
   ? journey.products.map((product) => ({ productType: product.product_type, status: product.status, activatedAt: product.activated_at, guidance: null, levelImpact: null }))
-  : eligibility?.afore_relation_status === "ACTIVE"
-    ? [{ productType: "AFORE", status: "ACTIVE", activatedAt: null, guidance: null, levelImpact: null }]
-    : [];
+  : [];
 const movements: DisplayMovement[] = movementDetails
   ? movementDetails.movements.map((movement) => ({
       code: movement.code,
@@ -139,11 +110,7 @@ const movements: DisplayMovement[] = movementDetails
       pointsDelta: movement.points_delta,
       occurredAt: movement.occurred_at,
     }))
-  : (legacyAccount?.recent_movements ?? []).map((movement) => ({
-      code: movement.rule_code ?? movement.entry_type,
-      pointsDelta: movement.points_delta,
-      occurredAt: movement.occurred_at,
-    }));
+  : [];
 const activeProductCount = products.filter((product) => product.status === "ACTIVE").length;
 const hasValidatedProduct = activeProductCount > 0;
 const hasCalculatedLevel = currentLevel !== null;
@@ -231,7 +198,7 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
       </div>
     </header>
 
-    {unavailable && !journey && !legacyAccount && derivedState === "ACTIVE" ? (
+    {unavailable && !journey ? (
       <section class="rewards-error" role="status">
         <div aria-hidden="true">!</div>
         <div>
