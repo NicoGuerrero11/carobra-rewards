@@ -135,6 +135,10 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   assert.deepEqual(context.validation, { status: "VALIDATED" });
   assert.deepEqual(context.portal, portal.response);
 
+  const cachedContextRead = await fetch(`${bff}/api/v1/rewards/customer-context`, { headers });
+  assert.equal(cachedContextRead.status, 200);
+  assert.equal(portal.readCount, 1);
+
   const read = await fetch(`${bff}/api/v1/rewards/portal`, { headers });
   assert.equal(read.status, 200);
   assert.deepEqual(await read.json(), portal.response);
@@ -156,6 +160,9 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   });
   assert.equal(preferences.status, 200);
   assert.equal(portal.preferencesCustomerId, customerId);
+  const refreshedContextRead = await fetch(`${bff}/api/v1/rewards/customer-context`, { headers });
+  assert.equal(refreshedContextRead.status, 200);
+  assert.equal(portal.readCount, 3);
 
   for (const [path, body] of [
     ["notifications/read", { notification_id: "notice:registration:1" }],
@@ -392,6 +399,7 @@ class StubCustomerPortalApplication implements RewardsCustomerPortalApplication 
   preferencesCustomerId: string | undefined;
   commandCustomerIds: string[] = [];
   failReads = false;
+  readCount = 0;
   readonly response: RewardsCustomerPortalHttpResponse = {
     customer_id: customerId,
     journey: new StubJourneyApplication().summary,
@@ -404,6 +412,7 @@ class StubCustomerPortalApplication implements RewardsCustomerPortalApplication 
   };
   async getPortal(id: CustomerId) {
     this.customerId = id;
+    this.readCount += 1;
     if (this.failReads) throw new Error("simulated portal failure");
     return this.response;
   }

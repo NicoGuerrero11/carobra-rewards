@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import { RewardsApiClient, SiteApiError, type FetchImplementation } from "./api-client.js";
 import type { SiteBackendConfig } from "./config.js";
 import type {
+  CustomerProfile,
   LoginRequest,
   RegisterRequest,
   SiteErrorEnvelope,
@@ -31,8 +33,17 @@ import type {
   UpdateLearningProgressInput,
   UpdatePreferencesInput,
 } from "./rewards/v2/customer-portal.js";
+import type { RewardsCustomerPortalHttpResponse } from "./rewards/v2/customer-portal-contract.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
+const CUSTOMER_CONTEXT_CACHE_TTL_MS = 30_000;
+const CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES = 500;
+
+interface CustomerContextPayload {
+  customer: CustomerProfile;
+  validation: { status: string };
+  portal: RewardsCustomerPortalHttpResponse | null;
+}
 
 export function createSiteBackendServer(
   config: SiteBackendConfig,
@@ -44,6 +55,7 @@ export function createSiteBackendServer(
 ): Server {
   const client = new RewardsApiClient(config, fetchImplementation);
   const rewardsV2TestScenarios = new RewardsV2TestScenarioApplication();
+  const customerContextCache = new CustomerContextCache();
   return createServer((request, response) => {
     void routeRequest(
       request,
@@ -55,6 +67,7 @@ export function createSiteBackendServer(
       rewardsV2JourneyApplication,
       rewardsCustomerPortalApplication,
       rewardsV2TestScenarios,
+      customerContextCache,
     );
   });
 }
@@ -69,6 +82,7 @@ async function routeRequest(
   rewardsV2JourneyApplication: RewardsV2JourneyHttpApplication | undefined,
   rewardsCustomerPortalApplication: RewardsCustomerPortalApplication | undefined,
   rewardsV2TestScenarios: RewardsV2TestScenarioApplication,
+  customerContextCache: CustomerContextCache,
 ): Promise<void> {
   try {
     const method = request.method ?? "GET";
@@ -102,7 +116,9 @@ async function routeRequest(
       );
     }
     if (method === "POST" && path === "/api/v1/auth/logout") {
-      return sendApiResult(response, await client.logout(cookie), config);
+      const result = await client.logout(cookie);
+      customerContextCache.delete(cookie);
+      return sendApiResult(response, result, config);
     }
     if (method === "GET" && path === "/api/v1/me") {
       return sendApiResult(response, await client.getCurrentCustomer(cookie), config);
@@ -111,19 +127,26 @@ async function routeRequest(
       return sendApiResult(response, await client.getValidationStatus(cookie), config);
     }
     if (method === "GET" && path === "/api/v1/rewards/customer-context") {
+      const cached = customerContextCache.get(cookie);
+      if (cached) {
+        sendJson(response, 200, cached);
+        return;
+      }
       const context = await client.getAuthenticatedCustomerContext(cookie);
       const customerPortal = await loadCustomerPortalSafely(
         rewardsCustomerPortalApplication,
         rewardsV2JourneyApplication,
         context.data.evidence,
       );
+      const payload: CustomerContextPayload = {
+        customer: context.data.customer,
+        validation: { status: context.data.validation.status },
+        portal: customerPortal,
+      };
+      customerContextCache.set(cookie, payload);
       return sendApiResult(response, {
         status: 200,
-        data: {
-          customer: context.data.customer,
-          validation: { status: context.data.validation.status },
-          portal: customerPortal,
-        },
+        data: payload,
         setCookies: context.setCookies,
       }, config);
     }
@@ -197,10 +220,12 @@ async function routeRequest(
     if (method === "PATCH" && path === "/api/v1/rewards/portal/preferences") {
       const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(response, 200, await portal.updatePreferences(
+      const preferences = await portal.updatePreferences(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<UpdatePreferencesInput>(request),
-      ));
+      );
+      customerContextCache.delete(cookie);
+      sendJson(response, 200, preferences);
       return;
     }
     if (method === "POST" && path === "/api/v1/rewards/portal/notifications/read") {
@@ -208,6 +233,7 @@ async function routeRequest(
       const evidence = await client.getRewardsIdentityEvidence(cookie);
       const body = await readJsonBody<{ notification_id: string }>(request);
       await portal.markNotificationRead(asCustomerId(evidence.data.customer_id), body.notification_id);
+      customerContextCache.delete(cookie);
       sendJson(response, 200, { status: "recorded" });
       return;
     }
@@ -215,18 +241,22 @@ async function routeRequest(
       const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
       const body = await readJsonBody<{ action_id: string }>(request);
-      sendJson(response, 200, { completed: await portal.completeAction(
+      const completed = await portal.completeAction(
         asCustomerId(evidence.data.customer_id), body.action_id,
-      ) });
+      );
+      customerContextCache.delete(cookie);
+      sendJson(response, 200, { completed });
       return;
     }
     if (method === "POST" && path === "/api/v1/rewards/portal/learning-progress") {
       const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(response, 200, { updated: await portal.updateLearningProgress(
+      const updated = await portal.updateLearningProgress(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<UpdateLearningProgressInput>(request),
-      ) });
+      );
+      customerContextCache.delete(cookie);
+      sendJson(response, 200, { updated });
       return;
     }
     if (method === "GET" && path === "/api/v1/rewards/referrals") {
@@ -264,19 +294,23 @@ async function routeRequest(
     if (method === "POST" && path === "/api/v1/rewards/actions") {
       const behaviors = requireBehaviorApplication(behaviorApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(response, 200, await behaviors.ingestSiteAction(
+      const result = await behaviors.ingestSiteAction(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<SiteActionHttpRequest>(request),
-      ));
+      );
+      customerContextCache.delete(cookie);
+      sendJson(response, 200, result);
       return;
     }
     if (method === "POST" && path === "/api/v1/rewards/onboarding/evidence") {
       const behaviors = requireBehaviorApplication(behaviorApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(response, 200, await behaviors.recordOnboardingEvidence(
+      const result = await behaviors.recordOnboardingEvidence(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<OnboardingEvidenceHttpRequest>(request),
-      ));
+      );
+      customerContextCache.delete(cookie);
+      sendJson(response, 200, result);
       return;
     }
 
@@ -307,6 +341,44 @@ async function routeRequest(
       error: { code: "api_unavailable", message: "The API is unavailable" },
     });
   }
+}
+
+class CustomerContextCache {
+  private readonly entries = new Map<string, { expiresAt: number; payload: CustomerContextPayload }>();
+
+  get(cookie: string | undefined): CustomerContextPayload | undefined {
+    const key = contextCacheKey(cookie);
+    if (!key) return undefined;
+    const entry = this.entries.get(key);
+    if (!entry) return undefined;
+    if (entry.expiresAt <= Date.now()) {
+      this.entries.delete(key);
+      return undefined;
+    }
+    return entry.payload;
+  }
+
+  set(cookie: string | undefined, payload: CustomerContextPayload): void {
+    const key = contextCacheKey(cookie);
+    if (!key) return;
+    this.entries.delete(key);
+    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, payload });
+    while (this.entries.size > CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.entries.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      this.entries.delete(oldestKey);
+    }
+  }
+
+  delete(cookie: string | undefined): void {
+    const key = contextCacheKey(cookie);
+    if (key) this.entries.delete(key);
+  }
+}
+
+function contextCacheKey(cookie: string | undefined): string | undefined {
+  if (!cookie) return undefined;
+  return createHash("sha256").update(cookie).digest("base64url");
 }
 
 async function loadCustomerPortalSafely(
