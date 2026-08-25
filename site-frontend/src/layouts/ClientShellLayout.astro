@@ -77,9 +77,17 @@ function isActive(item: NavItem) {
         </nav>
 
         <div class="client-shell__right">
-          <a class="client-shell__utility-link" href="/cliente/notificaciones" aria-label="Ver notificaciones">
-            <span aria-hidden="true">●</span>
-            <span class="client-shell__utility-label">Avisos</span>
+          <a
+            class:list={["client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
+            href="/cliente/notificaciones"
+            aria-label="Ver notificaciones"
+            aria-current={currentPath === "/cliente/notificaciones" ? "page" : undefined}
+            title="Notificaciones"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6.8 10.2a5.2 5.2 0 0 1 10.4 0c0 5.8 2.3 6.3 2.3 6.3H4.5s2.3-.5 2.3-6.3Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M10 19h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+            </svg>
           </a>
           <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">

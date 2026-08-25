@@ -11,6 +11,8 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page.getByRole("link", { name: "Recompensas", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Cursos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Gift Cards/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver notificaciones" })).toBeVisible();
+  await expect(page.getByText("Avisos", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Inicio", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Estamos validando tu producto" })).toBeVisible();

@@ -83,18 +83,34 @@ a {
 
 .client-shell__right { gap: 0.5rem; }
 
-.client-shell__utility-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-  padding: 0.48rem 0.7rem;
-  border-radius: 999px;
+.client-shell__notification-link {
+  position: relative;
+  width: 2.45rem;
+  height: 2.45rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cedceb;
+  border-radius: 50%;
   color: #315674;
-  font-size: 0.75rem;
-  font-weight: 780;
+  background: #fff;
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
 }
 
-.client-shell__utility-link > span:first-child { color: #e47f9b; font-size: 0.55rem; }
+.client-shell__notification-link:hover,
+.client-shell__notification-link:focus-visible,
+.client-shell__notification-link.is-active {
+  color: #6754a6;
+  border-color: #c9bdec;
+  background: #f1edff;
+  transform: translateY(-1px);
+}
+
+.client-shell__notification-link:focus-visible {
+  outline: 3px solid rgba(58,145,182,.25);
+  outline-offset: 2px;
+}
+
+.client-shell__notification-link svg { width: 1.2rem; height: 1.2rem; }
 
 .client-shell__left {
   gap: 0.6rem;
@@ -3047,7 +3063,6 @@ a {
 .account-support a { justify-self: end; padding: .8rem 1rem; border-radius: 999px; color: #173f68; background: #fff; }
 
 @media (max-width: 780px) {
-  .client-shell__utility-label { display: none; }
   .primary-action-panel { grid-template-columns: auto 1fr; }
   .primary-action-panel > a { grid-column: 1 / -1; text-align: center; }
   .customer-action-grid { grid-template-columns: 1fr; }
