@@ -143,6 +143,20 @@ llamadas salientes, conservando la evidencia. La reversión productiva deberá
 desactivar la configuración SISCA de producción y restaurar el artefacto
 previamente aprobado.
 
+### Operación del scheduler productivo
+
+Producción ejecuta un poller persistente dentro del runtime de la API cuando
+`SISCA_SCHEDULER_ENABLED=true`. Cada ciclo consulta PostgreSQL por validaciones
+`PENDING` cuyo `next_checkpoint_at` ya venció, procesa un lote acotado y usa el
+mismo servicio idempotente de H24, D3 y D5. El intervalo del poller controla la
+latencia operativa, no altera los vencimientos de 24, 72 y 120 horas.
+
+Los reinicios son recuperables porque la agenda reside en PostgreSQL. Los
+eventos seguros de checkpoint vencido, lote completado e iteración fallida se
+usan para monitoreo. La reversión inmediata consiste en establecer
+`SISCA_SCHEDULER_ENABLED=false` y redesplegar; los checkpoints permanecen
+pendientes y pueden retomarse sin duplicar consultas ya completadas.
+
 ## Open Questions
 
 - ¿Quiénes estarán autorizados para ejecutar checkpoints acelerados?

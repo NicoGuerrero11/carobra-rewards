@@ -11,6 +11,13 @@ def test_application_starts() -> None:
     assert app.title == "Carobra Rewards"
 
 
+def test_scheduler_is_disabled_by_default() -> None:
+    app = create_application()
+
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+
+
 def test_health_endpoint_returns_ok() -> None:
     app = create_application()
     client = TestClient(app)
