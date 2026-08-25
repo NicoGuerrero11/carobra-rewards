@@ -15,6 +15,10 @@ export function assertSafeMetadata(value: unknown, path = "metadata"): void {
   }
   if (typeof value !== "object" || value === null) return;
   for (const [key, nested] of Object.entries(value)) {
+    // This is a business-policy flag, not an authorization header or secret.
+    if (key === "requiresAuthorization" && typeof nested === "boolean") {
+      continue;
+    }
     if (sensitiveMetadataKey.test(key)) {
       throw new Error(`Sensitive metadata is not allowed at ${path}.${key}`);
     }

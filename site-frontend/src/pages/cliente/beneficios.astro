@@ -1,200 +1,162 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsJourneySummary } from "../../lib/rewards-v2-contract";
 
 const user = Astro.locals.user;
+const eligibility = Astro.locals.rewardsEligibility;
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let journey: RewardsJourneySummary | null = null;
 
-const clientUser = {
-  id: user?.id ?? "",
-  firstName: user?.firstName ?? "",
-  lastName: user?.lastName ?? "",
-  email: user?.email ?? "",
-};
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, {
+    headers: { cookie },
+  });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) journey = (await response.json()) as RewardsJourneySummary;
+} catch {
+  // The page keeps a truthful empty state when Rewards is temporarily unavailable.
+}
+
+const productValidated = journey?.products.some((product) => product.status === "ACTIVE")
+  || eligibility?.afore_relation_status === "ACTIVE";
+const catalogEnabled = journey?.modules.benefits_enabled === true;
+const availablePoints = journey?.points.available;
+const points = availablePoints === undefined
+  ? "—"
+  : new Intl.NumberFormat("es-MX").format(BigInt(availablePoints));
 ---
 
-<ClientShellLayout title="Beneficios | Carobra" description="Beneficios y redenciones en Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Rewards">
-  <main
-    id="benefits-root"
-    data-user={JSON.stringify(clientUser)}
-    class="client-page client-page--soft-separators client-benefits-page"
-  >
-    <section class="client-benefits-hero client-section--roomy">
-      <h1 class="client-section-title mt-4">Beneficios para ti</h1>
-      <p class="client-benefits-hero__description">
-        Explora el catálogo, revisa estado y vigencia, y ejecuta redenciones
-        simuladas desde un flujo unificado.
-      </p>
+<ClientShellLayout
+  title="Recompensas | Carobra Rewards"
+  description="Descubre y administra tus recompensas Carobra."
+  currentPath="/cliente/beneficios"
+  sectionLabel="Recompensas"
+>
+  <main class="prizes-page">
+    <header class="prizes-welcome">
+      <div>
+        <p class="prizes-eyebrow">Tu lugar feliz</p>
+        <h1>Recompensas</h1>
+        <p>Todo lo que podrás disfrutar con tus puntos, reunido en un solo espacio.</p>
+      </div>
+      <span>Hola, {user?.firstName ?? "cliente"}</span>
+    </header>
+
+    <section class="prizes-hero" aria-labelledby="prizes-title">
+      <div class="prizes-hero__copy">
+        <p class="prizes-eyebrow">Catálogo Carobra</p>
+        <h2 id="prizes-title">Tus puntos merecen algo especial.</h2>
+        <p>{catalogEnabled
+          ? "Tu catálogo está listo para explorar."
+          : productValidated
+            ? "Tu cuenta ya cumple el requisito de producto. Estamos preparando las recompensas que aparecerán aquí."
+            : "Puedes conocer el espacio desde ahora. El catálogo y el canje se abrirán cuando tu producto sea validado."}</p>
+        <div class="prizes-hero__tags">
+          <span>{productValidated ? "Producto validado" : "Validación en curso"}</span>
+          <span>{catalogEnabled ? "Catálogo disponible" : "Sin catálogo publicado"}</span>
+        </div>
+      </div>
+      <article class="prizes-wallet" aria-label="Saldo disponible">
+        <span aria-hidden="true">✦</span>
+        <p>Tu saldo</p>
+        <strong>{points}<small> pts</small></strong>
+        <a href="/cliente/recompensas">Ver movimientos <span aria-hidden="true">→</span></a>
+      </article>
+      <span class="prizes-hero__orb prizes-hero__orb--one" aria-hidden="true"></span>
+      <span class="prizes-hero__orb prizes-hero__orb--two" aria-hidden="true"></span>
     </section>
 
-    <section class="client-benefits-layout client-section--roomy">
-      <article class="client-card client-benefits-catalog">
-        <div class="client-benefits-catalog__head">
-          <h2 class="text-2xl font-extrabold text-[#14355f]">Catálogo</h2>
-          <p class="client-benefits-catalog__hint">
-            Selecciona un beneficio para ver su detalle.
-          </p>
+    <section class="prizes-bento" aria-label="Secciones de recompensas">
+      <a class="prize-tile prize-tile--giftcards" href="/cliente/gift-cards">
+        <div class="prize-tile__symbol" aria-hidden="true">G</div>
+        <div>
+          <p class="prizes-eyebrow">Explorar</p>
+          <h2>Gift Cards</h2>
+          <span>La sección ya está preparada para recibir el catálogo.</span>
         </div>
-        <ul id="benefits-list" class="client-benefits-list"></ul>
+        <strong>Conocer la sección <span aria-hidden="true">↗</span></strong>
+      </a>
+
+      <article class="prize-tile prize-tile--catalog">
+        <span class="prize-tile__number">01</span>
+        <div><p class="prizes-eyebrow">Descubrir</p><h2>Catálogo digital</h2><span>Opciones, puntos y vigencias vivirán aquí cuando la integración esté habilitada.</span></div>
+        <small>En preparación</small>
       </article>
 
-      <article class="client-card client-benefits-detail">
-        <p class="client-benefits-detail__kicker">Detalle seleccionado</p>
-        <h2 id="benefit-title" class="text-2xl font-extrabold text-[#14355f]"></h2>
-        <p id="benefit-category" class="client-benefits-detail__category"></p>
-
-        <div class="client-benefits-detail__meta">
-          <div class="client-benefits-meta-box">
-            <p class="client-benefits-meta-box__label">Estado</p>
-            <p id="benefit-state" class="client-benefits-meta-box__value"></p>
-          </div>
-          <div class="client-benefits-meta-box">
-            <p class="client-benefits-meta-box__label">Vigencia</p>
-            <p id="benefit-validity" class="client-benefits-meta-box__value"></p>
-          </div>
-        </div>
-
-        <p id="benefit-description" class="client-benefits-detail__description"></p>
-
-        <p id="redemption-feedback" class="client-benefits-feedback hidden"></p>
-
-        <div class="client-benefits-detail__actions">
-          <button id="redeem-button" type="button" class="btn-primary">Iniciar redención simulada</button>
-        </div>
+      <article class="prize-tile prize-tile--level">
+        <span class="prize-tile__number">02</span>
+        <div><p class="prizes-eyebrow">Para ti</p><h2>Recompensas de tu nivel</h2><span>El contenido correspondiente a cada nivel aparecerá sin mezclarlo con el cálculo de nivel.</span></div>
+        <small>Pendiente de contenido</small>
       </article>
+
+      <article class="prize-tile prize-tile--history">
+        <span class="prize-tile__number">03</span>
+        <div><p class="prizes-eyebrow">Control</p><h2>Mis canjes</h2><span>Aquí consultarás solicitudes, confirmaciones y el estado de cada redención.</span></div>
+        <small>Sin movimientos</small>
+      </article>
+    </section>
+
+    <section class="prizes-empty" aria-labelledby="empty-catalog-title">
+      <span aria-hidden="true">⌁</span>
+      <div>
+        <p class="prizes-eyebrow">Contenido real, cuando esté listo</p>
+        <h2 id="empty-catalog-title">Todavía no hay recompensas publicadas</h2>
+        <p>No mostraremos marcas, costos, vigencias ni condiciones hasta recibirlos de Bonda y contar con la aprobación del equipo.</p>
+      </div>
+      <span class:list={["prizes-state", productValidated && "is-ready"]}>{productValidated ? "Cuenta preparada" : "Producto pendiente"}</span>
     </section>
   </main>
 
   <script>
-    import type { BenefitState } from "../../lib/client-demo-state";
-    import { getBenefitStateLabel, loadClientDemoState, redeemBenefit } from "../../lib/client-demo-state";
-    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
-
-    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-    const root = requireElement<HTMLElement>("#benefits-root");
-    const logoutButton = requireElement<HTMLButtonElement>("#logout");
-    const listContainer = requireElement<HTMLUListElement>("#benefits-list");
-    const titleEl = requireElement<HTMLElement>("#benefit-title");
-    const categoryEl = requireElement<HTMLElement>("#benefit-category");
-    const stateEl = requireElement<HTMLElement>("#benefit-state");
-    const validityEl = requireElement<HTMLElement>("#benefit-validity");
-    const descriptionEl = requireElement<HTMLElement>("#benefit-description");
-    const redeemButton = requireElement<HTMLButtonElement>("#redeem-button");
-    const feedbackEl = requireElement<HTMLParagraphElement>("#redemption-feedback");
-
-    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
-    const params = new URLSearchParams(window.location.search);
-    let selectedBenefitId = params.get("id") ?? "";
-
-    function getStatusTone(state: BenefitState) {
-      if (state === "disponible") {
-        return {
-          cardStatusClass: "is-available",
-          detailStatusClass: "is-available",
-        };
-      }
-
-      if (state === "proximo") {
-        return {
-          cardStatusClass: "is-upcoming",
-          detailStatusClass: "is-upcoming",
-        };
-      }
-
-      return {
-        cardStatusClass: "is-redeemed",
-        detailStatusClass: "is-redeemed",
-      };
-    }
-
-    function render() {
-      const state = loadClientDemoState(user);
-      const benefits = state.benefits;
-
-      if (!selectedBenefitId || !benefits.some((benefit) => benefit.id === selectedBenefitId)) {
-        selectedBenefitId = benefits[0]?.id ?? "";
-      }
-
-      listContainer.innerHTML = benefits
-        .map((benefit) => {
-          const isSelected = benefit.id === selectedBenefitId;
-          const stateTone = getStatusTone(benefit.state);
-
-          return `
-            <li>
-              <button
-                data-benefit-id="${benefit.id}"
-                class="client-benefit-card ${isSelected ? "is-selected" : ""}"
-                type="button"
-              >
-                <div class="client-benefit-card__main">
-                  <p class="client-benefit-card__title">${benefit.title}</p>
-                  <p class="client-benefit-card__category">${benefit.category}</p>
-                </div>
-                <div class="client-benefit-card__meta">
-                  <span class="client-benefit-card__status ${stateTone.cardStatusClass}">${getBenefitStateLabel(benefit.state)}</span>
-                  <span class="client-benefit-card__validity">Vigencia ${benefit.validUntil}</span>
-                </div>
-              </button>
-            </li>
-          `;
-        })
-        .join("");
-
-      const selected = benefits.find((benefit) => benefit.id === selectedBenefitId);
-      if (!selected) {
-        return;
-      }
-      const selectedStateTone = getStatusTone(selected.state);
-
-      titleEl.textContent = selected.title;
-      categoryEl.textContent = `${selected.category} · ${getBenefitStateLabel(selected.state)}`;
-      stateEl.textContent = getBenefitStateLabel(selected.state);
-      stateEl.className = `client-benefits-meta-box__value client-benefits-meta-box__value--status ${selectedStateTone.detailStatusClass}`;
-      validityEl.textContent = selected.validUntil;
-      descriptionEl.textContent = selected.description;
-      redeemButton.toggleAttribute("disabled", selected.state !== "disponible");
-      redeemButton.classList.toggle("is-disabled", selected.state !== "disponible");
-      redeemButton.textContent = selected.state === "disponible" ? "Iniciar redención simulada" : "No disponible para redención";
-    }
-
-    function setFeedback(message: string, isError = false) {
-      feedbackEl.textContent = message;
-      feedbackEl.classList.remove("hidden");
-      feedbackEl.classList.toggle("is-error", isError);
-    }
-
-    listContainer.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-
-      const button = target.closest("[data-benefit-id]");
-      if (!(button instanceof HTMLElement)) {
-        return;
-      }
-
-      selectedBenefitId = button.getAttribute("data-benefit-id") ?? "";
-      const query = new URLSearchParams(window.location.search);
-      query.set("id", selectedBenefitId);
-      window.history.replaceState({}, "", `${window.location.pathname}?${query.toString()}`);
-      render();
-    });
-
-    redeemButton.addEventListener("click", () => {
-      if (!selectedBenefitId) {
-        return;
-      }
-
-      const result = redeemBenefit(user, selectedBenefitId);
-      setFeedback(result.message, !result.ok);
-      render();
-    });
-
-    attachLogoutHandler(logoutButton, API_BASE_URL);
-
-    void (async () => {
-      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
-      render();
-    })();
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
   </script>
+
+  <style>
+    .prizes-page { width: min(1160px,calc(100% - 2rem)); margin: 0 auto; padding: 1.8rem 0 4rem; color: #1a395c; }
+    .prizes-welcome { display:flex; justify-content:space-between; align-items:end; gap:1.5rem; margin-bottom:1.3rem; }
+    .prizes-welcome h1 { margin:.15rem 0 .35rem; color:#15365e; font-size:clamp(2.5rem,6vw,4.8rem); line-height:.92; letter-spacing:-.055em; }
+    .prizes-welcome div>p:last-child { margin:0; color:#667d92; font-size:1rem; }
+    .prizes-welcome>span { padding:.55rem .8rem; border-radius:999px; color:#635087; background:#eee8ff; font-size:.78rem; font-weight:850; }
+    .prizes-eyebrow { margin:0; color:#6d57a1; font-size:.68rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+    .prizes-hero { position:relative; isolation:isolate; min-height:25rem; display:grid; grid-template-columns:minmax(0,1fr) 18rem; align-items:end; gap:2rem; padding:clamp(1.5rem,5vw,3.5rem); border-radius:2.3rem; color:#fff; background:linear-gradient(125deg,#6251a4 0%,#317fb4 52%,#31b5ae 100%); box-shadow:0 28px 65px rgba(58,78,133,.24); overflow:hidden; }
+    .prizes-hero__copy,.prizes-wallet { position:relative; z-index:2; }
+    .prizes-hero .prizes-eyebrow { color:#d9d0ff; }
+    .prizes-hero h2 { max-width:45rem; margin:.45rem 0 .9rem; font-size:clamp(2.8rem,7vw,5.8rem); line-height:.86; letter-spacing:-.06em; text-wrap:balance; }
+    .prizes-hero__copy>p:not(.prizes-eyebrow) { max-width:43rem; margin:0; color:#e7f3f6; line-height:1.65; }
+    .prizes-hero__tags { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1.3rem; }
+    .prizes-hero__tags span { padding:.48rem .72rem; border:1px solid rgba(255,255,255,.25); border-radius:999px; background:rgba(255,255,255,.1); font-size:.72rem; font-weight:800; }
+    .prizes-wallet { padding:1.45rem; border-radius:1.5rem; color:#153b60; background:#fffdf8; box-shadow:0 22px 45px rgba(31,36,78,.22); transform:rotate(1.5deg); }
+    .prizes-wallet>span { color:#ef8f73; font-size:1.7rem; }
+    .prizes-wallet p { margin:1rem 0 .25rem; color:#7e7890; font-size:.7rem; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
+    .prizes-wallet strong { display:block; margin-bottom:1rem; font-size:3.2rem; line-height:1; }
+    .prizes-wallet strong small { font-size:.8rem; }
+    .prizes-wallet a { color:#6450a0; font-size:.78rem; font-weight:900; text-decoration:none; }
+    .prizes-hero__orb { position:absolute; z-index:1; border-radius:50%; filter:blur(.2px); opacity:.65; }
+    .prizes-hero__orb--one { width:12rem; height:12rem; right:13rem; top:-5rem; background:#ffd882; }
+    .prizes-hero__orb--two { width:7rem; height:7rem; left:-2rem; bottom:-2rem; background:#f58f96; }
+    .prizes-bento { display:grid; grid-template-columns:1.35fr .65fr 1fr; gap:1rem; margin-top:1rem; }
+    .prize-tile { min-height:16rem; display:flex; flex-direction:column; justify-content:space-between; padding:1.45rem; border:1px solid rgba(41,72,103,.1); border-radius:1.7rem; text-decoration:none; box-shadow:0 16px 34px rgba(29,60,91,.07); overflow:hidden; }
+    .prize-tile h2 { margin:.35rem 0 .55rem; color:#173d63; font-size:clamp(1.45rem,3vw,2.2rem); line-height:1; letter-spacing:-.03em; }
+    .prize-tile div>span { color:#5f7890; font-size:.86rem; line-height:1.55; }
+    .prize-tile__number { color:#315f7e; font-size:.72rem; font-weight:900; }
+    .prize-tile small,.prize-tile>strong { color:#355f7d; font-size:.76rem; font-weight:900; }
+    .prize-tile--giftcards { grid-row:span 2; min-height:33rem; color:#fff; background:linear-gradient(155deg,#ffbf73,#f17f88); }
+    .prize-tile--giftcards .prizes-eyebrow { color:#78433f; }
+    .prize-tile--giftcards h2 { color:#572f3e; font-size:clamp(2.5rem,5vw,4.4rem); }
+    .prize-tile--giftcards div>span,.prize-tile--giftcards>strong { color:#673a45; }
+    .prize-tile__symbol { width:4.5rem; height:4.5rem; display:grid; place-items:center; border-radius:1.3rem; color:#ee7581; background:#fff8e9; font-size:2rem; font-weight:950; transform:rotate(-6deg); box-shadow:0 12px 25px rgba(104,53,65,.16); }
+    .prize-tile--catalog { background:#dff7f1; }
+    .prize-tile--level { background:#eee8ff; }
+    .prize-tile--history { grid-column:span 2; min-height:16rem; background:#e2f3ff; }
+    .prizes-empty { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:1.2rem; margin-top:1rem; padding:1.5rem; border:1px dashed #b9cbd9; border-radius:1.5rem; background:rgba(255,255,255,.74); }
+    .prizes-empty>span:first-child { width:3.2rem; height:3.2rem; display:grid; place-items:center; border-radius:50%; color:#6d57a1; background:#eee8ff; font-size:1.3rem; }
+    .prizes-empty h2 { margin:.25rem 0 .35rem; color:#1f466b; font-size:1.35rem; }
+    .prizes-empty div>p:last-child { margin:0; color:#667e92; line-height:1.55; }
+    .prizes-state { padding:.48rem .7rem; border-radius:999px; color:#876240; background:#fff0ce; font-size:.72rem; font-weight:900; white-space:nowrap; }
+    .prizes-state.is-ready { color:#27745a; background:#dbf3e7; }
+    @media(max-width:820px){.prizes-hero{grid-template-columns:1fr}.prizes-wallet{width:min(100%,22rem)}.prizes-bento{grid-template-columns:1fr 1fr}.prize-tile--giftcards{grid-row:auto;grid-column:span 2;min-height:22rem}.prize-tile--history{grid-column:span 2}.prizes-empty{grid-template-columns:auto 1fr}.prizes-state{grid-column:2;justify-self:start}}
+    @media(max-width:520px){.prizes-page{width:min(100% - 1rem,1160px);padding-top:1rem}.prizes-welcome{align-items:flex-start;flex-direction:column}.prizes-hero{min-height:auto;padding:1.3rem;border-radius:1.5rem}.prizes-hero h2{font-size:3.2rem}.prizes-wallet{width:100%;transform:none}.prizes-bento{grid-template-columns:1fr}.prize-tile--giftcards,.prize-tile--history{grid-column:1}.prize-tile--giftcards{min-height:20rem}.prizes-empty{align-items:flex-start}}
+  </style>
 </ClientShellLayout>

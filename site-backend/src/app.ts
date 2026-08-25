@@ -21,6 +21,17 @@ import {
 } from "./rewards/shared/http-contracts.js";
 import { asCustomerId } from "./rewards/shared/identifiers.js";
 import type { ReferralHttpApplication } from "./rewards/referrals/http-application.js";
+import {
+  authorizeRewardsV2TestRequest,
+  RewardsV2TestScenarioApplication,
+  rewardsV2TestAccessHeader,
+} from "./rewards/v2/test-scenarios.js";
+import type { RewardsV2JourneyHttpApplication } from "./rewards/v2/journey-http-application.js";
+import type {
+  RewardsCustomerPortalApplication,
+  UpdateLearningProgressInput,
+  UpdatePreferencesInput,
+} from "./rewards/v2/customer-portal.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
 
@@ -30,8 +41,11 @@ export function createSiteBackendServer(
   rewardsApplication?: RewardsAccountHttpApplication,
   behaviorApplication?: RewardsBehaviorHttpApplication,
   referralApplication?: ReferralHttpApplication,
+  rewardsV2JourneyApplication?: RewardsV2JourneyHttpApplication,
+  rewardsCustomerPortalApplication?: RewardsCustomerPortalApplication,
 ): Server {
   const client = new RewardsApiClient(config, fetchImplementation);
+  const rewardsV2TestScenarios = new RewardsV2TestScenarioApplication();
   return createServer((request, response) => {
     void routeRequest(
       request,
@@ -41,6 +55,9 @@ export function createSiteBackendServer(
       rewardsApplication,
       behaviorApplication,
       referralApplication,
+      rewardsV2JourneyApplication,
+      rewardsCustomerPortalApplication,
+      rewardsV2TestScenarios,
     );
   });
 }
@@ -53,6 +70,9 @@ async function routeRequest(
   rewardsApplication: RewardsAccountHttpApplication | undefined,
   behaviorApplication: RewardsBehaviorHttpApplication | undefined,
   referralApplication: ReferralHttpApplication | undefined,
+  rewardsV2JourneyApplication: RewardsV2JourneyHttpApplication | undefined,
+  rewardsCustomerPortalApplication: RewardsCustomerPortalApplication | undefined,
+  rewardsV2TestScenarios: RewardsV2TestScenarioApplication,
 ): Promise<void> {
   try {
     const method = request.method ?? "GET";
@@ -62,6 +82,13 @@ async function routeRequest(
     if (method === "POST" && path === "/api/v1/auth/register") {
       const body = await readJsonBody<SiteRegisterRequest>(request);
       const result = await client.register(toApiRegisterRequest(body));
+      if (config.rewardsV2LiveFlowEnabled && rewardsV2JourneyApplication) {
+        await captureInvitedJourneySafely(
+          rewardsV2JourneyApplication,
+          result.data.customer.id,
+          result.data.registered_at,
+        );
+      }
       if (body.referral_token && referralApplication) {
         await captureReferralSafely(referralApplication, body.referral_token, result.data.customer.id);
       }
@@ -107,6 +134,122 @@ async function routeRequest(
       );
       return;
     }
+    if (method === "GET" && path === "/api/v1/rewards/journey") {
+      if (!rewardsV2JourneyApplication) {
+        throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+      }
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (config.rewardsV2LiveFlowEnabled) {
+        await rewardsV2JourneyApplication.synchronize({
+          customerId: asCustomerId(evidence.data.customer_id),
+          registeredAt: parseApiInstant(evidence.data.registered_at),
+          validationStatus: evidence.data.validation_status,
+          validatedAfore: evidence.data.product_evidence
+            ? {
+                provider: "SISCA",
+                productType: "AFORE",
+                sourceId: evidence.data.product_evidence.source_id,
+                validatedAt: parseApiInstant(evidence.data.product_evidence.validated_at),
+              }
+            : null,
+        });
+      }
+      const summary = await rewardsV2JourneyApplication.getSummary(
+        asCustomerId(evidence.data.customer_id),
+        evidence.data.validation_status,
+      );
+      if (!summary) {
+        sendJson(response, 404, {
+          error: {
+            code: "rewards_journey_not_found",
+            message: "Rewards journey is not available yet",
+          },
+        });
+        return;
+      }
+      sendJson(response, 200, summary);
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/activities") {
+      if (!rewardsV2JourneyApplication) {
+        throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+      }
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      sendJson(
+        response,
+        200,
+        await rewardsV2JourneyApplication.getActivities(
+          asCustomerId(evidence.data.customer_id),
+        ),
+      );
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/movements") {
+      if (!rewardsV2JourneyApplication) {
+        throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+      }
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      sendJson(
+        response,
+        200,
+        await rewardsV2JourneyApplication.getMovements(
+          asCustomerId(evidence.data.customer_id),
+        ),
+      );
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/portal") {
+      const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (config.rewardsV2LiveFlowEnabled && rewardsV2JourneyApplication) {
+        await synchronizeJourneyEvidence(rewardsV2JourneyApplication, evidence.data);
+      }
+      const customerPortal = await portal.getPortal(
+        asCustomerId(evidence.data.customer_id),
+        evidence.data.validation_status,
+      );
+      if (!customerPortal) {
+        sendJson(response, 404, { error: { code: "rewards_journey_not_found", message: "Rewards journey is not available yet" } });
+        return;
+      }
+      sendJson(response, 200, customerPortal);
+      return;
+    }
+    if (method === "PATCH" && path === "/api/v1/rewards/portal/preferences") {
+      const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      sendJson(response, 200, await portal.updatePreferences(
+        asCustomerId(evidence.data.customer_id),
+        await readJsonBody<UpdatePreferencesInput>(request),
+      ));
+      return;
+    }
+    if (method === "POST" && path === "/api/v1/rewards/portal/notifications/read") {
+      const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const body = await readJsonBody<{ notification_id: string }>(request);
+      await portal.markNotificationRead(asCustomerId(evidence.data.customer_id), body.notification_id);
+      sendJson(response, 200, { status: "recorded" });
+      return;
+    }
+    if (method === "POST" && path === "/api/v1/rewards/portal/actions/complete") {
+      const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const body = await readJsonBody<{ action_id: string }>(request);
+      sendJson(response, 200, { completed: await portal.completeAction(
+        asCustomerId(evidence.data.customer_id), body.action_id,
+      ) });
+      return;
+    }
+    if (method === "POST" && path === "/api/v1/rewards/portal/learning-progress") {
+      const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      sendJson(response, 200, { updated: await portal.updateLearningProgress(
+        asCustomerId(evidence.data.customer_id),
+        await readJsonBody<UpdateLearningProgressInput>(request),
+      ) });
+      return;
+    }
     if (method === "GET" && path === "/api/v1/rewards/referrals") {
       const referrals = requireReferralApplication(referralApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
@@ -115,6 +258,28 @@ async function routeRequest(
         200,
         await referrals.getDashboard(asCustomerId(evidence.data.customer_id)),
       );
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/test/scenarios") {
+      authorizeRewardsV2TestRequest(
+        config,
+        singleHeader(request.headers[rewardsV2TestAccessHeader]),
+      );
+      sendJson(response, 200, { scenarios: rewardsV2TestScenarios.list() });
+      return;
+    }
+    if (method === "GET" && path.startsWith("/api/v1/rewards/test/scenarios/")) {
+      authorizeRewardsV2TestRequest(
+        config,
+        singleHeader(request.headers[rewardsV2TestAccessHeader]),
+      );
+      const code = decodeURIComponent(path.slice("/api/v1/rewards/test/scenarios/".length));
+      const scenario = rewardsV2TestScenarios.get(code);
+      if (!scenario) {
+        sendJson(response, 404, { error: { code: "not_found", message: "Scenario not found" } });
+        return;
+      }
+      sendJson(response, 200, scenario);
       return;
     }
     if (method === "POST" && path === "/api/v1/rewards/actions") {
@@ -181,6 +346,30 @@ async function captureReferralSafely(
   }
 }
 
+async function captureInvitedJourneySafely(
+  application: RewardsV2JourneyHttpApplication,
+  customerId: string,
+  registeredAt: string,
+): Promise<void> {
+  try {
+    await application.ensureInvited({
+      customerId: asCustomerId(customerId),
+      registeredAt: parseApiInstant(registeredAt),
+    });
+  } catch {
+    // Customer registration remains authoritative in the API. The authenticated
+    // journey read retries this idempotent projection if Rewards was unavailable.
+  }
+}
+
+function parseApiInstant(value: string): Date {
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) {
+    throw new SiteApiError(503, "api_unavailable", "The API returned invalid evidence");
+  }
+  return instant;
+}
+
 function toApiRegisterRequest(body: SiteRegisterRequest): RegisterRequest {
   return {
     curp: body.curp,
@@ -219,6 +408,35 @@ function requireRewardsApplication(
     throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
   }
   return application;
+}
+
+function requireCustomerPortalApplication(
+  application: RewardsCustomerPortalApplication | undefined,
+): RewardsCustomerPortalApplication {
+  if (!application) throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+  return application;
+}
+
+async function synchronizeJourneyEvidence(
+  application: RewardsV2JourneyHttpApplication,
+  evidence: {
+    customer_id: string;
+    registered_at: string;
+    validation_status: string;
+    product_evidence: null | { source_id: string; validated_at: string };
+  },
+): Promise<void> {
+  await application.synchronize({
+    customerId: asCustomerId(evidence.customer_id),
+    registeredAt: parseApiInstant(evidence.registered_at),
+    validationStatus: evidence.validation_status,
+    validatedAfore: evidence.product_evidence ? {
+      provider: "SISCA",
+      productType: "AFORE",
+      sourceId: evidence.product_evidence.source_id,
+      validatedAt: parseApiInstant(evidence.product_evidence.validated_at),
+    } : null,
+  });
 }
 
 function sendApiResult<T>(
@@ -302,3 +520,7 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
 }
 
 class InvalidRequestError extends Error {}
+
+function singleHeader(value: string | readonly string[] | undefined): string | undefined {
+  return typeof value === "string" ? value : value?.[0];
+}

@@ -1,59 +1,19 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
-import { getSiteBackendBaseUrl } from "../../lib/api";
-
-interface ValidationStatusResponse {
-  validation_id: string;
-  status: string;
-  registered_at: string;
-  next_checkpoint: string | null;
-  next_checkpoint_at: string | null;
-}
 
 const user = Astro.locals.user;
 const eligibility = Astro.locals.rewardsEligibility;
-let validation: ValidationStatusResponse | null = null;
-let unavailable = false;
-try {
-  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/me/validation-status`, {
-    headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
-  });
-  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-  if (response.ok) validation = (await response.json()) as ValidationStatusResponse;
-  else unavailable = true;
-} catch {
-  unavailable = true;
-}
-
-const registeredAt = validation?.registered_at
-  ? new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" })
-      .format(new Date(validation.registered_at))
-  : null;
 const isInactive = eligibility?.reason === "customer_inactive"
   || user?.customerStatus === "INACTIVE";
-const requiresAttention = validation?.status === "REQUIRES_ATTENTION"
-  || eligibility?.sisca_validation_status === "REQUIRES_ATTENTION";
-const statusLabel = unavailable
-  ? "Consulta no disponible"
-  : isInactive
+const statusLabel = isInactive
     ? "Cuenta inactiva"
-    : requiresAttention
-      ? "Requiere atención"
-      : "Pendiente de validación";
-const validationTitle = unavailable
-  ? "No pudimos consultar tu validación"
-  : isInactive
+    : "Pendiente de validación";
+const validationTitle = isInactive
     ? "Cuenta inactiva"
-    : requiresAttention
-      ? "Tu validación requiere atención"
-      : "Validación AFORE pendiente";
-const validationMessage = unavailable
-  ? "El servicio no está disponible por el momento. Intenta actualizar la página más tarde."
-  : isInactive
+    : "Tu producto está en validación";
+const validationMessage = isInactive
     ? "Tu cuenta no está activa actualmente. Contacta a soporte para revisar el estado de tu servicio antes de acceder a Rewards."
-    : requiresAttention
-      ? "No pudimos completar la validación automáticamente. Nuestro equipo necesita revisar tu caso antes de habilitar Rewards."
-      : "Tu cuenta ya fue registrada. Estamos esperando el resultado de validación de tu AFORE.";
+    : "Tu cuenta ya fue registrada. Carobra está confirmando tu primer producto y te avisará cuando exista una actualización.";
 ---
 
 <ClientShellLayout
@@ -75,7 +35,7 @@ const validationMessage = unavailable
         <article class="client-card min-w-0 p-5 sm:min-w-[18rem]" aria-label="Estado de cuenta">
           <p class="text-xs font-bold uppercase tracking-[0.12em] text-[#587795]">Estado de cuenta</p>
           <p class="mt-2 text-xl font-extrabold text-[#14355f]">{statusLabel}</p>
-          <p class="mt-2 text-sm text-[#4f6f90]">Rewards ID: {user?.rewardsId || "No disponible"}</p>
+          <p class="mt-2 text-sm text-[#4f6f90]">Tu historial permanece protegido.</p>
         </article>
       </div>
     </section>
@@ -89,23 +49,7 @@ const validationMessage = unavailable
         <p class="mt-3 text-sm leading-6 text-[#4f6f90]">
           {validationMessage}
         </p>
-        {registeredAt && (
-          <dl class="mt-6 grid gap-4 rounded-2xl bg-[#f8fbff] p-4 sm:grid-cols-2">
-            <div>
-              <dt class="text-xs font-bold uppercase tracking-[0.08em] text-[#587795]">Registro</dt>
-              <dd class="mt-1 text-sm font-semibold text-[#244b73]">{registeredAt}</dd>
-            </div>
-            <div>
-              <dt class="text-xs font-bold uppercase tracking-[0.08em] text-[#587795]">Referencia</dt>
-              <dd class="mt-1 break-all text-sm font-semibold text-[#244b73]">{validation?.validation_id}</dd>
-            </div>
-          </dl>
-        )}
-        {validation?.next_checkpoint && (
-          <p class="mt-4 text-sm text-[#4f6f90]">
-            Próxima revisión: <strong>{validation.next_checkpoint}</strong>
-          </p>
-        )}
+        <p class="mt-4 text-sm font-semibold text-[#244b73]">No necesitas repetir tu registro ni proporcionar referencias internas.</p>
       </article>
 
       <aside class="client-card p-6" aria-labelledby="pending-access-title">

@@ -72,6 +72,7 @@ uv run uvicorn carobra_rewards.main:app --reload --host 127.0.0.1 --port 8000
 
 ```bash
 cd site-backend
+export REWARDS_V2_LIVE_FLOW_ENABLED=true
 npm run build
 npm start
 ```

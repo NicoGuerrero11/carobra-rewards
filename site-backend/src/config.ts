@@ -7,6 +7,11 @@ export interface SiteBackendConfig {
   port: number;
   apiRequestTimeoutMs: number;
   referralIdentityHmacSecret?: string;
+  rewardsV2LiveFlowEnabled: boolean;
+  rewardsV2TestMode?: {
+    accessKey: string;
+    environment: "development" | "test";
+  };
   sessionCookie: {
     name: string;
     secure: boolean;
@@ -58,8 +63,18 @@ export function loadConfig(
       1,
       120_000,
     ),
+    rewardsV2LiveFlowEnabled: parseBoolean(
+      "REWARDS_V2_LIVE_FLOW_ENABLED",
+      environment.REWARDS_V2_LIVE_FLOW_ENABLED ?? "false",
+    ),
     sessionCookie,
   };
+  const nodeEnvironment = (environment.NODE_ENV ?? "development").trim().toLowerCase();
+  if (config.rewardsV2LiveFlowEnabled && nodeEnvironment === "production") {
+    throw new Error(
+      "REWARDS_V2_LIVE_FLOW_ENABLED cannot be enabled in production before business approval",
+    );
+  }
   const databaseUrl = environment.DATABASE_URL?.trim();
   if (databaseUrl) config.databaseUrl = databaseUrl;
   const referralIdentityHmacSecret = environment.REFERRAL_IDENTITY_HMAC_SECRET?.trim();
@@ -68,6 +83,26 @@ export function loadConfig(
       throw new Error("REFERRAL_IDENTITY_HMAC_SECRET must contain at least 32 bytes");
     }
     config.referralIdentityHmacSecret = referralIdentityHmacSecret;
+  }
+  const testModeEnabled = parseBoolean(
+    "REWARDS_V2_TEST_MODE_ENABLED",
+    environment.REWARDS_V2_TEST_MODE_ENABLED ?? "false",
+  );
+  if (testModeEnabled) {
+    if (nodeEnvironment !== "development" && nodeEnvironment !== "test") {
+      throw new Error("Rewards V2 test mode is forbidden outside development or test");
+    }
+    const accessKey = requiredValue(
+      "REWARDS_V2_TEST_ACCESS_KEY",
+      environment.REWARDS_V2_TEST_ACCESS_KEY ?? "",
+    );
+    if (Buffer.byteLength(accessKey, "utf8") < 32) {
+      throw new Error("REWARDS_V2_TEST_ACCESS_KEY must contain at least 32 bytes");
+    }
+    config.rewardsV2TestMode = {
+      accessKey,
+      environment: nodeEnvironment,
+    };
   }
   return config;
 }

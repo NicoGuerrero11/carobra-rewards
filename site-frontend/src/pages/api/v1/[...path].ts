@@ -10,6 +10,14 @@ const allowedPaths = new Set([
   "me/validation-status",
   "rewards/eligibility",
   "rewards/account",
+  "rewards/journey",
+  "rewards/activities",
+  "rewards/movements",
+  "rewards/portal",
+  "rewards/portal/preferences",
+  "rewards/portal/notifications/read",
+  "rewards/portal/actions/complete",
+  "rewards/portal/learning-progress",
   "rewards/referrals",
 ]);
 
@@ -59,6 +67,7 @@ const proxy: APIRoute = async ({ params, request }) => {
 
 export const GET = proxy;
 export const POST = proxy;
+export const PATCH = proxy;
 
 function getSetCookies(headers: Headers): string[] {
   const headersWithCookies = headers as Headers & { getSetCookie?: () => string[] };

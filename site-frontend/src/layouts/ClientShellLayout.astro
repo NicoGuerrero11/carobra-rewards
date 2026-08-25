@@ -2,7 +2,7 @@
 import BaseLayout from "./BaseLayout.astro";
 
 interface NavItem {
-  id: "validation" | "rewards" | "referrals";
+  id: "rewards" | "prizes" | "courses" | "giftCards";
   label: string;
   href: string;
 }
@@ -21,16 +21,15 @@ const {
   sectionLabel = "Cliente",
 } = Astro.props as Props;
 
-const rewardsMode = currentPath.startsWith("/cliente/recompensas");
-const navItems: NavItem[] = rewardsMode
-  ? [
-      { id: "rewards", label: "Resumen Rewards", href: "/cliente/recompensas" },
-      { id: "referrals", label: "Referidos", href: "/cliente/recompensas/referidos" },
-    ]
-  : [{ id: "validation", label: "Estado de validación", href: "/cliente/validacion" }];
+const navItems: NavItem[] = [
+  { id: "rewards", label: "Rewards", href: "/cliente/recompensas" },
+  { id: "prizes", label: "Recompensas", href: "/cliente/beneficios" },
+  { id: "courses", label: "Cursos", href: "/cliente/cursos" },
+  { id: "giftCards", label: "Gift Cards", href: "/cliente/gift-cards" },
+];
 
 function isActive(item: NavItem) {
-  return item.href === currentPath;
+  return currentPath.startsWith(item.href);
 }
 ---
 
@@ -78,6 +77,18 @@ function isActive(item: NavItem) {
         </nav>
 
         <div class="client-shell__right">
+          <a
+            class:list={["client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
+            href="/cliente/notificaciones"
+            aria-label="Ver notificaciones"
+            aria-current={currentPath === "/cliente/notificaciones" ? "page" : undefined}
+            title="Notificaciones"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6.8 10.2a5.2 5.2 0 0 1 10.4 0c0 5.8 2.3 6.3 2.3 6.3H4.5s2.3-.5 2.3-6.3Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M10 19h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+            </svg>
+          </a>
           <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
               <span class="client-shell__user-icon" aria-hidden="true">
@@ -90,6 +101,8 @@ function isActive(item: NavItem) {
             </button>
 
             <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
+              <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
+              <a class="client-shell__user-menu-link" href="mailto:soporte@carobra.mx">Ayuda y soporte</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
           </div>

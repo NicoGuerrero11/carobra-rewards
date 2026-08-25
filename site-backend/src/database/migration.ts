@@ -17,6 +17,9 @@ import { referralInvitationLinks } from "./migrations/014-referral-invitation-li
 import { expirationNotificationDeliveries } from "./migrations/015-expiration-notification-deliveries.js";
 import { expectedRedemptionAssumptions } from "./migrations/016-expected-redemption-assumptions.js";
 import { rewardsJobManualRetries } from "./migrations/017-rewards-job-manual-retries.js";
+import { rewardsV2Foundation } from "./migrations/018-rewards-v2-foundation.js";
+import { rewardsV2LiveJourney } from "./migrations/019-rewards-v2-live-journey.js";
+import { rewardsCustomerPortal } from "./migrations/020-rewards-customer-portal.js";
 
 export interface Migration {
   id: string;
@@ -42,6 +45,9 @@ export const migrations: readonly Migration[] = [
   expirationNotificationDeliveries,
   expectedRedemptionAssumptions,
   rewardsJobManualRetries,
+  rewardsV2Foundation,
+  rewardsV2LiveJourney,
+  rewardsCustomerPortal,
 ];
 
 export async function migrate(client: PoolClient): Promise<void> {

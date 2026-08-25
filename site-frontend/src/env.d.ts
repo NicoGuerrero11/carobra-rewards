@@ -25,6 +25,10 @@ declare namespace App {
 
 interface ImportMetaEnv {
   readonly SITE_BACKEND_BASE_URL?: string;
+  readonly REWARDS_V2_PREVIEW_ENABLED?: string;
+  readonly REWARDS_V2_PREVIEW_USERNAME?: string;
+  readonly REWARDS_V2_PREVIEW_PASSWORD?: string;
+  readonly REWARDS_V2_TEST_ACCESS_KEY?: string;
 }
 
 interface ImportMeta {

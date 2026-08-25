@@ -167,6 +167,7 @@ class CustomerAuthService:
             customer=_profile(customer),
             validation_id=validation.id,
             validation_status=validation.status.value,
+            registered_at=validation.registered_at,
         )
 
     async def login(self, command: LoginCommand) -> LoginResult:
@@ -255,6 +256,7 @@ class CustomerAuthService:
             next_checkpoint_at=validation.next_checkpoint_at,
             last_checked_at=validation.last_checked_at,
             last_check_outcome=validation.last_check_outcome,
+            validated_at=validation.validated_at,
         )
 
     async def _authenticated_models(

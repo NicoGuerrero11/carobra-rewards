@@ -107,6 +107,7 @@ class RegistrationResponse(BaseModel):
     customer: CustomerProfileResponse
     validation_id: UUID
     validation_status: str
+    registered_at: datetime
 
     @classmethod
     def from_result(cls, result: RegistrationResult) -> RegistrationResponse:
@@ -114,12 +115,21 @@ class RegistrationResponse(BaseModel):
             customer=CustomerProfileResponse.from_profile(result.customer),
             validation_id=result.validation_id,
             validation_status=result.validation_status,
+            registered_at=result.registered_at,
         )
 
 
 class LoginResponse(BaseModel):
     customer: CustomerProfileResponse
     expires_at: datetime
+
+
+class ValidatedAforeEvidenceResponse(BaseModel):
+    provider: str
+    product_type: str
+    status: str
+    source_id: str
+    validated_at: datetime
 
 
 class CustomerValidationStatusResponse(BaseModel):
@@ -131,13 +141,26 @@ class CustomerValidationStatusResponse(BaseModel):
     next_checkpoint_at: datetime | None
     last_checked_at: datetime | None
     last_check_outcome: str | None
+    validated_at: datetime | None
+    product_evidence: ValidatedAforeEvidenceResponse | None
 
     @classmethod
     def from_result(
         cls,
         result: CustomerValidationStatus,
     ) -> CustomerValidationStatusResponse:
-        return cls(**asdict(result))
+        evidence = (
+            ValidatedAforeEvidenceResponse(
+                provider="SISCA",
+                product_type="AFORE",
+                status="ACTIVE",
+                source_id=f"sisca-validation:{result.validation_id}",
+                validated_at=result.validated_at,
+            )
+            if result.status == "VALIDATED" and result.validated_at is not None
+            else None
+        )
+        return cls(**asdict(result), product_evidence=evidence)
 
 
 class ErrorDetail(BaseModel):

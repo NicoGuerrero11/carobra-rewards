@@ -48,11 +48,12 @@ def _profile() -> CustomerProfile:
 class FakeAuthService:
     error: Exception | None = None
     logout_token: str | None = None
+    validated: bool = False
 
     async def register(self, command):
         if self.error:
             raise self.error
-        return RegistrationResult(_profile(), VALIDATION_ID, "PENDING")
+        return RegistrationResult(_profile(), VALIDATION_ID, "PENDING", NOW)
 
     async def login(self, command):
         if self.error:
@@ -79,12 +80,13 @@ class FakeAuthService:
         return CustomerValidationStatus(
             validation_id=VALIDATION_ID,
             customer_id=CUSTOMER_ID,
-            status="PENDING",
+            status="VALIDATED" if self.validated else "PENDING",
             registered_at=NOW,
             next_checkpoint="H24",
             next_checkpoint_at=NOW,
             last_checked_at=None,
             last_check_outcome=None,
+            validated_at=NOW if self.validated else None,
         )
 
 
@@ -127,6 +129,7 @@ def test_register_login_logout_me_and_validation_status_contract(
     registered = http.post("/api/v1/auth/register", json=_payload())
     assert registered.status_code == 201
     assert registered.json()["validation_status"] == "PENDING"
+    assert registered.json()["registered_at"] == NOW.isoformat().replace("+00:00", "Z")
 
     logged_in = http.post(
         "/api/v1/auth/login",
@@ -144,12 +147,37 @@ def test_register_login_logout_me_and_validation_status_contract(
     status_response = http.get("/api/v1/me/validation-status")
     assert status_response.status_code == 200
     assert status_response.json()["status"] == "PENDING"
+    assert status_response.json()["product_evidence"] is None
     assert "password" not in status_response.text.lower()
 
     logged_out = http.post("/api/v1/auth/logout")
     assert logged_out.status_code == 204
     assert service.logout_token == "browser-secret"
     assert "Max-Age=0" in logged_out.headers["set-cookie"]
+
+
+def test_validated_status_exposes_only_safe_afore_evidence(
+    client: tuple[TestClient, FakeAuthService],
+) -> None:
+    http, service = client
+    service.validated = True
+    http.post(
+        "/api/v1/auth/login",
+        json={"email": "ada@example.com", "password": "correct-horse-7"},
+    )
+
+    response = http.get("/api/v1/me/validation-status")
+
+    assert response.status_code == 200
+    assert response.json()["product_evidence"] == {
+        "provider": "SISCA",
+        "product_type": "AFORE",
+        "status": "ACTIVE",
+        "source_id": f"sisca-validation:{VALIDATION_ID}",
+        "validated_at": NOW.isoformat().replace("+00:00", "Z"),
+    }
+    assert "curp" not in response.text.lower()
+    assert "movement" not in response.text.lower()
 
 
 @pytest.mark.parametrize(
