@@ -111,6 +111,22 @@ class Settings(BaseSettings):
         alias="SISCA_TIMEOUT_SECONDS",
     )
     sisca_max_retries: int = Field(default=2, ge=0, le=10, alias="SISCA_MAX_RETRIES")
+    sisca_scheduler_enabled: bool = Field(
+        default=False,
+        alias="SISCA_SCHEDULER_ENABLED",
+    )
+    sisca_scheduler_poll_seconds: float = Field(
+        default=60.0,
+        ge=5.0,
+        le=3600.0,
+        alias="SISCA_SCHEDULER_POLL_SECONDS",
+    )
+    sisca_scheduler_batch_size: int = Field(
+        default=100,
+        ge=1,
+        le=1000,
+        alias="SISCA_SCHEDULER_BATCH_SIZE",
+    )
     sisca_known_movement_types: str = Field(
         default="TRASPASO,Traspaso NAP,Registro NAP",
         alias="SISCA_KNOWN_MOVEMENT_TYPES",

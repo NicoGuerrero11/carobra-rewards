@@ -100,6 +100,22 @@ Los checkpoints acelerados quedan apagados por defecto y requieren
 `SISCA_UAT_CONTROL_ENABLED=true` más una lista de identificadores internos en
 `SISCA_UAT_AUTHORIZED_OPERATORS`.
 
+### Scheduler SISCA de producción
+
+Producción debe configurar `SISCA_SCHEDULER_ENABLED=true`. La API consulta la
+base cada `SISCA_SCHEDULER_POLL_SECONDS` (60 segundos por defecto), procesa como
+máximo `SISCA_SCHEDULER_BATCH_SIZE` validaciones vencidas por ciclo y conserva
+los vencimientos calculados desde el registro: H24 a 24 horas, D3 a 72 horas y
+D5 a 120 horas. Un reinicio no pierde trabajo porque los vencimientos y la
+idempotencia viven en PostgreSQL.
+
+Los eventos seguros `sisca_validation_checkpoint_due`,
+`sisca_scheduler_batch_completed` y `sisca_scheduler_iteration_failed` permiten
+monitorear retrasos, volumen y fallos sin registrar CURP ni credenciales. Para
+pausar la operación se cambia `SISCA_SCHEDULER_ENABLED=false` y se vuelve a
+desplegar; las validaciones pendientes permanecen guardadas para el siguiente
+arranque.
+
 El navegador normal se comunica con el BFF mediante el proxy same-origin de
 Astro. CORS queda restringido a `CORS_ALLOWED_ORIGINS` para pruebas o clientes
 locales explícitos y rechaza configuraciones con origen comodín.
@@ -134,6 +150,6 @@ requiere ni conserva NSS.
 ## Alcance vigente
 
 Rewards registra al cliente, guarda el consentimiento y crea una validación
-SISCA `PENDING` en una sola transacción. La integración SISCA real, puntos,
-campañas, recompensas, redenciones y administración permanecen fuera de este
-MVP. El intake anterior sigue deshabilitado y oculto de OpenAPI por defecto.
+SISCA `PENDING` en una sola transacción. Después del commit dispara una consulta
+inicial y el scheduler productivo procesa H24, D3 y D5 cuando corresponda. El
+intake anterior sigue deshabilitado y oculto de OpenAPI por defecto.
