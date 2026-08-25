@@ -8,7 +8,6 @@ import type {
   SiteErrorEnvelope,
   SiteRegisterRequest,
 } from "./contracts.js";
-import type { RewardsAccountHttpApplication } from "./rewards/accounts/http-application.js";
 import type {
   OnboardingEvidenceHttpRequest,
   RewardsBehaviorHttpApplication,
@@ -38,7 +37,6 @@ const MAX_BODY_BYTES = 128 * 1024;
 export function createSiteBackendServer(
   config: SiteBackendConfig,
   fetchImplementation?: FetchImplementation,
-  rewardsApplication?: RewardsAccountHttpApplication,
   behaviorApplication?: RewardsBehaviorHttpApplication,
   referralApplication?: ReferralHttpApplication,
   rewardsV2JourneyApplication?: RewardsV2JourneyHttpApplication,
@@ -52,7 +50,6 @@ export function createSiteBackendServer(
       response,
       client,
       config,
-      rewardsApplication,
       behaviorApplication,
       referralApplication,
       rewardsV2JourneyApplication,
@@ -67,7 +64,6 @@ async function routeRequest(
   response: ServerResponse,
   client: RewardsApiClient,
   config: SiteBackendConfig,
-  rewardsApplication: RewardsAccountHttpApplication | undefined,
   behaviorApplication: RewardsBehaviorHttpApplication | undefined,
   referralApplication: ReferralHttpApplication | undefined,
   rewardsV2JourneyApplication: RewardsV2JourneyHttpApplication | undefined,
@@ -82,7 +78,7 @@ async function routeRequest(
     if (method === "POST" && path === "/api/v1/auth/register") {
       const body = await readJsonBody<SiteRegisterRequest>(request);
       const result = await client.register(toApiRegisterRequest(body));
-      if (config.rewardsV2LiveFlowEnabled && rewardsV2JourneyApplication) {
+      if (rewardsV2JourneyApplication) {
         await captureInvitedJourneySafely(
           rewardsV2JourneyApplication,
           result.data.customer.id,
@@ -114,46 +110,12 @@ async function routeRequest(
     if (method === "GET" && path === "/api/v1/me/validation-status") {
       return sendApiResult(response, await client.getValidationStatus(cookie), config);
     }
-    if (method === "GET" && path === "/api/v1/rewards/eligibility") {
-      const rewards = requireRewardsApplication(rewardsApplication);
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(
-        response,
-        200,
-        await rewards.getEligibility(asCustomerId(evidence.data.customer_id)),
-      );
-      return;
-    }
-    if (method === "GET" && path === "/api/v1/rewards/account") {
-      const rewards = requireRewardsApplication(rewardsApplication);
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(
-        response,
-        200,
-        await rewards.getSummary(asCustomerId(evidence.data.customer_id)),
-      );
-      return;
-    }
     if (method === "GET" && path === "/api/v1/rewards/journey") {
       if (!rewardsV2JourneyApplication) {
         throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
       }
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      if (config.rewardsV2LiveFlowEnabled) {
-        await rewardsV2JourneyApplication.synchronize({
-          customerId: asCustomerId(evidence.data.customer_id),
-          registeredAt: parseApiInstant(evidence.data.registered_at),
-          validationStatus: evidence.data.validation_status,
-          validatedAfore: evidence.data.product_evidence
-            ? {
-                provider: "SISCA",
-                productType: "AFORE",
-                sourceId: evidence.data.product_evidence.source_id,
-                validatedAt: parseApiInstant(evidence.data.product_evidence.validated_at),
-              }
-            : null,
-        });
-      }
+      await synchronizeJourneyEvidence(rewardsV2JourneyApplication, evidence.data);
       const summary = await rewardsV2JourneyApplication.getSummary(
         asCustomerId(evidence.data.customer_id),
         evidence.data.validation_status,
@@ -201,7 +163,7 @@ async function routeRequest(
     if (method === "GET" && path === "/api/v1/rewards/portal") {
       const portal = requireCustomerPortalApplication(rewardsCustomerPortalApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
-      if (config.rewardsV2LiveFlowEnabled && rewardsV2JourneyApplication) {
+      if (rewardsV2JourneyApplication) {
         await synchronizeJourneyEvidence(rewardsV2JourneyApplication, evidence.data);
       }
       const customerPortal = await portal.getPortal(
@@ -398,15 +360,6 @@ function requireBehaviorApplication(
   application: RewardsBehaviorHttpApplication | undefined,
 ): RewardsBehaviorHttpApplication {
   if (!application) throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
-  return application;
-}
-
-function requireRewardsApplication(
-  application: RewardsAccountHttpApplication | undefined,
-): RewardsAccountHttpApplication {
-  if (!application) {
-    throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
-  }
   return application;
 }
 

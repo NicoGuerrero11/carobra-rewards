@@ -156,13 +156,6 @@ const server = createServer(async (request, response) => {
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
-  if (method === "GET" && path === "/api/v1/rewards/eligibility") {
-    const authenticated = authenticatedProfile(request);
-    return authenticated
-      ? json(response, 200, eligibilityFor(authenticated))
-      : siteError(response, 401, "unauthenticated", "Authentication is required");
-  }
-
   if (method === "GET" && path === "/api/v1/rewards/journey") {
     const authenticated = authenticatedProfile(request);
     return authenticated
@@ -183,37 +176,6 @@ const server = createServer(async (request, response) => {
   )) {
     const payload = await readJson(request);
     return json(response, 200, path.endsWith("preferences") ? { ...payload, updated_at: "2026-08-24T12:00:00.000Z" } : { updated: true });
-  }
-
-  if (method === "GET" && path === "/api/v1/rewards/account") {
-    const authenticated = authenticatedProfile(request);
-    if (!authenticated) {
-      return siteError(response, 401, "unauthenticated", "Authentication is required");
-    }
-    if (authenticated !== eligibleProfile) {
-      return siteError(response, 403, "rewards_not_eligible", "Rewards account is not eligible");
-    }
-    return json(response, 200, {
-      account_id: "00000000-0000-0000-0000-000000000403",
-      available_points: "2000",
-      reserved_points: "0",
-      next_expiring_points: "2000",
-      next_expiration_at: "2028-01-14T12:00:00.000Z",
-      afore_relation_status: "ACTIVE",
-      recent_movements: [{
-        id: "00000000-0000-0000-0000-000000000404",
-        entry_type: "ISSUANCE",
-        points_delta: "2000",
-        rule_code: "REGISTRATION_ACTIVATION",
-        occurred_at: "2026-07-14T12:00:00.000Z",
-      }],
-      earning_opportunities: [],
-      benefits: {
-        available_items: 0,
-        redemption_enabled: false,
-        unavailable_reason: "Catalog pending approval",
-      },
-    });
   }
 
   if (method === "GET" && path === "/api/v1/rewards/activities") {
@@ -299,37 +261,6 @@ function validationFor(candidate) {
   if (candidate === inactiveProfile) return inactiveValidation;
   if (candidate === attentionProfile) return attentionValidation;
   return validation;
-}
-
-function eligibilityFor(candidate) {
-  if (candidate === eligibleProfile) {
-    return {
-      customer_id: candidate.id,
-      eligible: true,
-      reason: null,
-      customer_status: "ACTIVE",
-      sisca_validation_status: "VALIDATED",
-      afore_relation_status: "ACTIVE",
-    };
-  }
-  if (candidate === inactiveProfile) {
-    return {
-      customer_id: candidate.id,
-      eligible: false,
-      reason: "customer_inactive",
-      customer_status: "INACTIVE",
-      sisca_validation_status: "VALIDATED",
-      afore_relation_status: "INACTIVE",
-    };
-  }
-  return {
-    customer_id: candidate.id,
-    eligible: false,
-    reason: "sisca_not_validated",
-    customer_status: candidate.customer_status,
-    sisca_validation_status: candidate === attentionProfile ? "REQUIRES_ATTENTION" : "PENDING",
-    afore_relation_status: "PENDING",
-  };
 }
 
 function journeyFor(candidate) {

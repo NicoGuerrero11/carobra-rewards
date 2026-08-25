@@ -33,6 +33,7 @@ interface TransactionalDatabase {
 interface RuleRow extends QueryResultRow {
   id: string;
   code: string;
+  approved_for_production: boolean;
   settings: Record<string, unknown>;
 }
 
@@ -299,7 +300,7 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
     },
   ): Promise<void> {
     const points = positiveIntegerSetting(input.rule, "points");
-    const validityMonths = positiveIntegerSetting(input.rule, "testValidityMonths");
+    const validityMonths = canonicalValidityMonths(input.rule);
     const eventId = this.generateId();
     const inserted = await client.query(`
       INSERT INTO reward_events (
@@ -376,7 +377,7 @@ async function requireEnabledRule(
   effectiveAt: Date,
 ): Promise<RuleRow> {
   const row = (await client.query<RuleRow>(`
-    SELECT id::text, code, settings
+    SELECT id::text, code, approved_for_production, settings
     FROM rewards_v2_rule_versions
     WHERE code = $1 AND enabled = true
       AND effective_from <= $2
@@ -385,7 +386,18 @@ async function requireEnabledRule(
     LIMIT 1
   `, [code, effectiveAt])).rows[0];
   if (!row) throw new Error(`${code} is not enabled for the V2 live journey`);
+  if (!row.approved_for_production) {
+    throw new Error(`${code} is not approved for the canonical V2 journey`);
+  }
   return row;
+}
+
+function canonicalValidityMonths(rule: RuleRow): number {
+  const productionValue = rule.settings.productionValidityMonths;
+  if (Number.isInteger(productionValue) && (productionValue as number) > 0) {
+    return productionValue as number;
+  }
+  return positiveIntegerSetting(rule, "testValidityMonths");
 }
 
 function positiveIntegerSetting(rule: RuleRow, key: string): number {

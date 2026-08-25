@@ -5,11 +5,6 @@ import test from "node:test";
 
 import { createSiteBackendServer } from "../src/app.js";
 import type { SiteBackendConfig } from "../src/config.js";
-import type {
-  RewardsAccountHttpApplication,
-  RewardsAccountSummaryHttpResponse,
-  RewardsEligibilityHttpResponse,
-} from "../src/rewards/accounts/http-application.js";
 import { rewardsErrors } from "../src/rewards/shared/errors.js";
 import type { CustomerId } from "../src/rewards/shared/identifiers.js";
 import type {
@@ -32,111 +27,66 @@ import { RewardsV2TestScenarioApplication } from "../src/rewards/v2/test-scenari
 
 const customerId = "00000000-0000-4000-8000-000000000301";
 
-test("authenticated pending customer receives eligibility without account data", async (t) => {
+test("retired V1 rewards account and eligibility routes are not exposed", async (t) => {
   const upstream = await profileServer(t);
-  const rewards = new StubRewardsApplication();
-  const bff = await start(t, createSiteBackendServer(config(upstream), undefined, rewards));
+  const bff = await start(t, createSiteBackendServer(config(upstream)));
 
-  const response = await fetch(`${bff}/api/v1/rewards/eligibility`, {
-    headers: { cookie: "carobra_session=secret" },
-  });
-
-  assert.equal(response.status, 200);
-  const payload = await response.json();
-  assert.deepEqual(payload, rewards.eligibility);
-  assert.equal(rewards.customerId, customerId);
-  assert.doesNotMatch(JSON.stringify(payload), /available_points|account_id/);
-});
-
-test("eligibility contract preserves eligible, pending, inactive, and attention states", async (t) => {
-  const upstream = await profileServer(t);
-  const rewards = new StubRewardsApplication();
-  const bff = await start(t, createSiteBackendServer(config(upstream), undefined, rewards));
-  const states: RewardsEligibilityHttpResponse[] = [
-    {
-      customer_id: customerId,
-      eligible: true,
-      reason: null,
-      customer_status: "ACTIVE",
-      sisca_validation_status: "VALIDATED",
-      afore_relation_status: "ACTIVE",
-    },
-    rewards.eligibility,
-    {
-      customer_id: customerId,
-      eligible: false,
-      reason: "customer_inactive",
-      customer_status: "INACTIVE",
-      sisca_validation_status: "VALIDATED",
-      afore_relation_status: "INACTIVE",
-    },
-    {
-      customer_id: customerId,
-      eligible: false,
-      reason: "sisca_not_validated",
-      customer_status: "PENDING_VALIDATION",
-      sisca_validation_status: "REQUIRES_ATTENTION",
-      afore_relation_status: "PENDING",
-    },
-  ];
-
-  for (const state of states) {
-    rewards.eligibility = state;
-    const response = await fetch(`${bff}/api/v1/rewards/eligibility`, {
+  for (const path of ["eligibility", "account"]) {
+    const response = await fetch(`${bff}/api/v1/rewards/${path}`, {
       headers: { cookie: "carobra_session=secret" },
     });
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), state);
+    assert.equal(response.status, 404);
+    assert.equal((await response.json() as ErrorEnvelope).error.code, "not_found");
   }
 });
 
-test("account summary exposes persisted point and expiration values as exact strings", async (t) => {
-  const upstream = await profileServer(t);
-  const rewards = new StubRewardsApplication();
-  const bff = await start(t, createSiteBackendServer(config(upstream), undefined, rewards));
-
-  const response = await fetch(`${bff}/api/v1/rewards/account`, {
-    headers: { cookie: "carobra_session=secret" },
-  });
-
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), rewards.summary);
-});
-
-test("account summary maps ineligible and unauthenticated outcomes stably", async (t) => {
-  const unauthenticatedUpstream = await start(t, createServer((_request, response) => {
-    response.writeHead(401, { "content-type": "application/json" });
+test("registration always establishes the canonical V2 invited journey", async (t) => {
+  const registeredAt = "2026-08-25T12:00:00.000Z";
+  const upstream = await start(t, createServer((_request, response) => {
+    response.writeHead(201, { "content-type": "application/json" });
     response.end(JSON.stringify({
-      detail: { code: "unauthenticated", message: "Authentication is required" },
+      customer: { id: customerId },
+      validation_id: "00000000-0000-4000-8000-000000000302",
+      validation_status: "PENDING",
+      registered_at: registeredAt,
     }));
   }));
-  const rewards = new StubRewardsApplication();
-  const unauthenticatedBff = await start(
-    t,
-    createSiteBackendServer(config(unauthenticatedUpstream), undefined, rewards),
-  );
-  const unauthenticated = await fetch(`${unauthenticatedBff}/api/v1/rewards/account`);
-  assert.equal(unauthenticated.status, 401);
-  assert.equal((await unauthenticated.json() as ErrorEnvelope).error.code, "unauthenticated");
+  const journey = new StubJourneyApplication();
+  const bff = await start(t, createSiteBackendServer(
+    config(upstream), undefined, undefined, undefined, journey,
+  ));
 
-  const profileUpstream = await profileServer(t);
-  rewards.rejectSummary = true;
-  const ineligibleBff = await start(
-    t,
-    createSiteBackendServer(config(profileUpstream), undefined, rewards),
-  );
-  const ineligible = await fetch(`${ineligibleBff}/api/v1/rewards/account`, {
-    headers: { cookie: "carobra_session=secret" },
+  const response = await fetch(`${bff}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      curp: "ABCD123456HMNLRS09",
+      first_name: "Ada",
+      last_name: "Lovelace",
+      email: "ada@example.com",
+      phone: "5551234567",
+      password: "correct-horse-7",
+      confirm_password: "correct-horse-7",
+      postal_code: "01010",
+      state: "CDMX",
+      city: "CDMX",
+      terms_accepted: true,
+      terms_version: "2026-08",
+    }),
   });
-  assert.equal(ineligible.status, 403);
-  assert.equal((await ineligible.json() as ErrorEnvelope).error.code, "rewards_not_eligible");
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(journey.invitedCommand, {
+    customerId,
+    registeredAt: new Date(registeredAt),
+  });
 });
 
 test("authenticated V2 journey returns the real customer contract without test controls", async (t) => {
   const upstream = await profileServer(t);
   const journey = new StubJourneyApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream, true), undefined, undefined, undefined, undefined, journey,
+    config(upstream), undefined, undefined, undefined, journey,
   ));
 
   const response = await fetch(`${bff}/api/v1/rewards/journey`, {
@@ -169,7 +119,7 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   const upstream = await profileServer(t);
   const portal = new StubCustomerPortalApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, undefined, undefined, undefined, undefined, portal,
+    config(upstream), undefined, undefined, undefined, undefined, portal,
   ));
   const headers = { cookie: "carobra_session=secret", "content-type": "application/json" };
 
@@ -199,7 +149,7 @@ test("authenticated V2 detail routes expose bounded safe activity and ledger dat
   const upstream = await profileServer(t);
   const journey = new StubJourneyApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, undefined, undefined, undefined, journey,
+    config(upstream), undefined, undefined, undefined, journey,
   ));
 
   const [activities, movements] = await Promise.all([
@@ -226,7 +176,7 @@ test("V2 journey requires API session authority before querying Rewards", async 
   }));
   const journey = new StubJourneyApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, undefined, undefined, undefined, journey,
+    config(upstream), undefined, undefined, undefined, journey,
   ));
 
   const response = await fetch(`${bff}/api/v1/rewards/journey`);
@@ -237,10 +187,9 @@ test("V2 journey requires API session authority before querying Rewards", async 
 
 test("authenticated behavior commands use the API customer identity", async (t) => {
   const upstream = await profileServer(t);
-  const rewards = new StubRewardsApplication();
   const behaviors = new StubBehaviorApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, rewards, behaviors,
+    config(upstream), undefined, behaviors,
   ));
   const actionBody: SiteActionHttpRequest = {
     action_code: "BENEFIT_VIEW",
@@ -278,7 +227,7 @@ test("disabled behavior contracts return stable rule_disabled without persistenc
   const behaviors = new StubBehaviorApplication();
   behaviors.rejectAction = true;
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, new StubRewardsApplication(), behaviors,
+    config(upstream), undefined, behaviors,
   ));
   const response = await fetch(`${bff}/api/v1/rewards/actions`, {
     method: "POST",
@@ -308,50 +257,6 @@ function contractKeys(summary: RewardsJourneySummaryHttpResponse) {
   };
 }
 
-class StubRewardsApplication implements RewardsAccountHttpApplication {
-  customerId: string | undefined;
-  rejectSummary = false;
-  eligibility: RewardsEligibilityHttpResponse = {
-    customer_id: customerId,
-    eligible: false,
-    reason: "sisca_not_validated",
-    customer_status: "PENDING_VALIDATION",
-    sisca_validation_status: "PENDING",
-    afore_relation_status: "PENDING",
-  };
-  readonly summary: RewardsAccountSummaryHttpResponse = {
-    account_id: "00000000-0000-4000-8000-000000000401",
-    available_points: "2000",
-    reserved_points: "0",
-    next_expiring_points: "2000",
-    next_expiration_at: "2028-01-14T12:00:00.000Z",
-    afore_relation_status: "ACTIVE",
-    recent_movements: [{
-      id: "movement-1",
-      entry_type: "ISSUANCE",
-      points_delta: "2000",
-      rule_code: "REGISTRATION_ACTIVATION",
-      occurred_at: "2026-07-14T12:00:00.000Z",
-    }],
-    earning_opportunities: [],
-    benefits: {
-      available_items: 0,
-      redemption_enabled: false,
-      unavailable_reason: "Catalog pending approval",
-    },
-  };
-
-  async getEligibility(id: CustomerId): Promise<RewardsEligibilityHttpResponse> {
-    this.customerId = id;
-    return this.eligibility;
-  }
-
-  async getSummary(): Promise<RewardsAccountSummaryHttpResponse> {
-    if (this.rejectSummary) throw rewardsErrors.notEligible();
-    return this.summary;
-  }
-}
-
 class StubBehaviorApplication implements RewardsBehaviorHttpApplication {
   actionCommand: unknown;
   onboardingCommand: unknown;
@@ -378,6 +283,7 @@ class StubJourneyApplication implements RewardsV2JourneyHttpApplication {
   customerId: string | undefined;
   validationStatus: string | undefined;
   synchronizedEvidence: unknown;
+  invitedCommand: unknown;
   readonly summary: RewardsJourneySummaryHttpResponse = {
     customer_id: customerId,
     journey: {
@@ -414,7 +320,9 @@ class StubJourneyApplication implements RewardsV2JourneyHttpApplication {
     },
   };
 
-  async ensureInvited(): Promise<void> {}
+  async ensureInvited(command: unknown): Promise<void> {
+    this.invitedCommand = command;
+  }
 
   async synchronize(command: unknown): Promise<void> {
     this.synchronizedEvidence = command;
@@ -513,13 +421,12 @@ async function start(t: TestContext, server: Server): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
-function config(apiBaseUrl: string, liveFlow = false): SiteBackendConfig {
+function config(apiBaseUrl: string): SiteBackendConfig {
   return {
     apiBaseUrl,
     host: "127.0.0.1",
     port: 0,
     apiRequestTimeoutMs: 1000,
-    rewardsV2LiveFlowEnabled: liveFlow,
     sessionCookie: {
       name: "carobra_session",
       secure: false,

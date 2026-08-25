@@ -198,12 +198,12 @@ test(
         {
           code: "V2_INVITED_REGISTRATION",
           enabled: true,
-          approved_for_production: false,
+          approved_for_production: true,
           settings: {
             points: 45,
-            activationScope: "INTERNAL_TEST_ONLY",
+            activationScope: "PRODUCTION",
             testValidityMonths: 18,
-            productionValidityMonths: null,
+            productionValidityMonths: 18,
           },
           disabled_reason: null,
         },

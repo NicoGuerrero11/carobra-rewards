@@ -311,7 +311,6 @@ async function startBff(
     host: "127.0.0.1",
     port: 0,
     apiRequestTimeoutMs: timeout,
-    rewardsV2LiveFlowEnabled: false,
     sessionCookie: {
       name: "carobra_session",
       secure: false,
@@ -321,7 +320,7 @@ async function startBff(
     },
   };
   const running = await listen(
-    createSiteBackendServer(config, undefined, undefined, undefined, referralApplication),
+    createSiteBackendServer(config, undefined, undefined, referralApplication),
   );
   t.after(() => close(running.server));
   return running;

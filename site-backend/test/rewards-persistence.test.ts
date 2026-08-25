@@ -18,6 +18,7 @@ import { rewardsJobManualRetries } from "../src/database/migrations/017-rewards-
 import { rewardsV2Foundation } from "../src/database/migrations/018-rewards-v2-foundation.js";
 import { rewardsV2LiveJourney } from "../src/database/migrations/019-rewards-v2-live-journey.js";
 import { rewardsCustomerPortal } from "../src/database/migrations/020-rewards-customer-portal.js";
+import { rewardsV2Canonical } from "../src/database/migrations/021-rewards-v2-canonical.js";
 
 test("ledger foundation migration declares required tables and business constraints", () => {
   for (const table of [
@@ -308,4 +309,20 @@ test("customer portal persistence is account-scoped, constrained, and additive",
   assert.match(rewardsCustomerPortal.up, /progress BETWEEN 0 AND 100/);
   assert.match(rewardsCustomerPortal.up, /max_size_bytes BETWEEN 1 AND 20971520/);
   assert.doesNotMatch(rewardsCustomerPortal.up, /raw_evidence|provider|source_id|checkpoint/i);
+});
+
+test("canonical V2 migration retires V1 issuance and approves only the live V2 rules", () => {
+  assert.match(rewardsV2Canonical.up, /UPDATE behavior_rule_versions/);
+  assert.match(rewardsV2Canonical.up, /SET enabled = false/);
+  assert.match(rewardsV2Canonical.up, /Rewards V2 is the canonical business model/);
+  for (const code of [
+    "V2_INVITED_REGISTRATION",
+    "V2_INITIAL_PRODUCT_ACTIVE",
+    "V2_SISCA_AFORE_ACTIVE",
+    "V2_FIRST_ACTIVE_PRODUCT_LEVEL",
+  ]) {
+    assert.match(rewardsV2Canonical.up, new RegExp(code));
+  }
+  assert.match(rewardsV2Canonical.up, /approved_for_production = true/);
+  assert.doesNotMatch(rewardsV2Canonical.up, /DELETE FROM (?:ledger_entries|reward_events|point_lots|rewards_accounts)/);
 });

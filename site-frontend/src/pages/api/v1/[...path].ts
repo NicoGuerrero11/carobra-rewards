@@ -8,8 +8,6 @@ const allowedPaths = new Set([
   "auth/logout",
   "me",
   "me/validation-status",
-  "rewards/eligibility",
-  "rewards/account",
   "rewards/journey",
   "rewards/activities",
   "rewards/movements",
