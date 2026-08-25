@@ -8,8 +8,8 @@
 ## 2. Preparación de entornos y despliegue
 
 - [x] 2.1 Crear la infraestructura aislada de UAT conforme a la decisión de hosting, incluyendo base de datos, dominio HTTPS y acceso operativo.
-- [ ] 2.2 Preparar el entorno de producción separado, sin habilitar aún credenciales ni llamadas SISCA productivas.
-- [ ] 2.3 Configurar endpoint, autenticación, timeout, reintentos y catálogo SISCA de UAT mediante el mecanismo aprobado de secretos.
+- [x] 2.2 Preparar el entorno de producción separado, sin habilitar aún credenciales ni llamadas SISCA productivas.
+- [x] 2.3 Configurar endpoint, autenticación, timeout, reintentos y catálogo SISCA de UAT mediante el mecanismo aprobado de secretos.
 - [x] 2.4 Implementar validaciones que impidan usar un endpoint SISCA productivo o secretos productivos desde UAT.
 - [x] 2.5 Automatizar el despliegue de la API y las migraciones para que UAT y producción usen el mismo artefacto versionado.
 - [x] 2.6 Verificar salud, migraciones, HTTPS, registros seguros y conectividad saliente desde UAT antes de solicitar acceso a SISCA.
@@ -37,12 +37,12 @@
 - [ ] 5.1 Revisar y completar la guía de preparación UAT para SISCA con el contrato vigente, datos de conexión requeridos y canal de soporte.
 - [x] 5.2 Solicitar a SISCA endpoint, método de autenticación, requisitos de red, límites de tasa, contacto técnico y contrato de respuestas para pruebas controladas.
 - [ ] 5.3 Acordar un canal seguro para el intercambio de credenciales, referencias de clientes sintéticos y resultados de conciliación.
-- [ ] 5.4 Ejecutar un smoke test con un CURP sintético aprobado y conciliar la referencia de solicitud y el resultado con SISCA.
-- [ ] 5.5 Ejecutar los cinco casos de humo, documentar su conciliación y autorizar o pausar el lote de 95 casos restantes.
+- [x] 5.4 Ejecutar un smoke test con un CURP sintético aprobado y conciliar la referencia de solicitud y el resultado con SISCA.
+- [x] 5.5 Ejecutar los cinco casos de humo, documentar su conciliación y autorizar o pausar el lote de 95 casos restantes.
 
 ## 6. Cierre UAT y preparación de producción
 
-- [ ] 6.1 Verificar la puerta de salida UAT: conectividad, contrato, 100 casos conciliados, evidencia completa, errores resueltos y aceptación de responsables.
+- [x] 6.1 Verificar la puerta de salida UAT: conectividad, contrato, 100 casos conciliados, evidencia completa, errores resueltos y aceptación de responsables.
 - [ ] 6.2 Configurar de forma separada los secretos, endpoint y red de SISCA para producción después de aprobar la salida UAT.
 - [ ] 6.3 Ejecutar el despliegue productivo con el mismo artefacto aprobado y verificar salud sin usar el controlador acelerado.
 - [ ] 6.4 Documentar el plan de reversión productiva, la operación regular de validaciones y el monitoreo posterior a la habilitación.
