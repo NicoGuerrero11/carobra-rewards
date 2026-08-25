@@ -283,6 +283,9 @@ function projectPortal(
   }));
   return assertRewardsCustomerPortalContract({
     customer_id: summary.customer_id,
+    journey: summary,
+    activity_details: activities,
+    movement_details: movements,
     primary_action: primaryAction,
     actions,
     timeline,

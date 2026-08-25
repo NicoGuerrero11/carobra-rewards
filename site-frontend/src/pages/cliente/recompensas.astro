@@ -52,28 +52,20 @@ let movementDetails: MovementDetailsResponse | null = null;
 let unavailable = false;
 
 try {
-  const [journeyResponse, portalResponse, activitiesResponse, movementsResponse] = await Promise.all([
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, {
-      headers: { cookie },
-    }),
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
-      headers: { cookie },
-    }),
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/activities`, {
-      headers: { cookie },
-    }),
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/movements`, {
-      headers: { cookie },
-    }),
-  ]);
-  if (journeyResponse.status === 401 || portalResponse.status === 401) {
+  const portalResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
+    headers: { cookie },
+  });
+  if (portalResponse.status === 401) {
     return Astro.redirect("/login?error=unauthenticated");
   }
-  if (journeyResponse.ok) journey = (await journeyResponse.json()) as RewardsJourneySummary;
-  if (portalResponse.ok) portal = (await portalResponse.json()) as RewardsCustomerPortal;
-  if (activitiesResponse.ok) activityDetails = (await activitiesResponse.json()) as ActivityDetailsResponse;
-  if (movementsResponse.ok) movementDetails = (await movementsResponse.json()) as MovementDetailsResponse;
-  if (!journey) unavailable = true;
+  if (portalResponse.ok) {
+    portal = (await portalResponse.json()) as RewardsCustomerPortal;
+    journey = portal.journey;
+    activityDetails = portal.activity_details;
+    movementDetails = portal.movement_details;
+  } else {
+    unavailable = true;
+  }
 } catch {
   unavailable = true;
 }

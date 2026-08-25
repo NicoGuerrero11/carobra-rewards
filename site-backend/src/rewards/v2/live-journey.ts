@@ -28,6 +28,10 @@ export interface RewardsV2LiveJourneyPort {
 
 interface TransactionalDatabase {
   connect(): Promise<PoolClient>;
+  query<TRow extends QueryResultRow>(
+    text: string,
+    values?: unknown[],
+  ): Promise<{ rows: TRow[] }>;
 }
 
 interface RuleRow extends QueryResultRow {
@@ -48,6 +52,14 @@ interface ProductFactRow extends QueryResultRow {
   account_id: string;
   customer_id: string;
   status: string;
+}
+
+interface ProjectionMarkerRow extends QueryResultRow {
+  state: string;
+  current_level: string | null;
+  registration_award_exists: boolean;
+  product_event_exists: boolean;
+  product_award_exists: boolean;
 }
 
 export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
@@ -74,6 +86,8 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
 
   async synchronize(command: SynchronizeRewardsEvidenceCommand): Promise<void> {
     requireInstant("registeredAt", command.registeredAt);
+    if (await this.isProjectionCurrent(command)) return;
+
     const receivedAt = this.clock.now();
     requireInstant("receivedAt", receivedAt);
     const client = await this.database.connect();
@@ -229,6 +243,64 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
     } finally {
       client.release();
     }
+  }
+
+  private async isProjectionCurrent(
+    command: SynchronizeRewardsEvidenceCommand,
+  ): Promise<boolean> {
+    const validatedEvidence = command.validationStatus === "VALIDATED"
+      ? command.validatedAfore
+      : null;
+    if (validatedEvidence) requireInstant("validatedAt", validatedEvidence.validatedAt);
+    const productSourceId = validatedEvidence
+      ? normalizeSourceId(validatedEvidence.sourceId)
+      : null;
+    const productAwardSourceId = productSourceId
+      ? `v2-initial-product:${productSourceId}`
+      : null;
+    const marker = (await this.database.query<ProjectionMarkerRow>(`
+      SELECT journey.state, journey.current_level,
+        EXISTS (
+          SELECT 1 FROM reward_events AS registration_event
+          WHERE registration_event.account_id = journey.account_id
+            AND registration_event.source = 'INTERNAL'
+            AND registration_event.source_id = $2
+            AND registration_event.event_type = 'V2_INVITED_REGISTRATION'
+        ) AS registration_award_exists,
+        CASE WHEN $3::varchar IS NULL THEN false ELSE EXISTS (
+          SELECT 1
+          FROM rewards_product_fact_events AS product_event
+          JOIN rewards_product_facts AS product
+            ON product.id = product_event.product_fact_id
+          WHERE product_event.source = 'SISCA'
+            AND product_event.source_id = $3
+            AND product_event.to_status = 'ACTIVE'
+            AND product.customer_id = $1
+            AND product.status = 'ACTIVE'
+        ) END AS product_event_exists,
+        CASE WHEN $4::varchar IS NULL THEN false ELSE EXISTS (
+          SELECT 1 FROM reward_events AS product_award
+          WHERE product_award.account_id = journey.account_id
+            AND product_award.source = 'SISCA'
+            AND product_award.source_id = $4
+            AND product_award.event_type = 'V2_INITIAL_PRODUCT_ACTIVE'
+        ) END AS product_award_exists
+      FROM rewards_v2_journeys AS journey
+      WHERE journey.customer_id = $1
+      LIMIT 1
+    `, [
+      command.customerId,
+      `v2-invited-registration:${command.customerId}`,
+      productSourceId,
+      productAwardSourceId,
+    ])).rows[0];
+    if (!marker?.registration_award_exists) return false;
+    if (command.validationStatus !== "VALIDATED") return true;
+    if (!validatedEvidence) return false;
+    return marker.state === "ACTIVE"
+      && marker.current_level !== null
+      && marker.product_event_exists
+      && marker.product_award_exists;
   }
 
   private async ensureInvitedInTransaction(

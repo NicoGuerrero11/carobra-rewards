@@ -97,6 +97,7 @@ async function fetchValidationStatus(cookieHeader: string | null) {
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
+  const requestStartedAt = performance.now();
   const pathname = context.url.pathname;
 
   // Admin, benefits, activities and editable profile remain demo-only and are
@@ -121,9 +122,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
     e2eBypassAuth &&
     isProtected &&
     context.request.headers.get(e2eUserRoleHeader)?.toLowerCase() !== "none";
-  const user = bypassRequested
-    ? e2eClientUser
-    : await fetchSession(context.request.headers.get("cookie"));
+  const cookieHeader = context.request.headers.get("cookie");
+  const authContextStartedAt = performance.now();
+  const [user, validation] = bypassRequested
+    ? [e2eClientUser, null] as const
+    : await Promise.all([
+        fetchSession(cookieHeader),
+        isProtected ? fetchValidationStatus(cookieHeader) : Promise.resolve(null),
+      ]);
+  const authContextDuration = performance.now() - authContextStartedAt;
 
   if (isAuthPage && user) {
     return context.redirect("/cliente");
@@ -136,9 +143,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   context.locals.user = user;
-  const cookieHeader = context.request.headers.get("cookie");
   const bypassRole = context.request.headers.get(e2eUserRoleHeader)?.toLowerCase();
-  const validation = bypassRequested ? null : await fetchValidationStatus(cookieHeader);
   const validated = validation?.status === "VALIDATED";
   const rewardsEligibility: RewardsEligibilityResponse | null = bypassRequested
     ? {
@@ -183,5 +188,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (pathname === "/cliente/validacion" && !customerInactive) {
     return context.redirect("/cliente/recompensas");
   }
-  return next();
+  const pageStartedAt = performance.now();
+  const response = await next();
+  const pageDuration = performance.now() - pageStartedAt;
+  const totalDuration = performance.now() - requestStartedAt;
+  response.headers.append(
+    "server-timing",
+    [
+      `auth-context;dur=${formatDuration(authContextDuration)}`,
+      `page-render;dur=${formatDuration(pageDuration)}`,
+      `total;dur=${formatDuration(totalDuration)}`,
+    ].join(", "),
+  );
+  return response;
 });
+
+function formatDuration(duration: number): string {
+  return Math.max(0, duration).toFixed(1);
+}

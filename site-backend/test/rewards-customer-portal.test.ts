@@ -65,6 +65,9 @@ test("portal projection selects the next action and exposes only customer-safe d
   const portal = await application().getPortal(customerId, "VALIDATED");
   assert.ok(portal);
   assert.equal(portal.primary_action.id, actionId);
+  assert.equal(portal.journey, summary);
+  assert.equal(portal.activity_details.activities[0]?.activity_type, "CONTENT_VIEWED");
+  assert.equal(portal.movement_details.movements[0]?.code, "V2_INITIAL_PRODUCT_ACTIVE");
   assert.equal(portal.products[0]?.label, "Cuenta de retiro");
   assert.equal(portal.notifications.unread_count, portal.notifications.items.length);
   assert.ok(portal.timeline.some((entry) => entry.type === "POINTS"));

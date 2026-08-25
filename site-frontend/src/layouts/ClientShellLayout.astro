@@ -38,7 +38,7 @@ function isActive(item: NavItem) {
     <header class="client-shell__topnav">
       <div class="client-shell__topnav-inner">
         <div class="client-shell__left">
-          <a href="/cliente" class="client-shell__brand-link" aria-label="Carobra inicio cliente">
+          <a href="/cliente" class="client-shell__brand-link" aria-label="Carobra inicio cliente" data-astro-prefetch="hover">
             <img
               src="/images/carobra-logo-horizontal-cropped.png"
               alt="Carobra Consultores Especializados"
@@ -68,7 +68,7 @@ function isActive(item: NavItem) {
                   <span>{item.label}</span>
                 </span>
               ) : (
-                <a href={item.href} class="client-shell__nav-link">
+                <a href={item.href} class="client-shell__nav-link" data-astro-prefetch="hover">
                   <span>{item.label}</span>
                 </a>
               ),
@@ -80,6 +80,7 @@ function isActive(item: NavItem) {
           <a
             class:list={["client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
             href="/cliente/notificaciones"
+            data-astro-prefetch="hover"
             aria-label="Ver notificaciones"
             aria-current={currentPath === "/cliente/notificaciones" ? "page" : undefined}
             title="Notificaciones"
@@ -101,7 +102,7 @@ function isActive(item: NavItem) {
             </button>
 
             <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
-              <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
+              <a class="client-shell__user-menu-link" href="/cliente/perfil" data-astro-prefetch="hover">Mi cuenta</a>
               <a class="client-shell__user-menu-link" href="mailto:soporte@carobra.mx">Ayuda y soporte</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
@@ -118,7 +119,7 @@ function isActive(item: NavItem) {
                   <span>{item.label}</span>
                 </span>
               ) : (
-                <a href={item.href} class="client-shell__mobile-link">
+                <a href={item.href} class="client-shell__mobile-link" data-astro-prefetch="hover">
                   <span>{item.label}</span>
                 </a>
               ),

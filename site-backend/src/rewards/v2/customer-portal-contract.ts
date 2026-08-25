@@ -1,9 +1,17 @@
 import type { RewardsJourneyState, RewardsLevel, RewardsProductFactStatus } from "../shared/enums.js";
+import type {
+  RewardsActivityDetailsHttpResponse,
+  RewardsMovementDetailsHttpResponse,
+} from "./journey-details.js";
+import type { RewardsJourneySummaryHttpResponse } from "./journey-summary-contract.js";
 
 export type CustomerActionType = "STATUS" | "QUESTIONNAIRE" | "CONTENT" | "DOCUMENT" | "LEARNING" | "SUPPORT";
 
 export interface RewardsCustomerPortalHttpResponse {
   customer_id: string;
+  journey: RewardsJourneySummaryHttpResponse;
+  activity_details: RewardsActivityDetailsHttpResponse;
+  movement_details: RewardsMovementDetailsHttpResponse;
   primary_action: CustomerPortalAction;
   actions: ReadonlyArray<CustomerPortalAction>;
   timeline: ReadonlyArray<CustomerTimelineEntry>;

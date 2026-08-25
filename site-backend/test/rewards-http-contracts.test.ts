@@ -117,9 +117,10 @@ test("authenticated V2 journey returns the real customer contract without test c
 
 test("authenticated customer portal routes bind reads and commands to API session identity", async (t) => {
   const upstream = await profileServer(t);
+  const journey = new StubJourneyApplication();
   const portal = new StubCustomerPortalApplication();
   const bff = await start(t, createSiteBackendServer(
-    config(upstream), undefined, undefined, undefined, undefined, portal,
+    config(upstream), undefined, undefined, undefined, journey, portal,
   ));
   const headers = { cookie: "carobra_session=secret", "content-type": "application/json" };
 
@@ -127,6 +128,17 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   assert.equal(read.status, 200);
   assert.deepEqual(await read.json(), portal.response);
   assert.equal(portal.customerId, customerId);
+  assert.deepEqual(journey.synchronizedEvidence, {
+    customerId,
+    registeredAt: new Date("2026-07-13T10:00:00.000Z"),
+    validationStatus: "VALIDATED",
+    validatedAfore: {
+      provider: "SISCA",
+      productType: "AFORE",
+      sourceId: "sisca-validation:00000000-0000-4000-8000-000000000302",
+      validatedAt: new Date("2026-07-14T10:00:00.000Z"),
+    },
+  });
 
   const preferences = await fetch(`${bff}/api/v1/rewards/portal/preferences`, {
     method: "PATCH", headers, body: JSON.stringify({ activity_updates: false, learning_updates: true, product_updates: true }),
@@ -352,6 +364,9 @@ class StubCustomerPortalApplication implements RewardsCustomerPortalApplication 
   commandCustomerIds: string[] = [];
   readonly response: RewardsCustomerPortalHttpResponse = {
     customer_id: customerId,
+    journey: new StubJourneyApplication().summary,
+    activity_details: { activities: [] },
+    movement_details: { movements: [] },
     primary_action: { id: "journey:profile", type: "CONTENT", title: "Sigue construyendo tu perfil", description: "Aquí aparecerán actividades aprobadas para ti.", status: "INFORMATIONAL", href: null, approved_points: null },
     actions: [], timeline: [], notifications: { unread_count: 0, items: [] }, products: [],
     preferences: { activity_updates: true, learning_updates: true, product_updates: true, updated_at: null },

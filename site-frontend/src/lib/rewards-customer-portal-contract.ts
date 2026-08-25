@@ -1,4 +1,7 @@
-import type { RewardsV2ProductStatus } from "./rewards-v2-contract";
+import type {
+  RewardsJourneySummary,
+  RewardsV2ProductStatus,
+} from "./rewards-v2-contract";
 
 export interface CustomerPortalAction {
   id: string;
@@ -12,6 +15,13 @@ export interface CustomerPortalAction {
 
 export interface RewardsCustomerPortal {
   customer_id: string;
+  journey: RewardsJourneySummary;
+  activity_details: {
+    activities: Array<{ activity_type: string; qualifies: boolean; occurred_at: string }>;
+  };
+  movement_details: {
+    movements: Array<{ code: string; entry_type: string; points_delta: string; occurred_at: string }>;
+  };
   primary_action: CustomerPortalAction;
   actions: CustomerPortalAction[];
   timeline: Array<{ id: string; type: string; title: string; description: string; occurred_at: string }>;

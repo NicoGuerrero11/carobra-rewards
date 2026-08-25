@@ -183,15 +183,7 @@ const server = createServer(async (request, response) => {
     if (!authenticated) {
       return siteError(response, 401, "unauthenticated", "Authentication is required");
     }
-    return json(response, 200, {
-      activities: authenticated === eligibleProfile
-        ? [{
-            activity_type: "PROFILE_UPDATED",
-            qualifies: true,
-            occurred_at: "2026-07-15T12:00:00.000Z",
-          }]
-        : [],
-    });
+    return json(response, 200, activityDetailsFor(authenticated));
   }
 
   if (method === "GET" && path === "/api/v1/rewards/movements") {
@@ -199,13 +191,7 @@ const server = createServer(async (request, response) => {
     if (!authenticated) {
       return siteError(response, 401, "unauthenticated", "Authentication is required");
     }
-    const summary = journeyFor(authenticated);
-    return json(response, 200, {
-      movements: summary.recent_movements.map((movement) => ({
-        ...movement,
-        entry_type: "ISSUANCE",
-      })),
-    });
+    return json(response, 200, movementDetailsFor(authenticated));
   }
 
   if (method === "GET" && path === "/api/v1/rewards/referrals") {
@@ -326,6 +312,9 @@ function portalFor(candidate) {
   const actions = active ? [{ id: "00000000-0000-4000-8000-000000000701", type: "QUESTIONNAIRE", title: "Completa tu perfil financiero", description: "Responde un cuestionario breve para conocerte mejor.", status: "PENDING", href: "#actividad", approved_points: "20" }] : [];
   return {
     customer_id: candidate.id,
+    journey: journeyFor(candidate),
+    activity_details: activityDetailsFor(candidate),
+    movement_details: movementDetailsFor(candidate),
     primary_action: actions[0] ?? { id: "journey:validation", type: "STATUS", title: "Estamos validando tu producto", description: "No necesitas hacer nada adicional. Te avisaremos cuando Carobra termine la revisión.", status: "INFORMATIONAL", href: null, approved_points: null },
     actions,
     timeline,
@@ -335,6 +324,27 @@ function portalFor(candidate) {
     learning: { items: active ? [{ id: "00000000-0000-4000-8000-000000000703", course_code: "RETIRO_101", title: "Fundamentos para tu retiro", description: "Aprende los conceptos esenciales para tomar decisiones informadas.", category: "Retiro", status: "IN_PROGRESS", progress: 40, qualifies: false, assigned_at: "2026-08-01T12:00:00.000Z", last_activity_at: "2026-08-20T12:00:00.000Z" }] : [] },
     documents: { requests: [] },
     help: [{ id: "levels", title: "¿Cómo se calcula mi nivel?", body: "Tu nivel considera productos activos, permanencia y actividades aprobadas; gastar puntos no lo reduce." }],
+  };
+}
+
+function activityDetailsFor(candidate) {
+  return {
+    activities: candidate === eligibleProfile
+      ? [{
+          activity_type: "PROFILE_UPDATED",
+          qualifies: true,
+          occurred_at: "2026-07-15T12:00:00.000Z",
+        }]
+      : [],
+  };
+}
+
+function movementDetailsFor(candidate) {
+  return {
+    movements: journeyFor(candidate).recent_movements.map((movement) => ({
+      ...movement,
+      entry_type: "ISSUANCE",
+    })),
   };
 }
 

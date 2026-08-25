@@ -12,11 +12,14 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page.getByRole("link", { name: /Cursos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Gift Cards/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver notificaciones" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver notificaciones" })).toHaveAttribute("data-astro-prefetch", "hover");
   await expect(page.getByText("Avisos", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Inicio", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Estamos validando tu producto" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
+  const rendered = await page.reload();
+  expect(rendered?.headers()["server-timing"]).toMatch(/auth-context;dur=\d+\.\d, page-render;dur=\d+\.\d, total;dur=\d+\.\d/);
 
   await page.goto("/cliente/beneficios");
   await expect(page.getByRole("heading", { name: "Recompensas", exact: true })).toBeVisible();
