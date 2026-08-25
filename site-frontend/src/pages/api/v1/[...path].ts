@@ -8,6 +8,9 @@ const allowedPaths = new Set([
   "auth/logout",
   "me",
   "me/validation-status",
+  "rewards/eligibility",
+  "rewards/account",
+  "rewards/referrals",
 ]);
 
 const proxy: APIRoute = async ({ params, request }) => {

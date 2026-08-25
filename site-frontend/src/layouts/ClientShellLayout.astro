@@ -2,7 +2,7 @@
 import BaseLayout from "./BaseLayout.astro";
 
 interface NavItem {
-  id: "dashboard";
+  id: "validation" | "rewards" | "referrals";
   label: string;
   href: string;
 }
@@ -21,12 +21,16 @@ const {
   sectionLabel = "Cliente",
 } = Astro.props as Props;
 
-const navItems: NavItem[] = [
-  { id: "dashboard", label: "Estado de mi cuenta", href: "/cliente" },
-];
+const rewardsMode = currentPath.startsWith("/cliente/recompensas");
+const navItems: NavItem[] = rewardsMode
+  ? [
+      { id: "rewards", label: "Resumen Rewards", href: "/cliente/recompensas" },
+      { id: "referrals", label: "Referidos", href: "/cliente/recompensas/referidos" },
+    ]
+  : [{ id: "validation", label: "Estado de validación", href: "/cliente/validacion" }];
 
 function isActive(item: NavItem) {
-  return item.id === "dashboard" && currentPath === "/cliente";
+  return item.href === currentPath;
 }
 ---
 

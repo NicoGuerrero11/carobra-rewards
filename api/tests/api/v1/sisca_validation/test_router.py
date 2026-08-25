@@ -27,7 +27,10 @@ NOW = datetime(2026, 7, 9, tzinfo=UTC)
 
 
 class FakeExecuteService:
+    last_command = None
+
     async def __call__(self, command):
+        FakeExecuteService.last_command = command
         return ValidationExecutionResult(
             validation_id=command.validation_id,
             status=ValidationStatus.PENDING,
@@ -57,6 +60,7 @@ class FakeStatusService:
 def _client(monkeypatch) -> TestClient:
     monkeypatch.setenv("LEGACY_CUSTOMER_INTAKE_ENABLED", "false")
     monkeypatch.setenv("SISCA_INTERNAL_API_TOKEN", "test-secret")
+    FakeExecuteService.last_command = None
     reset_settings_cache()
     app = create_application()
     app.dependency_overrides[get_execute_validation_check] = FakeExecuteService
@@ -136,3 +140,53 @@ def test_status_requires_internal_api_key(monkeypatch) -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"]["code"] == "unauthorized"
+
+
+def test_controlled_uat_checkpoint_requires_uat_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("SISCA_UAT_CONTROL_ENABLED", "true")
+    monkeypatch.setenv("SISCA_UAT_AUTHORIZED_OPERATORS", "uat-operator-1")
+    client = _client(monkeypatch)
+
+    response = client.post(
+        f"/api/v1/internal/sisca-validations/{VALIDATION_ID}/uat-controlled-checks",
+        headers={"X-Internal-API-Key": "test-secret", "X-SISCA-UAT-Operator": "uat-operator-1"},
+        json={"checkpoint": "H24"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "uat_control_unavailable"
+
+
+def test_controlled_uat_checkpoint_requires_authorized_operator(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "uat")
+    monkeypatch.setenv("SISCA_UAT_CONTROL_ENABLED", "true")
+    monkeypatch.setenv("SISCA_UAT_AUTHORIZED_OPERATORS", "uat-operator-1")
+    client = _client(monkeypatch)
+
+    response = client.post(
+        f"/api/v1/internal/sisca-validations/{VALIDATION_ID}/uat-controlled-checks",
+        headers={"X-Internal-API-Key": "test-secret", "X-SISCA-UAT-Operator": "not-allowed"},
+        json={"checkpoint": "H24"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "uat_operator_unauthorized"
+
+
+def test_controlled_uat_checkpoint_passes_authorized_operator_to_service(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "uat")
+    monkeypatch.setenv("SISCA_UAT_CONTROL_ENABLED", "true")
+    monkeypatch.setenv("SISCA_UAT_AUTHORIZED_OPERATORS", "uat-operator-1")
+    client = _client(monkeypatch)
+
+    response = client.post(
+        f"/api/v1/internal/sisca-validations/{VALIDATION_ID}/uat-controlled-checks",
+        headers={"X-Internal-API-Key": "test-secret", "X-SISCA-UAT-Operator": "uat-operator-1"},
+        json={"checkpoint": "D3"},
+    )
+
+    assert response.status_code == 200
+    assert FakeExecuteService.last_command is not None
+    assert FakeExecuteService.last_command.controlled_uat is True
+    assert FakeExecuteService.last_command.operator_id == "uat-operator-1"

@@ -1,0 +1,146 @@
+---
+import ClientShellLayout from "../../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../../lib/api";
+
+interface ReferralDashboard {
+  invite_path: string;
+  accepting_referrals: boolean;
+  unavailable_reason: string | null;
+  totals: {
+    invited: number;
+    registered: number;
+    active: number;
+    earned_points: string;
+  };
+  referrals: Array<{
+    position: number;
+    status: "INVITED" | "REGISTERED" | "ACTIVE" | "UNDER_REVIEW" | "NOT_ELIGIBLE";
+    registration_completed: boolean;
+    six_month_completed: boolean;
+    twelve_month_completed: boolean;
+  }>;
+}
+
+let dashboard: ReferralDashboard | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/referrals`, {
+    headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
+  });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.status === 403) return Astro.redirect("/cliente/validacion");
+  if (response.ok) dashboard = (await response.json()) as ReferralDashboard;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+
+const points = (value: string | undefined) =>
+  new Intl.NumberFormat("es-MX").format(BigInt(value ?? "0"));
+const statusLabels: Record<ReferralDashboard["referrals"][number]["status"], string> = {
+  INVITED: "Invitación registrada",
+  REGISTERED: "Registro completado",
+  ACTIVE: "Servicio activo",
+  UNDER_REVIEW: "En revisión",
+  NOT_ELIGIBLE: "No elegible",
+};
+---
+
+<ClientShellLayout
+  title="Mis referidos | Carobra Rewards"
+  description="Invita personas y consulta el avance anónimo de tus referidos."
+  currentPath="/cliente/recompensas/referidos"
+  sectionLabel="Carobra Rewards"
+>
+  <main class="client-page client-page--soft-separators">
+    <section class="client-home-hero client-section--roomy mt-4 py-16">
+      <div class="client-home-hero__inner">
+        <div>
+          <p class="client-home-hero__kicker">Carobra Rewards</p>
+          <h1>Invita y gana puntos</h1>
+          <p class="mt-3 max-w-2xl text-sm text-[#dcecff] sm:text-base">
+            Comparte tu link personal. No mostraremos tus datos a la persona invitada ni sus datos en tu progreso.
+          </p>
+        </div>
+        <article class="client-card min-w-0 p-5 sm:min-w-[18rem]">
+          <p class="text-xs font-bold uppercase tracking-[0.12em] text-[#587795]">Puntos por referidos</p>
+          <p class="mt-2 text-3xl font-extrabold text-[#14355f]">{points(dashboard?.totals.earned_points)} pts</p>
+        </article>
+      </div>
+    </section>
+
+    {unavailable || !dashboard ? (
+      <section class="client-card p-6" role="status">
+        <h2 class="text-xl font-extrabold text-[#14355f]">No pudimos cargar tus referidos</h2>
+        <p class="mt-2 text-sm text-[#4f6f90]">Intenta actualizar la página en unos minutos.</p>
+      </section>
+    ) : (
+      <>
+        <section class="client-card p-6" aria-labelledby="invite-link-title">
+          <h2 id="invite-link-title" class="text-xl font-extrabold text-[#14355f]">Tu link personal</h2>
+          {dashboard.accepting_referrals ? (
+            <>
+              <p class="mt-2 text-sm text-[#4f6f90]">Es reutilizable y no tiene vencimiento.</p>
+              <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                <input id="referral-link" class="min-w-0 flex-1 rounded-xl border border-[#c7d7e7] bg-[#f8fbff] px-3 py-2 text-sm text-[#244b73]" value={dashboard.invite_path} readonly aria-label="Link personal de referidos" />
+                <button id="copy-referral-link" class="btn-primary" type="button">Copiar link</button>
+              </div>
+              <p id="copy-feedback" class="mt-3 text-sm font-semibold text-[#31597e]" role="status" aria-live="polite"></p>
+            </>
+          ) : (
+            <p class="mt-3 rounded-xl bg-[#f4f8fc] p-4 text-sm text-[#4f6f90]" role="status">
+              {dashboard.unavailable_reason ?? "El programa todavía no está disponible."}
+            </p>
+          )}
+        </section>
+
+        <section class="grid gap-4 sm:grid-cols-3" aria-label="Resumen de referidos">
+          <article class="client-card p-5"><p class="text-sm text-[#587795]">Invitaciones</p><strong class="mt-2 block text-2xl text-[#14355f]">{dashboard.totals.invited}</strong></article>
+          <article class="client-card p-5"><p class="text-sm text-[#587795]">Registros válidos</p><strong class="mt-2 block text-2xl text-[#14355f]">{dashboard.totals.registered}</strong></article>
+          <article class="client-card p-5"><p class="text-sm text-[#587795]">Servicios activos</p><strong class="mt-2 block text-2xl text-[#14355f]">{dashboard.totals.active}</strong></article>
+        </section>
+
+        <section class="client-card p-6" aria-labelledby="referral-progress-title">
+          <h2 id="referral-progress-title" class="text-xl font-extrabold text-[#14355f]">Progreso</h2>
+          {dashboard.referrals.length ? (
+            <ol class="mt-5 space-y-3">
+              {dashboard.referrals.map((referral) => (
+                <li class="rounded-xl border border-[#dce7f1] bg-[#f8fbff] p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <strong class="text-[#244b73]">Referido {referral.position}</strong>
+                    <span class="rounded-full bg-[#e8f1fa] px-3 py-1 text-xs font-bold text-[#31597e]">{statusLabels[referral.status]}</span>
+                  </div>
+                  <p class="mt-3 text-sm text-[#4f6f90]">
+                    Registro: {referral.registration_completed ? "completado" : "pendiente"} · 6 meses: {referral.six_month_completed ? "completado" : "pendiente"} · 12 meses: {referral.twelve_month_completed ? "completado" : "pendiente"}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p class="mt-4 text-sm text-[#4f6f90]">Todavía no tienes referidos registrados.</p>
+          )}
+        </section>
+      </>
+    )}
+  </main>
+
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+    const copyButton = document.querySelector<HTMLButtonElement>("#copy-referral-link");
+    const linkInput = document.querySelector<HTMLInputElement>("#referral-link");
+    const feedback = document.querySelector<HTMLElement>("#copy-feedback");
+    copyButton?.addEventListener("click", async () => {
+      if (!linkInput || !feedback) return;
+      const absoluteLink = new URL(linkInput.value, window.location.origin).toString();
+      try {
+        await navigator.clipboard.writeText(absoluteLink);
+        feedback.textContent = "Link copiado.";
+      } catch {
+        linkInput.value = absoluteLink;
+        linkInput.select();
+        feedback.textContent = "Selecciona y copia el link.";
+      }
+    });
+  </script>
+</ClientShellLayout>

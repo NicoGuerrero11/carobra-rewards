@@ -27,6 +27,13 @@ docs/
 !docs/
 docs/*
 !docs/customer-intake-demo-walkthrough.md
+!docs/rewards-mvp-exploration.md
+!docs/rewards-http-contracts.md
+!docs/rewards-operations-runbook.md
+!docs/rewards-scheduler-runbook.md
+
+# Generated partner deliverables
+deliverables/sisca-uat/Guia-preparacion-UAT-SISCA-Carobra-Rewards.docx
 
 # IDE / OS
 .DS_Store

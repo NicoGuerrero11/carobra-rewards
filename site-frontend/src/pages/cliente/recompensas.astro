@@ -1,0 +1,176 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+
+const user = Astro.locals.user;
+
+interface AccountSummary {
+  account_id: string;
+  available_points: string;
+  reserved_points: string;
+  next_expiring_points: string;
+  next_expiration_at: string | null;
+  afore_relation_status: string;
+  recent_movements: Array<{
+    id: string;
+    entry_type: string;
+    points_delta: string;
+    rule_code: string | null;
+    occurred_at: string;
+  }>;
+  earning_opportunities: Array<{
+    code: string;
+    point_value: string;
+    validity_policy: string;
+  }>;
+  benefits: {
+    available_items: number;
+    redemption_enabled: boolean;
+    unavailable_reason: string | null;
+  };
+}
+
+let summary: AccountSummary | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/account`, {
+    headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
+  });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.status === 403) return Astro.redirect("/cliente/validacion");
+  if (response.ok) summary = (await response.json()) as AccountSummary;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+
+const points = (value: string | undefined) =>
+  new Intl.NumberFormat("es-MX").format(BigInt(value ?? "0"));
+const date = (value: string) =>
+  new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
+const movementLabel = (movement: AccountSummary["recent_movements"][number]) => {
+  if (movement.rule_code === "REGISTRATION_ACTIVATION") return "Bienvenida a Carobra Rewards";
+  const labels: Record<string, string> = {
+    ISSUANCE: "Puntos obtenidos",
+    CONSUMPTION: "Redención",
+    EXPIRATION: "Puntos vencidos",
+    ADJUSTMENT: "Ajuste",
+    REFUND: "Reembolso",
+  };
+  return labels[movement.entry_type] ?? "Movimiento de puntos";
+};
+---
+
+<ClientShellLayout
+  title="Mis recompensas | Carobra Rewards"
+  description="Resumen de tu cuenta Carobra Rewards."
+  currentPath="/cliente/recompensas"
+  sectionLabel="Carobra Rewards"
+>
+  <main class="client-page client-page--soft-separators">
+    <section class="client-home-hero client-section--roomy mt-4 py-16">
+      <div class="client-home-hero__inner">
+        <div>
+          <p class="client-home-hero__kicker">Carobra Rewards</p>
+          <h1>Hola, {user?.firstName ?? "cliente"}</h1>
+          <p class="mt-3 max-w-2xl text-sm text-[#dcecff] sm:text-base">
+            Consulta tu saldo vigente, vencimientos y próximos pasos desde una sola vista.
+          </p>
+        </div>
+        <article class="client-card min-w-0 p-5 sm:min-w-[18rem]" aria-labelledby="available-balance-title">
+          <p id="available-balance-title" class="text-xs font-bold uppercase tracking-[0.12em] text-[#587795]">Saldo disponible</p>
+          <p class="mt-2 text-3xl font-extrabold text-[#14355f]">{points(summary?.available_points)} pts</p>
+          <p class="mt-2 text-sm text-[#4f6f90]">Datos persistidos de tu cuenta</p>
+        </article>
+      </div>
+    </section>
+
+    {unavailable ? (
+      <section class="client-card p-6" role="status">
+        <h2 class="text-xl font-extrabold text-[#14355f]">No pudimos cargar tu resumen</h2>
+        <p class="mt-2 text-sm text-[#4f6f90]">Intenta actualizar la página en unos minutos.</p>
+      </section>
+    ) : (
+      <>
+        <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Resumen de cuenta">
+          <article class="client-card p-5">
+            <p class="text-xs font-bold uppercase tracking-[0.1em] text-[#587795]">Estado AFORE</p>
+            <p class="mt-2 text-xl font-extrabold text-[#14355f]">{summary?.afore_relation_status === "ACTIVE" ? "Activo" : "No disponible"}</p>
+            <p class="mt-2 text-sm text-[#4f6f90]">Elegibilidad validada</p>
+          </article>
+          <article class="client-card p-5">
+            <p class="text-xs font-bold uppercase tracking-[0.1em] text-[#587795]">Próximo vencimiento</p>
+            <p class="mt-2 text-xl font-extrabold text-[#14355f]">{points(summary?.next_expiring_points)} pts</p>
+            <p class="mt-2 text-sm text-[#4f6f90]">{summary?.next_expiration_at ? date(summary.next_expiration_at) : "Sin vencimientos próximos"}</p>
+          </article>
+          <article class="client-card p-5 sm:col-span-2 lg:col-span-1">
+            <p class="text-xs font-bold uppercase tracking-[0.1em] text-[#587795]">Meta sugerida</p>
+            <p class="mt-2 text-xl font-extrabold text-[#14355f]">Explora tus opciones</p>
+            <p class="mt-2 text-sm text-[#4f6f90]">Las metas aparecerán cuando el catálogo esté aprobado.</p>
+          </article>
+        </section>
+
+        <section class="grid gap-6 lg:grid-cols-2">
+          <article class="client-card p-6" aria-labelledby="earning-title">
+            <h2 id="earning-title" class="text-xl font-extrabold text-[#14355f]">Cómo seguir ganando</h2>
+            {summary?.earning_opportunities.length ? (
+              <ul class="mt-5 space-y-3">
+                {summary.earning_opportunities.map((opportunity) => (
+                  <li class="rounded-xl bg-[#f4f8fc] p-4">
+                    <p class="font-bold text-[#244b73]">{opportunity.code.replaceAll("_", " ")}</p>
+                    <p class="mt-1 text-sm text-[#4f6f90]">{points(opportunity.point_value)} puntos</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="mt-4 rounded-xl bg-[#f4f8fc] p-4 text-sm leading-6 text-[#4f6f90]">
+                Aún no hay nuevas acciones habilitadas. Aquí mostraremos solo oportunidades aprobadas y disponibles.
+              </p>
+            )}
+          </article>
+
+          <article class="client-card p-6" aria-labelledby="movements-title">
+            <h2 id="movements-title" class="text-xl font-extrabold text-[#14355f]">Movimientos recientes</h2>
+            {summary?.recent_movements.length ? (
+              <ul class="mt-5 divide-y divide-[#e1e9f2]">
+                {summary.recent_movements.map((movement) => (
+                  <li class="flex items-start justify-between gap-3 py-4 first:pt-0 last:pb-0">
+                    <div class="min-w-0">
+                      <p class="font-bold text-[#244b73]">{movementLabel(movement)}</p>
+                      <p class="mt-1 text-xs text-[#587795]">{date(movement.occurred_at)}</p>
+                    </div>
+                    <strong class={BigInt(movement.points_delta) >= 0n ? "text-[#137044]" : "text-[#8a2f2f]"}>
+                      {BigInt(movement.points_delta) >= 0n ? "+" : ""}{points(movement.points_delta)} pts
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="mt-4 text-sm text-[#4f6f90]">Todavía no hay movimientos para mostrar.</p>
+            )}
+          </article>
+        </section>
+
+        <section class="client-card p-6" aria-labelledby="benefits-title">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 id="benefits-title" class="text-xl font-extrabold text-[#14355f]">Beneficios</h2>
+              <p class="mt-2 text-sm text-[#4f6f90]">
+                {summary?.benefits.redemption_enabled
+                  ? `${summary.benefits.available_items} opciones disponibles`
+                  : "El catálogo y las redenciones aún no están habilitados."}
+              </p>
+            </div>
+            <span class="inline-flex w-fit rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-bold text-[#31597e]">
+              {summary?.benefits.redemption_enabled ? "Disponible" : "Próximamente"}
+            </span>
+          </div>
+        </section>
+      </>
+    )}
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+</ClientShellLayout>

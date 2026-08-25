@@ -27,6 +27,7 @@ class ValidationCheckType(StrEnum):
     SCHEDULED = "SCHEDULED"
     MANUAL = "MANUAL"
     RETRY = "RETRY"
+    CONTROLLED_UAT = "CONTROLLED_UAT"
 
 
 class ValidationCheckOutcome(StrEnum):
@@ -238,6 +239,7 @@ class SiscaValidationCheck:
     error_category: TechnicalFailureCategory | None
     retryable: bool
     created_at: datetime
+    operator_id: str | None = None
 
 
 def require_utc(value: datetime) -> datetime:

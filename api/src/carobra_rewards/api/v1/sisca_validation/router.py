@@ -9,8 +9,10 @@ from carobra_rewards.api.v1.sisca_validation.dependencies import (
     get_execute_validation_check,
     get_validation_status_service,
     require_internal_api_key,
+    require_uat_control_operator,
 )
 from carobra_rewards.api.v1.sisca_validation.schemas import (
+    ExecuteControlledUatCheckpointRequest,
     ExecuteValidationCheckRequest,
     ValidationErrorEnvelope,
     ValidationExecutionResponse,
@@ -61,6 +63,34 @@ async def execute_validation_check(
         raise _safe_error(404, "validation_not_found", "Validation not found") from exc
     except ValidationCheckpointNotDueError as exc:
         raise _safe_error(409, "checkpoint_not_due", "Checkpoint is not due") from exc
+    except ValidationCheckpointMismatchError as exc:
+        raise _safe_error(409, "checkpoint_mismatch", "Checkpoint is not current") from exc
+    return ValidationExecutionResponse.from_result(result)
+
+
+@router.post(
+    "/internal/sisca-validations/{validation_id}/uat-controlled-checks",
+    response_model=ValidationExecutionResponse,
+    responses=_errors,
+    dependencies=[Depends(require_internal_api_key)],
+)
+async def execute_controlled_uat_checkpoint(
+    validation_id: UUID,
+    request: ExecuteControlledUatCheckpointRequest,
+    operator_id: Annotated[str, Depends(require_uat_control_operator)],
+    service: Annotated[ExecuteSiscaValidationCheck, Depends(get_execute_validation_check)],
+) -> ValidationExecutionResponse:
+    try:
+        result = await service(
+            ExecuteValidationCheckCommand(
+                validation_id=validation_id,
+                checkpoint=request.checkpoint,
+                controlled_uat=True,
+                operator_id=operator_id,
+            )
+        )
+    except ValidationNotFoundError as exc:
+        raise _safe_error(404, "validation_not_found", "Validation not found") from exc
     except ValidationCheckpointMismatchError as exc:
         raise _safe_error(409, "checkpoint_mismatch", "Checkpoint is not current") from exc
     return ValidationExecutionResponse.from_result(result)

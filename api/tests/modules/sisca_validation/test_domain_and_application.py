@@ -199,6 +199,29 @@ def test_known_but_disallowed_movement_is_not_eligible() -> None:
     assert result.outcome is ValidationCheckOutcome.MATCH_NOT_ELIGIBLE
 
 
+def test_confirmed_sisca_certified_transfer_is_validated() -> None:
+    result = normalize_gateway_result(
+        FoundSiscaValidation("TRASPASO", "Certificado", date(2026, 8, 24)),
+        known_movement_types=frozenset({"TRASPASO"}),
+        allowed_movement_types=frozenset({"TRASPASO"}),
+        minimum_transfer_date=None,
+    )
+
+    assert result.outcome is ValidationCheckOutcome.MATCH_VALIDATED
+
+
+def test_unknown_confirmed_sisca_status_fails_closed() -> None:
+    result = normalize_gateway_result(
+        FoundSiscaValidation("TRASPASO", "Estatus nuevo", date(2026, 8, 24)),
+        known_movement_types=frozenset({"TRASPASO"}),
+        allowed_movement_types=frozenset({"TRASPASO"}),
+        minimum_transfer_date=None,
+    )
+
+    assert result.outcome is ValidationCheckOutcome.TECHNICAL_FAILURE
+    assert result.error_category is TechnicalFailureCategory.UNKNOWN_CATALOG
+
+
 @pytest.mark.asyncio
 async def test_validation_rejects_an_orphan_customer_without_calling_sisca() -> None:
     repo = FakeRepository()
@@ -228,6 +251,91 @@ async def test_h24_no_information_advances_to_d3() -> None:
     assert result.status is ValidationStatus.PENDING
     assert result.next_checkpoint is ValidationCheckpoint.D3
     assert result.outcome is ValidationCheckOutcome.NO_INFORMATION
+
+
+@pytest.mark.asyncio
+async def test_controlled_uat_checkpoints_advance_without_waiting_for_calendar_time(caplog) -> None:
+    repo = FakeRepository()
+    validation = SiscaValidation.create(
+        customer_id=UUID("00000000-0000-0000-0000-000000000101"),
+        registered_at=NOW,
+    )
+    repo.validations[validation.id] = validation
+    repo.curps[validation.customer_id] = "ABCD123456HMNLRS09"
+    service = _service(
+        repo,
+        SequenceGateway([SiscaNoInformation(), SiscaNoInformation(), SiscaNoInformation()]),
+    )
+    caplog.set_level("INFO")
+
+    h24 = await service(
+        ExecuteValidationCheckCommand(
+            validation.id,
+            ValidationCheckpoint.H24,
+            controlled_uat=True,
+            operator_id="uat-operator-1",
+        )
+    )
+    d3 = await service(
+        ExecuteValidationCheckCommand(
+            validation.id,
+            ValidationCheckpoint.D3,
+            controlled_uat=True,
+            operator_id="uat-operator-1",
+        )
+    )
+    d5 = await service(
+        ExecuteValidationCheckCommand(
+            validation.id,
+            ValidationCheckpoint.D5,
+            controlled_uat=True,
+            operator_id="uat-operator-1",
+        )
+    )
+
+    assert h24.next_checkpoint is ValidationCheckpoint.D3
+    assert d3.next_checkpoint is ValidationCheckpoint.D5
+    assert d5.status is ValidationStatus.CANCELLED
+    assert [check.check_type.value for check in repo.checks] == ["CONTROLLED_UAT"] * 3
+    assert {check.operator_id for check in repo.checks} == {"uat-operator-1"}
+    audit = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "sisca_uat_controlled_checkpoint_completed"
+    ]
+    assert len(audit) == 3
+    assert "ABCD123456HMNLRS09" not in repr(audit)
+
+
+@pytest.mark.asyncio
+async def test_controlled_uat_checkpoint_preserves_terminal_state_protection() -> None:
+    repo = FakeRepository()
+    validation = _pending_validation(checkpoint=ValidationCheckpoint.H24)
+    terminal = validation.apply_result(
+        checkpoint=ValidationCheckpoint.H24,
+        result=normalize_gateway_result(
+            FoundSiscaValidation("Traspaso NAP", "ACEPTADA PROCESAR", date(2026, 7, 2)),
+            known_movement_types=KNOWN,
+            allowed_movement_types=ALLOWED,
+            minimum_transfer_date=date(2026, 7, 1),
+        ),
+        checked_at=NOW,
+        manual=False,
+    )
+    repo.validations[terminal.id] = terminal
+    gateway = SequenceGateway([SiscaNoInformation()])
+
+    result = await _service(repo, gateway)(
+        ExecuteValidationCheckCommand(
+            terminal.id,
+            ValidationCheckpoint.D3,
+            controlled_uat=True,
+            operator_id="uat-operator-1",
+        )
+    )
+
+    assert result.stale is True
+    assert gateway.calls == 0
 
 
 @pytest.mark.asyncio

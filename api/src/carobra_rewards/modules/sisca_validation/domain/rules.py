@@ -15,7 +15,10 @@ from carobra_rewards.modules.sisca_validation.domain.models import (
 ACCEPTED_TO_PROCESS = "ACEPTADA PROCESAR"
 ACCEPTED_OPERATIONS = "ACEPTADA OPERACIONES"
 CANCELLED = "CANCELADA"
-KNOWN_STATUSES = {ACCEPTED_TO_PROCESS, ACCEPTED_OPERATIONS, CANCELLED}
+CERTIFIED = "CERTIFICADO"
+DEFAULT_VALIDATED_STATUSES = frozenset({CERTIFIED, ACCEPTED_TO_PROCESS})
+DEFAULT_PENDING_STATUSES = frozenset({ACCEPTED_OPERATIONS})
+DEFAULT_CANCELLED_STATUSES = frozenset({CANCELLED})
 
 
 def normalize_catalog_value(value: str) -> str:
@@ -28,6 +31,9 @@ def normalize_gateway_result(
     known_movement_types: frozenset[str],
     allowed_movement_types: frozenset[str],
     minimum_transfer_date: date | None,
+    validated_statuses: frozenset[str] = DEFAULT_VALIDATED_STATUSES,
+    pending_statuses: frozenset[str] = DEFAULT_PENDING_STATUSES,
+    cancelled_statuses: frozenset[str] = DEFAULT_CANCELLED_STATUSES,
 ) -> NormalizedCheckResult:
     if isinstance(result, SiscaNoInformation):
         return NormalizedCheckResult(
@@ -48,12 +54,16 @@ def normalize_gateway_result(
     normalized_allowed = frozenset(
         normalize_catalog_value(value) for value in allowed_movement_types
     )
-    if sf_status not in KNOWN_STATUSES or movement not in normalized_known:
+    normalized_validated = frozenset(normalize_catalog_value(value) for value in validated_statuses)
+    normalized_pending = frozenset(normalize_catalog_value(value) for value in pending_statuses)
+    normalized_cancelled = frozenset(normalize_catalog_value(value) for value in cancelled_statuses)
+    known_statuses = normalized_validated | normalized_pending | normalized_cancelled
+    if sf_status not in known_statuses or movement not in normalized_known:
         return _unknown_catalog(result)
 
-    if sf_status == CANCELLED:
+    if sf_status in normalized_cancelled:
         outcome = ValidationCheckOutcome.MATCH_CANCELLED
-    elif sf_status == ACCEPTED_OPERATIONS:
+    elif sf_status in normalized_pending:
         outcome = ValidationCheckOutcome.MATCH_TEMPORARY_PENDING
     elif movement not in normalized_allowed or (
         minimum_transfer_date is not None and result.transfer_date < minimum_transfer_date

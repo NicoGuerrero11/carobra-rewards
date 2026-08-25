@@ -7,6 +7,12 @@ const e2eBypassAuth =
   process.env.E2E_BYPASS_AUTH === "true" ||
   import.meta.env.PUBLIC_E2E_BYPASS_AUTH === "true";
 const e2eUserRoleHeader = "x-e2e-user-role";
+const customerEntryPaths = new Set([
+  "/cliente",
+  "/cliente/validacion",
+  "/cliente/recompensas",
+  "/cliente/recompensas/referidos",
+]);
 
 const e2eClientUser = {
   id: "e2e-client-user",
@@ -26,6 +32,15 @@ interface CustomerProfileResponse {
   email: string;
   customer_status: string;
   onboarding_status: string;
+}
+
+interface RewardsEligibilityResponse {
+  customer_id: string;
+  eligible: boolean;
+  reason: string | null;
+  customer_status: string | null;
+  sisca_validation_status: string | null;
+  afore_relation_status: string | null;
 }
 
 async function fetchSession(cookieHeader: string | null) {
@@ -58,6 +73,20 @@ async function fetchSession(cookieHeader: string | null) {
   }
 }
 
+async function fetchRewardsEligibility(cookieHeader: string | null) {
+  if (!cookieHeader) return null;
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/eligibility`, {
+      method: "GET",
+      headers: { cookie: cookieHeader },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as RewardsEligibilityResponse;
+  } catch {
+    return null;
+  }
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const pathname = context.url.pathname;
 
@@ -69,11 +98,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (pathname === "/verificar-email") {
     return context.redirect("/login");
   }
-  if (pathname.startsWith("/cliente/")) {
+  if (pathname.startsWith("/cliente/") && !customerEntryPaths.has(pathname)) {
     return context.redirect("/cliente");
   }
 
-  const isProtected = pathname === "/cliente";
+  const isProtected = customerEntryPaths.has(pathname);
   const isAuthPage = authPages.has(pathname);
   if (!isProtected && !isAuthPage) {
     return next();
@@ -98,5 +127,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   context.locals.user = user;
+  const cookieHeader = context.request.headers.get("cookie");
+  const bypassRole = context.request.headers.get(e2eUserRoleHeader)?.toLowerCase();
+  const rewardsEligibility = bypassRequested
+    ? {
+        customer_id: user.id,
+        eligible: bypassRole === "eligible",
+        reason: bypassRole === "eligible" ? null : "sisca_not_validated",
+        customer_status: bypassRole === "eligible" ? "ACTIVE" : "PENDING_VALIDATION",
+        sisca_validation_status: bypassRole === "eligible" ? "VALIDATED" : "PENDING",
+        afore_relation_status: bypassRole === "eligible" ? "ACTIVE" : "PENDING",
+      }
+    : await fetchRewardsEligibility(cookieHeader);
+  context.locals.rewardsEligibility = rewardsEligibility ?? undefined;
+
+  if (pathname === "/cliente") {
+    return context.redirect(
+      rewardsEligibility?.eligible ? "/cliente/recompensas" : "/cliente/validacion",
+    );
+  }
+  if (pathname.startsWith("/cliente/recompensas") && !rewardsEligibility?.eligible) {
+    return context.redirect("/cliente/validacion");
+  }
+  if (pathname === "/cliente/validacion" && rewardsEligibility?.eligible) {
+    return context.redirect("/cliente/recompensas");
+  }
   return next();
 });

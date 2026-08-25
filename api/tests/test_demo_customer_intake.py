@@ -3,6 +3,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.dialects import postgresql
+
 from scripts.demo_customer_intake import (
     CreatedRecordIds,
     DemoConfigurationError,
@@ -12,7 +14,6 @@ from scripts.demo_customer_intake import (
     parse_args,
     validate_safe_environment,
 )
-from sqlalchemy.dialects import postgresql
 
 
 def test_rejects_missing_test_database_url() -> None:

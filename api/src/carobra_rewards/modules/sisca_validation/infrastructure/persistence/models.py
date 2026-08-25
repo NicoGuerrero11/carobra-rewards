@@ -84,3 +84,4 @@ class SiscaValidationCheckModel(Base):
     error_category: Mapped[str | None] = mapped_column(String(40), nullable=True)
     retryable: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    operator_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

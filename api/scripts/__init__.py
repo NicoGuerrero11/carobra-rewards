@@ -1,1 +1,1 @@
-"""Utility scripts for local demos and maintenance."""
+"""Operational scripts for the Carobra Rewards API."""

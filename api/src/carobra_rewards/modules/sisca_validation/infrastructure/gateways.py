@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import ssl
 from datetime import date
 from time import monotonic
+from typing import Literal
 
 import httpx
 
@@ -40,12 +42,24 @@ class HttpSiscaValidationGateway:
         validation_path: str,
         timeout_seconds: float,
         api_token: str | None = None,
+        auth_mode: Literal["bearer", "api_key"] = "api_key",
+        api_key_header: str = "X-API-Key",
+        response_format: Literal["canonical", "business_envelope"] = "business_envelope",
+        trace_identifier: str | None = None,
+        trace_identifier_header: str = "X-Rewards-Id",
+        ca_bundle_path: str | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._validation_path = "/" + validation_path.lstrip("/")
         self._timeout_seconds = timeout_seconds
         self._api_token = api_token
+        self._auth_mode = auth_mode
+        self._api_key_header = api_key_header
+        self._response_format = response_format
+        self._trace_identifier = trace_identifier
+        self._trace_identifier_header = trace_identifier_header
+        self._tls_context = _build_tls_context(ca_bundle_path)
         self._client = client
 
     async def query(self, request: SiscaValidationRequest) -> SiscaGatewayResult:
@@ -87,11 +101,16 @@ class HttpSiscaValidationGateway:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "X-Request-ID": str(request.request_id),
+            "X-Request-Id": str(request.request_id),
             "X-Requested-At": request.requested_at.isoformat(),
         }
         if self._api_token is not None:
-            headers["Authorization"] = f"Bearer {self._api_token}"
+            if self._auth_mode == "bearer":
+                headers["Authorization"] = f"Bearer {self._api_token}"
+            else:
+                headers[self._api_key_header] = self._api_token
+        if self._trace_identifier is not None:
+            headers[self._trace_identifier_header] = self._trace_identifier
         if self._client is not None:
             return await self._client.post(
                 self._validation_path,
@@ -99,7 +118,7 @@ class HttpSiscaValidationGateway:
                 headers=headers,
                 timeout=self._timeout_seconds,
             )
-        async with httpx.AsyncClient(base_url=self._base_url) as client:
+        async with httpx.AsyncClient(base_url=self._base_url, verify=self._tls_context) as client:
             return await client.post(
                 self._validation_path,
                 json={"curp": request.curp},
@@ -107,8 +126,7 @@ class HttpSiscaValidationGateway:
                 timeout=self._timeout_seconds,
             )
 
-    @staticmethod
-    def _map_response(response: httpx.Response) -> SiscaGatewayResult:
+    def _map_response(self, response: httpx.Response) -> SiscaGatewayResult:
         status = response.status_code
         if status in {401, 403}:
             return SiscaTechnicalFailure(
@@ -134,32 +152,85 @@ class HttpSiscaValidationGateway:
             payload = response.json()
         except ValueError:
             return _malformed(status)
-        if not isinstance(payload, dict) or type(payload.get("found")) is not bool:
-            return _malformed(status)
-        if payload["found"] is False:
-            if set(payload) == {"found"}:
-                return SiscaNoInformation(http_status=status)
-            return _malformed(status)
-        expected = {"found", "tipo_movimiento", "estatus_sf", "fecha_traspaso"}
-        if set(payload) != expected:
-            return _malformed(status)
-        movement = payload["tipo_movimiento"]
-        sf_status = payload["estatus_sf"]
-        transfer_date = payload["fecha_traspaso"]
-        if not all(isinstance(value, str) and value.strip() for value in (movement, sf_status)):
-            return _malformed(status)
-        if not isinstance(transfer_date, str):
-            return _malformed(status)
+        if self._response_format == "business_envelope":
+            return _map_business_envelope(payload, status)
+        return _map_canonical_payload(payload, status)
+
+
+def _map_canonical_payload(payload: object, status: int) -> SiscaGatewayResult:
+    if not isinstance(payload, dict) or type(payload.get("found")) is not bool:
+        return _malformed(status)
+    if payload["found"] is False:
+        if set(payload) == {"found"}:
+            return SiscaNoInformation(http_status=status)
+        return _malformed(status)
+    expected = {"found", "tipo_movimiento", "estatus_sf", "fecha_traspaso"}
+    if set(payload) != expected:
+        return _malformed(status)
+    movement = payload["tipo_movimiento"]
+    sf_status = payload["estatus_sf"]
+    transfer_date = payload["fecha_traspaso"]
+    if not all(isinstance(value, str) and value.strip() for value in (movement, sf_status)):
+        return _malformed(status)
+    if not isinstance(transfer_date, str):
+        return _malformed(status)
+    try:
+        parsed_date = date.fromisoformat(transfer_date)
+    except ValueError:
+        return _malformed(status)
+    return FoundSiscaValidation(
+        movement_type=movement,
+        sf_status=sf_status,
+        transfer_date=parsed_date,
+        http_status=status,
+    )
+
+
+def _map_business_envelope(payload: object, status: int) -> SiscaGatewayResult:
+    if not isinstance(payload, dict) or set(payload) != {"success", "codigo", "mensaje", "data"}:
+        return _malformed(status)
+    if payload["success"] is not True or not isinstance(payload["mensaje"], str):
+        return _malformed(status)
+    code = payload["codigo"]
+    if code == "SIN_INFORMACION" and payload["data"] is None:
+        return SiscaNoInformation(http_status=status)
+    if code != "OK" or not isinstance(payload["data"], dict):
+        return _malformed(status)
+    data = payload["data"]
+    expected = {"tipo_movimiento", "estatus", "fecha_traspaso"}
+    if set(data) != expected:
+        return _malformed(status)
+    movement = data["tipo_movimiento"]
+    sf_status = data["estatus"]
+    transfer_date = data["fecha_traspaso"]
+    if not all(isinstance(value, str) and value.strip() for value in (movement, sf_status)):
+        return _malformed(status)
+    if not isinstance(transfer_date, str):
+        return _malformed(status)
+    parsed_date = _parse_transfer_date(transfer_date)
+    if parsed_date is None:
+        return _malformed(status)
+    return FoundSiscaValidation(
+        movement_type=movement,
+        sf_status=sf_status,
+        transfer_date=parsed_date,
+        http_status=status,
+    )
+
+
+def _parse_transfer_date(value: str) -> date | None:
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
         try:
-            parsed_date = date.fromisoformat(transfer_date)
+            return _parse_dmy(value)
         except ValueError:
-            return _malformed(status)
-        return FoundSiscaValidation(
-            movement_type=movement,
-            sf_status=sf_status,
-            transfer_date=parsed_date,
-            http_status=status,
-        )
+            return None
+
+
+def _parse_dmy(value: str) -> date:
+    day, month, year = (int(part) for part in value.split("/"))
+    return date(year, month, day)
 
 
 def _malformed(http_status: int | None) -> SiscaTechnicalFailure:
@@ -168,3 +239,10 @@ def _malformed(http_status: int | None) -> SiscaTechnicalFailure:
         retryable=False,
         http_status=http_status,
     )
+
+
+def _build_tls_context(ca_bundle_path: str | None) -> ssl.SSLContext:
+    context = ssl.create_default_context()
+    if ca_bundle_path is not None:
+        context.load_verify_locations(cafile=ca_bundle_path)
+    return context

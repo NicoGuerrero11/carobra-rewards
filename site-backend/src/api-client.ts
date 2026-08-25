@@ -5,6 +5,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegistrationResponse,
+  RewardsIdentityEvidence,
   SiteErrorCode,
   ValidationStatusResponse,
 } from "./contracts.js";
@@ -61,6 +62,28 @@ export class RewardsApiClient {
       undefined,
       cookieHeader,
     );
+  }
+
+  async getRewardsIdentityEvidence(
+    cookieHeader: string | undefined,
+  ): Promise<ApiResult<RewardsIdentityEvidence>> {
+    const [profile, validation] = await Promise.all([
+      this.getCurrentCustomer(cookieHeader),
+      this.getValidationStatus(cookieHeader),
+    ]);
+    if (validation.data.customer_id !== profile.data.id) {
+      throw new SiteApiError(503, "api_unavailable", "The API returned inconsistent evidence");
+    }
+    return {
+      status: 200,
+      data: {
+        customer_id: profile.data.id,
+        customer_status: profile.data.customer_status,
+        validation_id: validation.data.validation_id,
+        validation_status: validation.data.status,
+      },
+      setCookies: [...profile.setCookies, ...validation.setCookies],
+    };
   }
 
   private async request<TResponse>(
