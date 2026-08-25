@@ -79,6 +79,16 @@ los cinco casos de humo y el lote restante.
 
 ### 4. Las comprobaciones aceleradas conservan la semántica del ciclo de vida
 
+El alta confirmará primero la transacción que crea al cliente, su consentimiento
+y la validación pendiente. Inmediatamente después, la API ejecutará una consulta
+inicial en segundo plano a SISCA mediante el mismo servicio de validación y
+gateway usados por los checkpoints. La respuesta HTTP del alta conservará al
+cliente como Invitado y no esperará la latencia ni los reintentos del partner.
+Un resultado validado activará el producto AFORE y quedará disponible para las
+lecturas autenticadas del sitio; un resultado aún pendiente conservará H24 como
+siguiente checkpoint. La indisponibilidad de SISCA no revertirá el alta ya
+confirmada ni expondrá el CURP o la respuesta cruda al sitio.
+
 En UAT existirá un mecanismo explícitamente autorizado para ejecutar H24,
 D3 y D5 sobre casos sintéticos sin esperar 24, 72 y 120 horas reales. Este
 mecanismo utilizará el mismo servicio de validación, gateway SISCA,

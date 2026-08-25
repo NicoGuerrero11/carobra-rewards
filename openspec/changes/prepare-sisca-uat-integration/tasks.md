@@ -21,6 +21,7 @@
 - [x] 3.3 Enrutar los checkpoints controlados por el mismo servicio, gateway SISCA, normalización, reintentos y transiciones del flujo normal.
 - [x] 3.4 Registrar en auditoría el operador, caso, checkpoint, hora, resultado y referencia opaca de cada ejecución controlada.
 - [x] 3.5 Añadir pruebas automatizadas de H24, D3, D5, estados terminales, rechazo en producción y redacción de datos sensibles.
+- [x] 3.6 Disparar una consulta SISCA inicial después del registro confirmado, conservar el alta ante fallos externos y devolver al sitio el estado resultante.
 
 ## 4. Orquestación y evidencia del piloto de 100 clientes
 

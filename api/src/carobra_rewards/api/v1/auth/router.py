@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 
 from carobra_rewards.api.v1.auth.dependencies import get_customer_auth_service
 from carobra_rewards.api.v1.auth.schemas import (
@@ -41,12 +41,14 @@ router = APIRouter(tags=["customer-auth"])
 )
 async def register(
     request: RegisterRequest,
+    background_tasks: BackgroundTasks,
     service: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
 ) -> RegistrationResponse:
     try:
         result = await service.register(request.to_command())
     except Exception as exc:
         _raise_http_error(exc)
+    background_tasks.add_task(service.run_initial_validation, result)
     return RegistrationResponse.from_result(result)
 
 
