@@ -77,6 +77,10 @@ function isActive(item: NavItem) {
         </nav>
 
         <div class="client-shell__right">
+          <a class="client-shell__utility-link" href="/cliente/notificaciones" aria-label="Ver notificaciones">
+            <span aria-hidden="true">●</span>
+            <span class="client-shell__utility-label">Avisos</span>
+          </a>
           <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
               <span class="client-shell__user-icon" aria-hidden="true">
@@ -89,6 +93,8 @@ function isActive(item: NavItem) {
             </button>
 
             <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
+              <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
+              <a class="client-shell__user-menu-link" href="mailto:soporte@carobra.mx">Ayuda y soporte</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test("pending SISCA customer can navigate the complete portal safely", async ({ page }) => {
+test("pending customer can navigate the complete provider-neutral portal safely", async ({ page }) => {
   await login(page, "ada@example.com");
 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
@@ -13,6 +13,8 @@ test("pending SISCA customer can navigate the complete portal safely", async ({ 
   await expect(page.getByRole("link", { name: /Gift Cards/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Inicio", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Estamos validando tu producto" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
 
   await page.goto("/cliente/beneficios");
   await expect(page.getByRole("heading", { name: "Recompensas", exact: true })).toBeVisible();
@@ -22,8 +24,8 @@ test("pending SISCA customer can navigate the complete portal safely", async ({ 
   await expect(page.getByRole("button", { name: /canjear|redimir/i })).toHaveCount(0);
 
   await page.goto("/cliente/cursos");
-  await expect(page.getByRole("heading", { name: "Aquí estará tu sección de cursos" })).toBeVisible();
-  await expect(page.getByText("Contenido en preparación").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Una biblioteca hecha para tu camino" })).toBeVisible();
+  await expect(page.getByText("Aún no tienes cursos asignados")).toBeVisible();
 
   await page.goto("/cliente/gift-cards");
   await expect(page.getByRole("heading", { name: "Aquí estará tu sección de Gift Cards" })).toBeVisible();
@@ -31,12 +33,25 @@ test("pending SISCA customer can navigate the complete portal safely", async ({ 
   await expect(page.getByText("No hay Gift Cards publicadas todavía")).toBeVisible();
 });
 
-test("validated SISCA customer sees Rewards as home and a truthful rewards catalog", async ({ page }) => {
+test("validated customer sees a complete portal and a truthful rewards catalog", async ({ page }) => {
   await login(page, "eligible@example.com");
 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Bronce" })).toBeVisible();
   await expect(page.getByText("150 pts").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Completa tu perfil financiero" }).first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
+
+  await page.goto("/cliente/cursos");
+  await expect(page.getByRole("heading", { name: "Fundamentos para tu retiro" })).toBeVisible();
+  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "40");
+
+  await page.goto("/cliente/notificaciones");
+  await expect(page.getByRole("heading", { name: "Notificaciones" })).toBeVisible();
+
+  await page.goto("/cliente/perfil");
+  await expect(page.getByRole("heading", { name: "Mi cuenta" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Elige qué actualizaciones recibir" })).toBeVisible();
 
   await page.goto("/cliente/beneficios");
   await expect(page.getByText("Cuenta preparada")).toBeVisible();

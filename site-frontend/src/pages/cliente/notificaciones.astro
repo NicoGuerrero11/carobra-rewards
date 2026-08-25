@@ -1,0 +1,35 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+} catch {}
+const notifications = portal?.notifications.items ?? [];
+const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
+---
+<ClientShellLayout title="Notificaciones | Carobra" description="Avisos de tu cuenta Carobra Rewards." currentPath="/cliente/notificaciones" sectionLabel="Notificaciones">
+  <main class="portal-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Centro de avisos</p><h1>Notificaciones</h1><p>Cambios importantes, actividades y movimientos de tu cuenta.</p></div><span>{portal?.notifications.unread_count ?? 0} sin leer</span></header>
+    <section class="portal-section" aria-labelledby="notifications-title">
+      <div class="portal-section-heading"><div><p class="portal-eyebrow">Tu cuenta</p><h2 id="notifications-title">Actividad reciente</h2></div><p>Los avisos describen lo que cambió y cuándo ocurrió.</p></div>
+      {notifications.length ? <ul class="notification-list">{notifications.map((notice) => (
+        <li class:list={[!notice.read && "is-unread"]} data-notification-id={notice.id}><span aria-hidden="true"></span><div><strong>{notice.title}</strong><p>{notice.message}</p><small>{date(notice.occurred_at)}</small></div>{!notice.read && <button class="mark-read" type="button">Marcar como leída</button>}</li>
+      ))}</ul> : <div class="rewards-empty"><strong>No tienes avisos por ahora</strong><p>Cuando exista una actualización relevante aparecerá aquí.</p></div>}
+    </section>
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+    document.querySelectorAll<HTMLButtonElement>(".mark-read").forEach((button) => button.addEventListener("click", async () => {
+      const item = button.closest<HTMLElement>("[data-notification-id]");
+      if (!item) return;
+      const response = await fetch("/api/v1/rewards/portal/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ notification_id: item.dataset.notificationId }) });
+      if (response.ok) { button.remove(); item.classList.remove("is-unread"); }
+    }));
+  </script>
+</ClientShellLayout>

@@ -1,153 +1,53 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
-
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 const user = Astro.locals.user;
-
-const clientUser = {
-  id: user?.id ?? "",
-  firstName: user?.firstName ?? "",
-  lastName: user?.lastName ?? "",
-  email: user?.email ?? "",
-};
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+} catch {}
+const preferences = portal?.preferences ?? { activity_updates: true, learning_updates: true, product_updates: true };
 ---
-
-<ClientShellLayout title="Perfil Cliente | Carobra" description="Gestión de perfil cliente en Carobra Rewards." currentPath="/cliente/perfil" sectionLabel="Perfil">
-  <main id="profile-root" data-user={JSON.stringify(clientUser)} class="client-page">
-    <section class="client-card p-5">
-      <p class="pill">Perfil</p>
-      <h1 class="mt-3 text-3xl font-extrabold text-[#102745]">Gestiona tus datos básicos</h1>
-      <p class="mt-1 text-sm text-[#4c637f]">Actualiza tu información para mantener una relación más útil con Carobra.</p>
-    </section>
-
-    <section class="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-      <article class="client-card p-5">
-        <h2 class="text-xl font-extrabold text-[#14355f]">Editar perfil</h2>
-        <p class="mt-1 text-sm text-[#4c637f]">Los cambios se reflejan de inmediato en tu dashboard y actividad reciente.</p>
-
-        <form id="profile-form" class="mt-5 grid gap-4 sm:grid-cols-2">
-          <label class="block text-sm font-semibold text-[#244b73]">
-            Nombre
-            <input id="firstName" name="firstName" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" required />
-          </label>
-
-          <label class="block text-sm font-semibold text-[#244b73]">
-            Apellido
-            <input id="lastName" name="lastName" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" required />
-          </label>
-
-          <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
-            Correo
-            <input id="email" name="email" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-[#f4f8fc] px-3 py-2 text-sm text-[#4c637f]" type="email" readonly />
-          </label>
-
-          <label class="block text-sm font-semibold text-[#244b73]">
-            Teléfono
-            <input id="phone" name="phone" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="tel" placeholder="Ej. +52 55 1234 5678" />
-          </label>
-
-          <label class="block text-sm font-semibold text-[#244b73]">
-            Ciudad
-            <input id="city" name="city" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="text" placeholder="Ej. CDMX" />
-          </label>
-
-          <p id="profile-feedback" class="text-sm font-semibold text-[#0c3d75] sm:col-span-2"></p>
-
-          <button type="submit" class="btn-primary sm:col-span-2">Guardar cambios</button>
-        </form>
+<ClientShellLayout title="Mi cuenta | Carobra" description="Perfil, preferencias y seguridad de tu cuenta." currentPath="/cliente/perfil" sectionLabel="Mi cuenta">
+  <main class="portal-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Tu espacio personal</p><h1>Mi cuenta</h1><p>Consulta tus datos, elige qué avisos recibir y encuentra ayuda.</p></div><span>Cuenta protegida</span></header>
+    <section class="account-grid">
+      <article class="portal-card account-card">
+        <p class="portal-eyebrow">Datos personales</p><h2>{user?.firstName} {user?.lastName}</h2><p>Estos son los datos asociados a tu sesión.</p>
+        <dl><div><dt>Correo</dt><dd>{user?.email}</dd></div><div><dt>Nombre</dt><dd>{user?.firstName} {user?.lastName}</dd></div></dl>
+        <a href="mailto:soporte@carobra.mx?subject=Actualizar%20datos%20de%20mi%20cuenta">Solicitar una corrección</a>
       </article>
-
-      <article class="client-card p-5">
-        <p class="text-xs font-bold uppercase tracking-[0.14em] text-[#4f6f90]">Resumen actual</p>
-        <h3 id="profile-summary-name" class="mt-2 text-xl font-extrabold text-[#14355f]"></h3>
-        <p id="profile-summary-email" class="text-sm text-[#4c637f]"></p>
-
-        <dl class="mt-4 space-y-3 text-sm">
-          <div class="rounded-2xl bg-[#f2f7fc] p-3">
-            <dt class="text-xs font-semibold uppercase tracking-[0.08em] text-[#5a7593]">Teléfono</dt>
-            <dd id="profile-summary-phone" class="mt-1 font-semibold text-[#2e4d70]"></dd>
-          </div>
-          <div class="rounded-2xl bg-[#f2f7fc] p-3">
-            <dt class="text-xs font-semibold uppercase tracking-[0.08em] text-[#5a7593]">Ciudad</dt>
-            <dd id="profile-summary-city" class="mt-1 font-semibold text-[#2e4d70]"></dd>
-          </div>
-        </dl>
-
-        <a href="/cliente" class="btn-secondary mt-4 w-full">Volver al dashboard</a>
+      <article class="portal-card account-card">
+        <p class="portal-eyebrow">Seguridad</p><h2>Protege tu acceso</h2><p>Carobra nunca te pedirá tu contraseña por correo o teléfono.</p>
+        <ul><li>Usa una contraseña única.</li><li>Cierra sesión en equipos compartidos.</li><li>Reporta cualquier actividad que no reconozcas.</li></ul>
+        <a href="mailto:soporte@carobra.mx?subject=Ayuda%20con%20mi%20acceso">Ayuda con mi acceso</a>
       </article>
     </section>
+    <section class="portal-section" aria-labelledby="preferences-title">
+      <div class="portal-section-heading"><div><p class="portal-eyebrow">Preferencias</p><h2 id="preferences-title">Elige qué actualizaciones recibir</h2></div><p>Puedes cambiar estas opciones cuando quieras.</p></div>
+      <form id="preferences-form" class="preferences-form">
+        <label><span><strong>Actividad de Rewards</strong><small>Cuestionarios, documentos y movimientos relevantes.</small></span><input name="activity_updates" type="checkbox" checked={preferences.activity_updates} /></label>
+        <label><span><strong>Cursos y contenidos</strong><small>Nuevos aprendizajes asignados y recordatorios de avance.</small></span><input name="learning_updates" type="checkbox" checked={preferences.learning_updates} /></label>
+        <label><span><strong>Actualizaciones de productos</strong><small>Confirmaciones y cambios visibles en tu cuenta.</small></span><input name="product_updates" type="checkbox" checked={preferences.product_updates} /></label>
+        <div><button type="submit">Guardar preferencias</button><p id="preferences-feedback" role="status"></p></div>
+      </form>
+    </section>
+    <section class="help-center account-support"><div><p class="rewards-eyebrow">Soporte</p><h2>¿Necesitas hablar con nosotros?</h2><p>Explícanos qué necesitas y el equipo de Carobra revisará tu caso.</p></div><a href="mailto:soporte@carobra.mx">Contactar soporte</a></section>
   </main>
-
   <script>
-    import { loadClientDemoState, updateProfile } from "../../lib/client-demo-state";
-    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
-
-    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-    const root = requireElement<HTMLElement>("#profile-root");
-    const form = requireElement<HTMLFormElement>("#profile-form");
-    const feedback = requireElement<HTMLParagraphElement>("#profile-feedback");
-    const logoutButton = requireElement<HTMLButtonElement>("#logout");
-
-    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
-
-    const firstNameInput = requireElement<HTMLInputElement>("#firstName");
-    const lastNameInput = requireElement<HTMLInputElement>("#lastName");
-    const emailInput = requireElement<HTMLInputElement>("#email");
-    const phoneInput = requireElement<HTMLInputElement>("#phone");
-    const cityInput = requireElement<HTMLInputElement>("#city");
-
-    const summaryName = requireElement<HTMLElement>("#profile-summary-name");
-    const summaryEmail = requireElement<HTMLElement>("#profile-summary-email");
-    const summaryPhone = requireElement<HTMLElement>("#profile-summary-phone");
-    const summaryCity = requireElement<HTMLElement>("#profile-summary-city");
-
-    function render() {
-      const state = loadClientDemoState(user);
-
-      firstNameInput.value = state.profile.firstName;
-      lastNameInput.value = state.profile.lastName;
-      emailInput.value = state.profile.email;
-      phoneInput.value = state.profile.phone;
-      cityInput.value = state.profile.city;
-
-      summaryName.textContent = `${state.profile.firstName} ${state.profile.lastName}`;
-      summaryEmail.textContent = state.profile.email;
-      summaryPhone.textContent = state.profile.phone || "Pendiente";
-      summaryCity.textContent = state.profile.city || "Pendiente";
-    }
-
-    form.addEventListener("submit", (event) => {
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+    const form = requireElement<HTMLFormElement>("#preferences-form");
+    const feedback = requireElement<HTMLElement>("#preferences-feedback");
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      feedback.classList.remove("text-[#8a2f2f]");
-      feedback.classList.add("text-[#0c3d75]");
-
-      const firstName = firstNameInput.value.trim();
-      const lastName = lastNameInput.value.trim();
-      const phone = phoneInput.value.trim();
-      const city = cityInput.value.trim();
-
-      if (!firstName || !lastName) {
-        feedback.textContent = "Nombre y apellido son obligatorios.";
-        feedback.classList.remove("text-[#0c3d75]");
-        feedback.classList.add("text-[#8a2f2f]");
-        return;
-      }
-
-      updateProfile(user, {
-        firstName,
-        lastName,
-        phone,
-        city,
-      });
-
-      feedback.textContent = "Perfil actualizado correctamente.";
-      render();
+      const values = new FormData(form);
+      const response = await fetch("/api/v1/rewards/portal/preferences", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ activity_updates: values.has("activity_updates"), learning_updates: values.has("learning_updates"), product_updates: values.has("product_updates") }) });
+      feedback.textContent = response.ok ? "Preferencias guardadas." : "No pudimos guardar tus preferencias. Intenta de nuevo.";
     });
-
-    attachLogoutHandler(logoutButton, API_BASE_URL);
-
-    void (async () => {
-      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
-      render();
-    })();
   </script>
 </ClientShellLayout>

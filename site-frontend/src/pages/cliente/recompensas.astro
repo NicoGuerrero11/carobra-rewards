@@ -1,6 +1,7 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 import {
   levelLabel,
   type RewardsJourneySummary,
@@ -12,14 +13,6 @@ import {
 const user = Astro.locals.user;
 const eligibility = Astro.locals.rewardsEligibility;
 const cookie = Astro.request.headers.get("cookie") ?? "";
-
-interface ValidationStatusResponse {
-  status: string;
-  registered_at: string;
-  next_checkpoint: string | null;
-  next_checkpoint_at: string | null;
-  last_checked_at: string | null;
-}
 
 interface ActivityDetailsResponse {
   activities: Array<{
@@ -50,10 +43,11 @@ interface LegacyAccountSummary {
 }
 
 interface DisplayProduct {
-  provider: string;
   productType: string;
   status: RewardsV2ProductStatus;
   activatedAt: string | null;
+  guidance: string | null;
+  levelImpact: string | null;
 }
 
 interface DisplayMovement {
@@ -63,18 +57,18 @@ interface DisplayMovement {
 }
 
 let journey: RewardsJourneySummary | null = null;
-let validation: ValidationStatusResponse | null = null;
+let portal: RewardsCustomerPortal | null = null;
 let legacyAccount: LegacyAccountSummary | null = null;
 let activityDetails: ActivityDetailsResponse | null = null;
 let movementDetails: MovementDetailsResponse | null = null;
 let unavailable = false;
 
 try {
-  const [journeyResponse, validationResponse, activitiesResponse, movementsResponse] = await Promise.all([
+  const [journeyResponse, portalResponse, activitiesResponse, movementsResponse] = await Promise.all([
     fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, {
       headers: { cookie },
     }),
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/me/validation-status`, {
+    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
       headers: { cookie },
     }),
     fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/activities`, {
@@ -84,11 +78,11 @@ try {
       headers: { cookie },
     }),
   ]);
-  if (journeyResponse.status === 401 || validationResponse.status === 401) {
+  if (journeyResponse.status === 401 || portalResponse.status === 401) {
     return Astro.redirect("/login?error=unauthenticated");
   }
   if (journeyResponse.ok) journey = (await journeyResponse.json()) as RewardsJourneySummary;
-  if (validationResponse.ok) validation = (await validationResponse.json()) as ValidationStatusResponse;
+  if (portalResponse.ok) portal = (await portalResponse.json()) as RewardsCustomerPortal;
   if (activitiesResponse.ok) activityDetails = (await activitiesResponse.json()) as ActivityDetailsResponse;
   if (movementsResponse.ok) movementDetails = (await movementsResponse.json()) as MovementDetailsResponse;
   if (!journey && journeyResponse.status !== 404) unavailable = true;
@@ -114,28 +108,24 @@ if (!journey && eligibility?.eligible) {
 const derivedState: RewardsV2JourneyState = journey?.journey.state
   ?? (eligibility?.reason === "customer_inactive"
     ? "INACTIVE"
-    : validation?.status === "REQUIRES_ATTENTION"
-      ? "BLOCKED"
-      : eligibility?.eligible
-        ? "ACTIVE"
-        : "INVITED");
+    : eligibility?.eligible ? "ACTIVE" : "INVITED");
 const currentLevel: RewardsV2Level | null = journey?.journey.current_level ?? null;
-const validationStatus = journey?.journey.validation_status
-  ?? validation?.status
-  ?? eligibility?.sisca_validation_status
-  ?? "PENDING";
-const registeredAt = journey?.journey.registered_at ?? validation?.registered_at ?? null;
+const validationStatus = journey?.journey.validation_status ?? "PENDING";
+const registeredAt = journey?.journey.registered_at ?? null;
 const availablePoints = journey?.points.available ?? legacyAccount?.available_points ?? null;
 const reservedPoints = journey?.points.reserved ?? legacyAccount?.reserved_points ?? "0";
-const products: DisplayProduct[] = journey
-  ? journey.products.map((product) => ({
-      provider: product.provider,
+const products: DisplayProduct[] = portal
+  ? portal.products.map((product) => ({
       productType: product.product_type,
       status: product.status,
       activatedAt: product.activated_at,
+      guidance: product.guidance,
+      levelImpact: product.level_impact,
     }))
+  : journey
+  ? journey.products.map((product) => ({ productType: product.product_type, status: product.status, activatedAt: product.activated_at, guidance: null, levelImpact: null }))
   : eligibility?.afore_relation_status === "ACTIVE"
-    ? [{ provider: "SISCA", productType: "AFORE", status: "ACTIVE", activatedAt: null }]
+    ? [{ productType: "AFORE", status: "ACTIVE", activatedAt: null, guidance: null, levelImpact: null }]
     : [];
 const movements: DisplayMovement[] = movementDetails
   ? movementDetails.movements.map((movement) => ({
@@ -293,11 +283,23 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
           </article>
         </section>
 
+        {portal && (
+          <section class="primary-action-panel" aria-labelledby="primary-action-title">
+            <div class="primary-action-panel__number" aria-hidden="true">→</div>
+            <div>
+              <p class="rewards-eyebrow">Tu siguiente acción</p>
+              <h2 id="primary-action-title">{portal.primary_action.title}</h2>
+              <p>{portal.primary_action.description}</p>
+            </div>
+            {portal.primary_action.href && <a href={portal.primary_action.href}>Continuar</a>}
+          </section>
+        )}
+
         {(derivedState === "INVITED" || derivedState === "BLOCKED") && (
           <section class="validation-dashboard" aria-labelledby="validation-dashboard-title">
             <article class="validation-dashboard__status">
-              <p class="rewards-eyebrow">Validación SISCA</p>
-              <h2 id="validation-dashboard-title">Tu AFORE está siendo confirmada</h2>
+              <p class="rewards-eyebrow">Validación de producto</p>
+              <h2 id="validation-dashboard-title">Estamos confirmando tu primer producto</h2>
               <p>
                 Puedes entrar a Rewards y consultar tu saldo mientras esperamos la respuesta.
                 No necesitas repetir tu registro ni cargar información adicional.
@@ -333,7 +335,7 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
                 <span aria-hidden="true">01</span>
                 <div>
                   <strong>Validar tu primer producto</strong>
-                  <p>No necesitas hacer nada adicional mientras Carobra y SISCA completan la revisión.</p>
+                  <p>No necesitas hacer nada adicional mientras Carobra completa la revisión.</p>
                 </div>
               </div>
             ) : journey?.progress.rule_available ? (
@@ -363,7 +365,7 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
             <p class="rewards-card__message">
               Cuando haya cuestionarios, contenidos o documentos relevantes para ti, aparecerán aquí y podrás ver cómo contribuyen a tu avance.
             </p>
-            <span class="profile-status">Sin actividades pendientes por ahora</span>
+            <span class="profile-status">{portal?.actions.some((action) => action.status === "PENDING") ? "Tienes actividades disponibles" : "Sin actividades pendientes por ahora"}</span>
           </article>
         </section>
 
@@ -411,7 +413,8 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
                     <span class:list={["product-icon", `is-${product.status.toLowerCase()}`]} aria-hidden="true"></span>
                     <div>
                       <strong>{productName(product.productType)}</strong>
-                      <small>{product.provider}{product.activatedAt ? ` · Desde ${date(product.activatedAt)}` : ""}</small>
+                      <small>{product.activatedAt ? `Activo desde ${date(product.activatedAt)}` : "Información en actualización"}</small>
+                      {product.levelImpact && <p>{product.levelImpact}</p>}
                     </div>
                     <span class="status-pill">{productStatus(product.status)}</span>
                   </li>
@@ -492,6 +495,52 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
           </article>
         </section>
 
+        {portal && (
+          <section class="customer-center" aria-labelledby="customer-center-title">
+            <div class="section-intro">
+              <div><p class="rewards-eyebrow">Centro de actividad</p><h2 id="customer-center-title">Todo lo que puedes hacer desde Rewards</h2></div>
+              <p>Las actividades aparecen cuando están disponibles para tu cuenta. Nunca te pediremos repetir información sin una solicitud visible.</p>
+            </div>
+            <div class="customer-action-grid">
+              {portal.actions.length ? portal.actions.map((action) => (
+                <article>
+                  <span>{action.type === "QUESTIONNAIRE" ? "?" : action.type === "DOCUMENT" ? "↑" : "▶"}</span>
+                  <div><small>{action.status === "COMPLETED" ? "Completada" : "Disponible"}</small><h3>{action.title}</h3><p>{action.description}</p></div>
+                  {action.href && action.status === "PENDING" && <a href={action.href}>Abrir actividad</a>}
+                </article>
+              )) : (
+                <article class="is-empty"><span>✓</span><div><small>Al día</small><h3>No tienes actividades pendientes</h3><p>Te avisaremos aquí cuando exista un cuestionario, contenido o documento para ti.</p></div></article>
+              )}
+            </div>
+          </section>
+        )}
+
+        {portal && (
+          <section class="rewards-grid rewards-grid--detail">
+            <article id="documentos" class="rewards-card" aria-labelledby="documents-title">
+              <p class="rewards-eyebrow">Documentos</p><h2 id="documents-title">Solicitudes para tu cuenta</h2>
+              {portal.documents.requests.length ? (
+                <ul class="portal-simple-list">{portal.documents.requests.map((request) => (
+                  <li><div><strong>{request.title}</strong><p>{request.purpose}</p></div><span>{request.upload_available ? "Carga disponible" : "Te contactaremos"}</span></li>
+                ))}</ul>
+              ) : <div class="rewards-empty"><strong>No tienes documentos pendientes</strong><p>Si Carobra necesita algo, verás aquí el motivo y el estado de la solicitud.</p></div>}
+            </article>
+            <article class="rewards-card" aria-labelledby="timeline-title">
+              <p class="rewards-eyebrow">Historial</p><h2 id="timeline-title">Lo más reciente en tu cuenta</h2>
+              <ol class="customer-timeline">{portal.timeline.slice(0, 6).map((entry) => (
+                <li><span aria-hidden="true"></span><div><strong>{entry.title}</strong><p>{entry.description}</p><small>{date(entry.occurred_at)}</small></div></li>
+              ))}</ol>
+            </article>
+          </section>
+        )}
+
+        {portal && (
+          <section class="help-center" aria-labelledby="help-title">
+            <div><p class="rewards-eyebrow">Ayuda clara</p><h2 id="help-title">Entiende cómo funciona tu cuenta</h2></div>
+            <div>{portal.help.map((item) => <details><summary>{item.title}</summary><p>{item.body}</p></details>)}</div>
+          </section>
+        )}
+
         <section id="beneficios" class="benefits-shell" aria-labelledby="benefits-title">
           <div class="benefits-shell__header">
             <div>
@@ -499,7 +548,7 @@ const levelSequence: Array<{ code: RewardsV2Level; label: string }> = [
               <h2 id="benefits-title">Tu espacio para redimir</h2>
               <p>{hasValidatedProduct
                 ? "Tu producto ya cumple el requisito de acceso. El catálogo aparecerá aquí cuando la integración de beneficios esté habilitada."
-                : "Podrás redimir cuando SISCA confirme tu primer producto y el catálogo de beneficios esté habilitado."}</p>
+                : "Podrás redimir cuando Carobra confirme tu primer producto y el catálogo de beneficios esté habilitado."}</p>
             </div>
             <div class="benefits-shell__actions">
               <span class:list={["redemption-state", hasValidatedProduct && "is-ready"]}>
