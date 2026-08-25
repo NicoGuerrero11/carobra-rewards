@@ -38,11 +38,21 @@ The site backend MUST NOT duplicate these business rules.
 - **THEN** it calls the API instead of writing customer, consent, or SISCA
   validation records directly
 
-### Requirement: Site backend must act as a thin BFF
-The site backend SHALL provide web-facing routes for the site, call the API,
-handle browser cookie ergonomics, and translate API errors into stable
-site-facing errors. It MUST NOT own Rewards business state or direct database
-writes.
+### Requirement: Site backend must act as a thin V2-only BFF
+The site backend SHALL provide web-facing routes for the site, call the business
+application, handle browser cookie ergonomics, and translate errors into stable
+site-facing errors. For Rewards, it SHALL expose only the V2 journey and portal
+contracts and MUST NOT offer V1 rewards account or eligibility routes as an
+alternative.
+
+#### Scenario: Site requests rewards state
+- **WHEN** the frontend asks for the authenticated customer's rewards experience
+- **THEN** the site backend returns the V2 journey or portal contract without
+  consulting a V1 fallback
+
+#### Scenario: Legacy rewards route is requested
+- **WHEN** a browser requests a retired V1 rewards account or eligibility path
+- **THEN** the site backend returns not found
 
 #### Scenario: Site backend adapts an API error
 - **WHEN** the API rejects a registration request with a duplicate email or CURP
@@ -70,10 +80,22 @@ links MUST be removed or disabled unless a later change adds them explicitly.
 - **THEN** they are not offered Google OAuth as an enabled production auth path
   by this change
 
-### Requirement: Frontend forms must call the site backend rather than the API directly
+### Requirement: Frontend forms and rewards pages must call V2 site-backend contracts
 The site frontend SHALL submit registration, login, logout, profile, and
-validation-status requests to the site backend. Direct browser calls to the API
-MUST NOT be required for the normal site experience.
+validation-status requests through the site backend. Rewards pages SHALL consume
+only V2 journey and portal contracts. Direct browser calls to the API and
+fallback calls to V1 rewards contracts MUST NOT be required for the normal site
+experience.
+
+#### Scenario: Open Rewards with V2 state
+- **WHEN** an authenticated customer opens the rewards page
+- **THEN** the frontend renders points, level, eligibility, and actions
+  exclusively from V2 responses
+
+#### Scenario: V2 response is unavailable
+- **WHEN** the V2 journey cannot be loaded
+- **THEN** the frontend presents an unavailable or migration state and does not
+  request V1 data
 
 #### Scenario: Submit registration through site backend
 - **WHEN** a customer submits the registration form from the site frontend
@@ -84,3 +106,25 @@ MUST NOT be required for the normal site experience.
 - **WHEN** API base URL, cookie domain, or CORS settings change
 - **THEN** the site frontend does not need to encode business API details beyond
   its site backend endpoint contract
+
+### Requirement: Customer contracts must enforce provider abstraction
+The site backend SHALL translate internal product and validation evidence into
+provider-neutral customer contracts. Customer-facing endpoints and pages MUST
+NOT include provider, source, source ID, checkpoint, request ID, raw evidence,
+or internal integration error fields.
+
+#### Scenario: Customer portal serializes product detail
+- **WHEN** the site backend returns product detail to an authenticated customer
+- **THEN** the serialized response contains only customer-facing product type,
+  status, dates, impact, and guidance
+
+### Requirement: Internal and customer views must use separate projections
+The system SHALL preserve detailed provider evidence for authorized operations
+and audit views while exposing a separately validated customer projection.
+Hiding a field in CSS or omitting it only in one page MUST NOT be treated as
+sufficient redaction.
+
+#### Scenario: Operations investigates a validation case
+- **WHEN** an authorized operations user opens an internal case
+- **THEN** internal evidence remains available according to authorization while
+  the corresponding customer response remains provider-neutral

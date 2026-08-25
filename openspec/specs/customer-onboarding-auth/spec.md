@@ -48,16 +48,26 @@ site frontend also validates the form.
 - **THEN** the system rejects registration with an email-specific uniqueness
   outcome
 
-### Requirement: Completed registration must create the customer, consent, and validation atomically
+### Requirement: Completed registration must create the customer lifecycle atomically and establish V2 idempotently
 The system SHALL create the auth user, customer, terms consent record, and
-initial pending SISCA validation in one transaction when customer registration
-completes. If any required record cannot be created, the transaction MUST roll
-back completely.
+initial pending SISCA validation atomically when customer registration
+completes. The site Rewards flow SHALL establish a V2 `INVITED` journey and V2
+registration award idempotently and MUST retry that projection during the
+authenticated V2 read or backfill if its first attempt is temporarily
+unavailable. The operation MUST NOT create or select a V1 rewards model.
 
-#### Scenario: Registration creates validation lifecycle
+#### Scenario: Registration creates validation and Rewards V2 lifecycle
 - **WHEN** customer registration completes successfully
 - **THEN** the system persists an auth user, customer, accepted terms consent,
-  and a `PENDING` SISCA validation for the customer in the same transaction
+  `PENDING` SISCA validation and establishes a V2 invited journey with one
+  idempotent V2 registration award
+
+#### Scenario: Recover a temporarily unavailable V2 projection
+- **WHEN** customer identity registration commits but the first V2 projection
+  attempt is temporarily unavailable
+- **THEN** the next authenticated V2 journey read or environment backfill
+  establishes the same invited journey without using V1 or duplicating the
+  award
 
 #### Scenario: Roll back partial registration
 - **WHEN** customer creation, consent creation, or SISCA validation creation
@@ -110,3 +120,20 @@ technical exception details.
 - **WHEN** a request without a valid session asks for the customer profile or
   validation status
 - **THEN** the system rejects the request without returning customer data
+
+### Requirement: Customer status messaging must be provider-agnostic
+The authenticated customer experience SHALL describe validation and product
+status as Carobra-owned customer states. It MUST NOT display SISCA, provider
+names, evidence references, checkpoints, request identifiers, or raw
+integration errors on customer routes.
+
+#### Scenario: Customer waits for first-product validation
+- **WHEN** the customer authenticates while internal validation evidence is
+  pending
+- **THEN** the portal states that Carobra is validating the product and exposes
+  no internal provider or checkpoint terminology
+
+#### Scenario: Internal provider reports a technical failure
+- **WHEN** an internal validation request fails technically
+- **THEN** the customer receives a stable Carobra status or support message
+  without the provider name, raw failure, or retry implementation details
