@@ -13,6 +13,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY alembic.ini ./
 COPY README.md ./
 COPY alembic ./alembic
+COPY certs ./certs
 COPY src ./src
 RUN uv sync --frozen --no-dev
 

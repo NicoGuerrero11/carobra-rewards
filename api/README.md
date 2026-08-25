@@ -75,6 +75,10 @@ confirmado usa `POST /afore/ws/ws_datos_por_curp.php`, autenticación mediante
 `success/codigo/mensaje/data`. `SIN_INFORMACION` llega con HTTP 200. El registro
 más reciente usa `tipo_movimiento=TRASPASO`, `estatus=Certificado` y fecha
 `DD/MM/AAAA`. SISCA permite 60 solicitudes por minuto y reconsultas de una CURP.
+Actualmente su servidor omite el intermedio público `RapidSSL TLS RSA CA G1` de
+la cadena TLS. UAT carga la copia verificada incluida en `certs/` mediante
+`SISCA_CA_BUNDLE_PATH`; la verificación de hostname, vigencia y raíz permanece
+activa y nunca debe reemplazarse por `verify=false`.
 
 ### Railway UAT
 

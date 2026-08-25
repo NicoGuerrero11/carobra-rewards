@@ -89,3 +89,18 @@ def test_uat_http_configuration_requires_rewards_trace_identifier() -> None:
 
     with pytest.raises(ValueError, match="SISCA_TRACE_IDENTIFIER"):
         settings.validate_sisca_http_configuration()
+
+
+def test_uat_http_configuration_rejects_missing_custom_ca_file() -> None:
+    settings = Settings(
+        APP_ENV="uat",
+        SISCA_ADAPTER="http",
+        SISCA_BASE_URL="https://sisca.example.test",
+        SISCA_UAT_ALLOWED_HOSTS="sisca.example.test",
+        SISCA_UAT_API_TOKEN=SecretStr("uat-secret"),
+        SISCA_TRACE_IDENTIFIER="carobra-rewards-uat",
+        SISCA_CA_BUNDLE_PATH="/missing/ca.pem",
+    )
+
+    with pytest.raises(ValueError, match="readable CA certificate"):
+        settings.validate_sisca_http_configuration()

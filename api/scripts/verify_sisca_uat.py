@@ -56,6 +56,8 @@ async def _run_probe() -> tuple[dict[str, object], int]:
     if settings.app_env != "uat":
         raise ValueError("APP_ENV must be 'uat' for the UAT connectivity probe")
     settings.validate_sisca_http_configuration()
+    if settings.sisca_base_url is None:
+        raise ValueError("SISCA_BASE_URL must be configured for the UAT connectivity probe")
     if not curp:
         raise ValueError("SISCA_UAT_PROBE_CURP must contain a synthetic SISCA UAT CURP")
 
@@ -74,6 +76,7 @@ async def _run_probe() -> tuple[dict[str, object], int]:
         response_format=settings.sisca_response_format,
         trace_identifier=settings.sisca_trace_identifier,
         trace_identifier_header=settings.sisca_trace_identifier_header,
+        ca_bundle_path=settings.sisca_ca_bundle_path,
     )
     result = await gateway.query(
         SiscaValidationRequest(

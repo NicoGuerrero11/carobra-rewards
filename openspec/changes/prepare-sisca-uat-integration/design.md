@@ -61,6 +61,12 @@ operativo, presupuesto, mecanismo concreto de secretos, HTTPS, monitoreo,
 respaldos y reversión se registrarán antes del aprovisionamiento; la selección
 de Railway no autoriza todavía conexiones SISCA ni credenciales productivas.
 
+La prueba saliente detectó que el host de SISCA publica sólo el certificado
+leaf y omite el intermedio `RapidSSL TLS RSA CA G1`. Rewards incluye una copia
+pública obtenida de DigiCert y validada contra su huella SHA-256 publicada para
+completar la cadena en el cliente. No se deshabilita la validación TLS ni se
+confía en el certificado leaf de SISCA de forma directa.
+
 ### 3. UAT de Rewards prueba de forma controlada contra la API operativa de SISCA
 
 SISCA no ofrecerá inicialmente un runtime UAT separado. `api-uat` permanecerá

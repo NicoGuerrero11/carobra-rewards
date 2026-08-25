@@ -1,5 +1,6 @@
 from datetime import date
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -84,6 +85,10 @@ class Settings(BaseSettings):
         alias="SISCA_PRODUCTION_API_TOKEN",
     )
     sisca_uat_allowed_hosts: str = Field(default="", alias="SISCA_UAT_ALLOWED_HOSTS")
+    sisca_ca_bundle_path: str | None = Field(
+        default=None,
+        alias="SISCA_CA_BUNDLE_PATH",
+    )
     sisca_production_allowed_hosts: str = Field(
         default="",
         alias="SISCA_PRODUCTION_ALLOWED_HOSTS",
@@ -215,6 +220,8 @@ class Settings(BaseSettings):
             raise ValueError("An environment-specific SISCA authentication secret is required")
         if self.sisca_trace_identifier is None or not self.sisca_trace_identifier.strip():
             raise ValueError("SISCA_TRACE_IDENTIFIER must be configured for SISCA HTTP mode")
+        if self.sisca_ca_bundle_path is not None and not Path(self.sisca_ca_bundle_path).is_file():
+            raise ValueError("SISCA_CA_BUNDLE_PATH must reference a readable CA certificate file")
         _validate_http_header_name(self.sisca_api_key_header, key="SISCA_API_KEY_HEADER")
         _validate_http_header_name(
             self.sisca_trace_identifier_header,

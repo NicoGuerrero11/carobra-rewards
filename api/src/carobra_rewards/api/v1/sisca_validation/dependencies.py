@@ -91,6 +91,7 @@ def get_sisca_gateway(
         response_format=settings.sisca_response_format,
         trace_identifier=settings.sisca_trace_identifier,
         trace_identifier_header=settings.sisca_trace_identifier_header,
+        ca_bundle_path=settings.sisca_ca_bundle_path,
     )
 
 

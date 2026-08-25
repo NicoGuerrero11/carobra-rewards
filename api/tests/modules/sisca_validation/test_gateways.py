@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from carobra_rewards.modules.sisca_validation.domain.models import (
 )
 from carobra_rewards.modules.sisca_validation.infrastructure.gateways import (
     HttpSiscaValidationGateway,
+    _build_tls_context,
 )
 
 
@@ -206,6 +208,21 @@ async def test_http_gateway_classifies_timeout() -> None:
 
     assert isinstance(result, SiscaTechnicalFailure)
     assert result.category is TechnicalFailureCategory.TIMEOUT
+
+
+def test_tls_context_loads_the_verified_sisca_intermediate() -> None:
+    certificate = Path(__file__).parents[3] / "certs" / "RapidSSLTLSRSACAG1.pem"
+
+    context = _build_tls_context(str(certificate))
+    common_names = {
+        value
+        for item in context.get_ca_certs()
+        for attribute in item["subject"]
+        for key, value in attribute
+        if key == "commonName"
+    }
+
+    assert "RapidSSL TLS RSA CA G1" in common_names
 
 
 @pytest.mark.asyncio

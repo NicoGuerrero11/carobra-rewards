@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import ssl
 from datetime import date
 from time import monotonic
 from typing import Literal
@@ -46,6 +47,7 @@ class HttpSiscaValidationGateway:
         response_format: Literal["canonical", "business_envelope"] = "business_envelope",
         trace_identifier: str | None = None,
         trace_identifier_header: str = "X-Rewards-Id",
+        ca_bundle_path: str | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -57,6 +59,7 @@ class HttpSiscaValidationGateway:
         self._response_format = response_format
         self._trace_identifier = trace_identifier
         self._trace_identifier_header = trace_identifier_header
+        self._tls_context = _build_tls_context(ca_bundle_path)
         self._client = client
 
     async def query(self, request: SiscaValidationRequest) -> SiscaGatewayResult:
@@ -115,7 +118,7 @@ class HttpSiscaValidationGateway:
                 headers=headers,
                 timeout=self._timeout_seconds,
             )
-        async with httpx.AsyncClient(base_url=self._base_url) as client:
+        async with httpx.AsyncClient(base_url=self._base_url, verify=self._tls_context) as client:
             return await client.post(
                 self._validation_path,
                 json={"curp": request.curp},
@@ -236,3 +239,10 @@ def _malformed(http_status: int | None) -> SiscaTechnicalFailure:
         retryable=False,
         http_status=http_status,
     )
+
+
+def _build_tls_context(ca_bundle_path: str | None) -> ssl.SSLContext:
+    context = ssl.create_default_context()
+    if ca_bundle_path is not None:
+        context.load_verify_locations(cafile=ca_bundle_path)
+    return context
