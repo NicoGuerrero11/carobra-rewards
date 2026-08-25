@@ -89,7 +89,7 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
       const productEvidenceRule = await requireEnabledRule(
         client,
         "V2_SISCA_AFORE_ACTIVE",
-        command.validatedAfore.validatedAt,
+        receivedAt,
       );
       const productSourceId = normalizeSourceId(command.validatedAfore.sourceId);
       const existingEvent = (await client.query<{ product_fact_id: string }>(`
@@ -168,7 +168,7 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
       const productAwardRule = await requireEnabledRule(
         client,
         "V2_INITIAL_PRODUCT_ACTIVE",
-        command.validatedAfore.validatedAt,
+        receivedAt,
       );
       await this.issueV2Award(client, {
         accountId: journey.account_id,
@@ -185,7 +185,7 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
       const levelRule = await requireEnabledRule(
         client,
         "V2_FIRST_ACTIVE_PRODUCT_LEVEL",
-        command.validatedAfore.validatedAt,
+        receivedAt,
       );
       if (journey.current_level === null) {
         const decisionKey = `v2-first-active-product:${productSourceId}`;
@@ -235,10 +235,12 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
     client: PoolClient,
     command: EnsureInvitedJourneyCommand,
   ): Promise<AccountJourneyRow> {
+    const issuedAt = this.clock.now();
+    requireInstant("issuedAt", issuedAt);
     const rule = await requireEnabledRule(
       client,
       "V2_INVITED_REGISTRATION",
-      command.registeredAt,
+      issuedAt,
     );
     const proposedAccountId = this.generateId();
     await client.query(`
@@ -279,7 +281,7 @@ export class PostgresRewardsV2LiveJourney implements RewardsV2LiveJourneyPort {
       sourceId: `v2-invited-registration:${command.customerId}`,
       eventType: "V2_INVITED_REGISTRATION",
       occurredAt: command.registeredAt,
-      issuedAt: this.clock.now(),
+      issuedAt,
       safeMetadata: { journeyId: journey.journey_id },
     });
     return journey;
