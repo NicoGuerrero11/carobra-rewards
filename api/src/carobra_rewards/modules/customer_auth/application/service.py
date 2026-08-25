@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Protocol, cast
 from uuid import UUID, uuid4
@@ -42,10 +44,13 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.models i
 from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator import (
     TokenHexRewardsIdGenerator,
 )
-from carobra_rewards.modules.sisca_validation.domain.models import SiscaValidation
+from carobra_rewards.modules.sisca_validation.application.models import ValidationExecutionResult
+from carobra_rewards.modules.sisca_validation.domain.models import SiscaValidation, ValidationStatus
 from carobra_rewards.modules.sisca_validation.infrastructure.persistence.models import (
     SiscaValidationModel,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RewardsIdGenerator(Protocol):
@@ -53,6 +58,7 @@ class RewardsIdGenerator(Protocol):
 
 
 ValidationFactory = Callable[[UUID, datetime], SiscaValidation]
+InitialValidationCheck = Callable[[UUID], Awaitable[ValidationExecutionResult]]
 Clock = Callable[[], datetime]
 _MAX_REWARDS_ID_ATTEMPTS = 3
 
@@ -73,12 +79,14 @@ class CustomerAuthService:
         session_ttl: timedelta,
         rewards_id_generator: RewardsIdGenerator | None = None,
         validation_factory: ValidationFactory | None = None,
+        initial_validation_check: InitialValidationCheck | None = None,
         clock: Clock = utc_now,
     ) -> None:
         self._session_factory = session_factory
         self._session_ttl = session_ttl
         self._rewards_id_generator = rewards_id_generator or TokenHexRewardsIdGenerator()
         self._validation_factory = validation_factory or _create_validation
+        self._initial_validation_check = initial_validation_check
         self._clock = clock
 
     async def register(self, command: RegisterCustomerCommand) -> RegistrationResult:
@@ -89,9 +97,11 @@ class CustomerAuthService:
 
         now = self._clock().astimezone(UTC)
         password_hash = hash_password(command.password)
+        registration = None
         for attempt in range(_MAX_REWARDS_ID_ATTEMPTS):
             try:
-                return await self._register_once(command, now, password_hash)
+                registration = await self._register_once(command, now, password_hash)
+                break
             except IntegrityError as exc:
                 match _constraint_name(exc):
                     case "uq_auth_users_email":
@@ -105,7 +115,48 @@ class CustomerAuthService:
                         raise CustomerAuthPersistenceError() from exc
             except SQLAlchemyError as exc:
                 raise CustomerAuthPersistenceError() from exc
-        raise AssertionError("Rewards ID retry loop exited unexpectedly")
+        if registration is None:
+            raise AssertionError("Rewards ID retry loop exited unexpectedly")
+        return registration
+
+    async def run_initial_validation(
+        self,
+        registration: RegistrationResult,
+    ) -> RegistrationResult:
+        if self._initial_validation_check is None:
+            return registration
+        try:
+            execution = await self._initial_validation_check(registration.validation_id)
+        except Exception:
+            logger.exception(
+                "sisca_initial_validation_failed",
+                extra={
+                    "event": "sisca_initial_validation_failed",
+                    "validation_id": str(registration.validation_id),
+                },
+            )
+            return registration
+
+        customer_status = registration.customer.customer_status
+        if execution.status is ValidationStatus.VALIDATED:
+            customer_status = "ACTIVE"
+        elif execution.status is ValidationStatus.CANCELLED:
+            customer_status = "INACTIVE"
+        logger.info(
+            "sisca_initial_validation_completed",
+            extra={
+                "event": "sisca_initial_validation_completed",
+                "validation_id": str(registration.validation_id),
+                "status": execution.status.value,
+                "outcome": None if execution.outcome is None else execution.outcome.value,
+                "attempts": execution.attempts,
+            },
+        )
+        return replace(
+            registration,
+            customer=replace(registration.customer, customer_status=customer_status),
+            validation_status=execution.status.value,
+        )
 
     async def _register_once(
         self,

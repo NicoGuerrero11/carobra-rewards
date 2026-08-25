@@ -49,11 +49,16 @@ class FakeAuthService:
     error: Exception | None = None
     logout_token: str | None = None
     validated: bool = False
+    initial_validation_id: UUID | None = None
 
     async def register(self, command):
         if self.error:
             raise self.error
         return RegistrationResult(_profile(), VALIDATION_ID, "PENDING", NOW)
+
+    async def run_initial_validation(self, registration):
+        self.initial_validation_id = registration.validation_id
+        return registration
 
     async def login(self, command):
         if self.error:
@@ -130,6 +135,7 @@ def test_register_login_logout_me_and_validation_status_contract(
     assert registered.status_code == 201
     assert registered.json()["validation_status"] == "PENDING"
     assert registered.json()["registered_at"] == NOW.isoformat().replace("+00:00", "Z")
+    assert service.initial_validation_id == VALIDATION_ID
 
     logged_in = http.post(
         "/api/v1/auth/login",
