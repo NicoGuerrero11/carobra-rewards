@@ -33,7 +33,6 @@ interface ScenarioDefinition extends RewardsV2TestScenarioListItem {
   registrationMonths: number;
   qualifyingActivityCount: number;
   products: ReadonlyArray<{
-    provider: string;
     productType: string;
     status: RewardsProductFactStatus;
   }>;
@@ -42,10 +41,10 @@ interface ScenarioDefinition extends RewardsV2TestScenarioListItem {
 const scenarioNow = new Date("2026-08-24T12:00:00.000Z");
 const registrationAt = new Date("2026-01-24T12:00:00.000Z");
 const testExpiryAt = new Date("2027-07-24T12:00:00.000Z");
-const activeAfore = { provider: "SISCA", productType: "AFORE", status: "ACTIVE" as const };
-const activeSkandia = { provider: "SKANDIA", productType: "PPR", status: "ACTIVE" as const };
-const activeQualitas = { provider: "QUALITAS", productType: "AUTO_POLICY", status: "ACTIVE" as const };
-const activeAdditional = { provider: "CAROBRA", productType: "ADDITIONAL_PRODUCT", status: "ACTIVE" as const };
+const activeAfore = { productType: "AFORE", status: "ACTIVE" as const };
+const activeSkandia = { productType: "PPR", status: "ACTIVE" as const };
+const activeQualitas = { productType: "AUTO_POLICY", status: "ACTIVE" as const };
+const activeAdditional = { productType: "ADDITIONAL_PRODUCT", status: "ACTIVE" as const };
 
 const internalMatrix: RewardsLevelMatrix = {
   productThresholds: [
@@ -61,7 +60,7 @@ const internalMatrix: RewardsLevelMatrix = {
 };
 
 const scenarioDefinitions: readonly ScenarioDefinition[] = [
-  scenario("invited", "Invitado", "Registro completo; SISCA sigue pendiente.", {
+  scenario("invited", "Invitado", "Registro completo; el primer producto sigue en validación.", {
     journeyState: "INVITED",
     validationStatus: "PENDING",
     currentLevel: null,
@@ -198,7 +197,6 @@ function buildSummary(definition: ScenarioDefinition): RewardsJourneySummaryHttp
       remaining_qualifying_activities: evaluation.progress.remainingQualifyingActivities,
     },
     products: definition.products.map((product) => ({
-      provider: product.provider,
       product_type: product.productType,
       status: product.status,
       activated_at: product.status === "ACTIVE" ? scenarioNow.toISOString() : null,

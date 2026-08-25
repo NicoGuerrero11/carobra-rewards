@@ -6,6 +6,7 @@ import {
   createRewardsBehaviorHttpApplication,
   createReferralHttpApplication,
   createRewardsV2JourneyHttpApplication,
+  createRewardsCustomerPortalApplication,
 } from "./rewards/accounts/composition.js";
 
 const config = loadConfig();
@@ -19,6 +20,7 @@ const server = createSiteBackendServer(
     ? createReferralHttpApplication(database, config.referralIdentityHmacSecret)
     : undefined,
   database ? createRewardsV2JourneyHttpApplication(database) : undefined,
+  database ? createRewardsCustomerPortalApplication(database) : undefined,
 );
 if (database) {
   server.on("close", () => void database.end());

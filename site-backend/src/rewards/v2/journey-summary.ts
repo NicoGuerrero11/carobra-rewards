@@ -39,7 +39,6 @@ interface JourneyRow extends QueryResultRow {
 }
 
 interface ProductRow extends QueryResultRow {
-  provider: string;
   product_type: string;
   status: string;
   activated_at: Date | null;
@@ -93,7 +92,7 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
 
     const [productsResult, movementsResult, effectiveFlags] = await Promise.all([
       this.database.query<ProductRow>(`
-        SELECT provider, product_type, status, activated_at
+        SELECT product_type, status, activated_at
         FROM rewards_product_facts
         WHERE customer_id = $1
         ORDER BY updated_at DESC, id DESC
@@ -138,7 +137,6 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
         `, [row.account_id, now])).rows[0]?.expires_at ?? null
       : null;
     const products = productsResult.rows.map((product) => ({
-      provider: product.provider,
       product_type: product.product_type,
       status: requireProductFactStatus(product.status),
       activated_at: product.activated_at?.toISOString() ?? null,

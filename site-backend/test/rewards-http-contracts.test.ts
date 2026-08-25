@@ -18,6 +18,12 @@ import type {
   SiteActionHttpRequest,
 } from "../src/rewards/behaviors/http-application.js";
 import type { RewardsV2JourneyHttpApplication } from "../src/rewards/v2/journey-http-application.js";
+import type { RewardsCustomerPortalHttpResponse } from "../src/rewards/v2/customer-portal-contract.js";
+import type {
+  RewardsCustomerPortalApplication,
+  UpdateLearningProgressInput,
+  UpdatePreferencesInput,
+} from "../src/rewards/v2/customer-portal.js";
 import {
   assertRewardsJourneySummaryContract,
   type RewardsJourneySummaryHttpResponse,
@@ -157,6 +163,36 @@ test("authenticated V2 journey returns the real customer contract without test c
   assert.ok(testSummary);
   assert.deepEqual(contractKeys(testSummary), contractKeys(journey.summary));
   assert.doesNotMatch(JSON.stringify(journey.summary), /scenario|test[_-]?key|credential/i);
+});
+
+test("authenticated customer portal routes bind reads and commands to API session identity", async (t) => {
+  const upstream = await profileServer(t);
+  const portal = new StubCustomerPortalApplication();
+  const bff = await start(t, createSiteBackendServer(
+    config(upstream), undefined, undefined, undefined, undefined, undefined, portal,
+  ));
+  const headers = { cookie: "carobra_session=secret", "content-type": "application/json" };
+
+  const read = await fetch(`${bff}/api/v1/rewards/portal`, { headers });
+  assert.equal(read.status, 200);
+  assert.deepEqual(await read.json(), portal.response);
+  assert.equal(portal.customerId, customerId);
+
+  const preferences = await fetch(`${bff}/api/v1/rewards/portal/preferences`, {
+    method: "PATCH", headers, body: JSON.stringify({ activity_updates: false, learning_updates: true, product_updates: true }),
+  });
+  assert.equal(preferences.status, 200);
+  assert.equal(portal.preferencesCustomerId, customerId);
+
+  for (const [path, body] of [
+    ["notifications/read", { notification_id: "notice:registration:1" }],
+    ["actions/complete", { action_id: "00000000-0000-4000-8000-000000000801" }],
+    ["learning-progress", { assignment_id: "00000000-0000-4000-8000-000000000802", progress: 70 }],
+  ] as const) {
+    const response = await fetch(`${bff}/api/v1/rewards/portal/${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+    assert.equal(response.status, 200);
+  }
+  assert.deepEqual(portal.commandCustomerIds, [customerId, customerId, customerId]);
 });
 
 test("authenticated V2 detail routes expose bounded safe activity and ledger data", async (t) => {
@@ -360,7 +396,6 @@ class StubJourneyApplication implements RewardsV2JourneyHttpApplication {
       remaining_qualifying_activities: null,
     },
     products: [{
-      provider: "SISCA",
       product_type: "AFORE",
       status: "ACTIVE",
       activated_at: "2026-07-14T10:00:00.000Z",
@@ -401,6 +436,24 @@ class StubJourneyApplication implements RewardsV2JourneyHttpApplication {
     this.validationStatus = validationStatus;
     return this.summary;
   }
+}
+
+class StubCustomerPortalApplication implements RewardsCustomerPortalApplication {
+  customerId: string | undefined;
+  preferencesCustomerId: string | undefined;
+  commandCustomerIds: string[] = [];
+  readonly response: RewardsCustomerPortalHttpResponse = {
+    customer_id: customerId,
+    primary_action: { id: "journey:profile", type: "CONTENT", title: "Sigue construyendo tu perfil", description: "Aquí aparecerán actividades aprobadas para ti.", status: "INFORMATIONAL", href: null, approved_points: null },
+    actions: [], timeline: [], notifications: { unread_count: 0, items: [] }, products: [],
+    preferences: { activity_updates: true, learning_updates: true, product_updates: true, updated_at: null },
+    learning: { items: [] }, documents: { requests: [] }, help: [],
+  };
+  async getPortal(id: CustomerId) { this.customerId = id; return this.response; }
+  async updatePreferences(id: CustomerId, input: UpdatePreferencesInput) { this.preferencesCustomerId = id; return { ...input, updated_at: null }; }
+  async markNotificationRead(id: CustomerId) { this.commandCustomerIds.push(id); }
+  async completeAction(id: CustomerId) { this.commandCustomerIds.push(id); return true; }
+  async updateLearningProgress(id: CustomerId, _input: UpdateLearningProgressInput) { this.commandCustomerIds.push(id); return true; }
 }
 
 async function profileServer(t: TestContext): Promise<string> {

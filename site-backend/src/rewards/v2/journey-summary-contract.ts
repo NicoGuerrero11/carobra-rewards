@@ -29,7 +29,6 @@ export interface RewardsJourneySummaryHttpResponse {
     remaining_qualifying_activities: number | null;
   };
   products: ReadonlyArray<{
-    provider: string;
     product_type: string;
     status: RewardsProductFactStatus;
     activated_at: string | null;
@@ -57,6 +56,9 @@ export function assertRewardsJourneySummaryContract(
   }
   if (value.redemption.eligible && value.products.every((product) => product.status !== "ACTIVE")) {
     throw new Error("Journey summary cannot enable redemption without an active product");
+  }
+  if (/\bSISCA\b/i.test(JSON.stringify(value))) {
+    throw new Error("Journey summary cannot expose internal provider terminology");
   }
   return value;
 }

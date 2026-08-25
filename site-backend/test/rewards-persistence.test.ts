@@ -17,6 +17,7 @@ import { expectedRedemptionAssumptions } from "../src/database/migrations/016-ex
 import { rewardsJobManualRetries } from "../src/database/migrations/017-rewards-job-manual-retries.js";
 import { rewardsV2Foundation } from "../src/database/migrations/018-rewards-v2-foundation.js";
 import { rewardsV2LiveJourney } from "../src/database/migrations/019-rewards-v2-live-journey.js";
+import { rewardsCustomerPortal } from "../src/database/migrations/020-rewards-customer-portal.js";
 
 test("ledger foundation migration declares required tables and business constraints", () => {
   for (const table of [
@@ -289,4 +290,22 @@ test("Rewards V2 live journey links ledger awards to V2 rules without rewriting 
   assert.match(rewardsV2LiveJourney.up, /V2_FIRST_ACTIVE_PRODUCT_LEVEL/);
   assert.match(rewardsV2LiveJourney.up, /INTERNAL_TEST_ONLY/);
   assert.doesNotMatch(rewardsV2LiveJourney.up, /approved_for_production[\s\S]{0,120}true/);
+});
+
+test("customer portal persistence is account-scoped, constrained, and additive", () => {
+  for (const table of [
+    "rewards_customer_preferences",
+    "rewards_notification_reads",
+    "rewards_customer_actions",
+    "rewards_learning_assignments",
+    "rewards_document_requests",
+  ]) {
+    assert.match(rewardsCustomerPortal.up, new RegExp(`CREATE TABLE ${table}`));
+    assert.match(rewardsCustomerPortal.down, new RegExp(`DROP TABLE ${table}`));
+  }
+  assert.match(rewardsCustomerPortal.up, /PRIMARY KEY \(customer_id, notification_id\)/);
+  assert.match(rewardsCustomerPortal.up, /UNIQUE \(customer_id, action_code\)/);
+  assert.match(rewardsCustomerPortal.up, /progress BETWEEN 0 AND 100/);
+  assert.match(rewardsCustomerPortal.up, /max_size_bytes BETWEEN 1 AND 20971520/);
+  assert.doesNotMatch(rewardsCustomerPortal.up, /raw_evidence|provider|source_id|checkpoint/i);
 });
