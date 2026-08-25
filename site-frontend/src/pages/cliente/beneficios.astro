@@ -18,8 +18,8 @@ try {
   // The page keeps a truthful empty state when Rewards is temporarily unavailable.
 }
 
-const productValidated = journey?.journey.validation_status === "VALIDATED"
-  || eligibility?.sisca_validation_status === "VALIDATED";
+const productValidated = journey?.products.some((product) => product.status === "ACTIVE")
+  || eligibility?.afore_relation_status === "ACTIVE";
 const catalogEnabled = journey?.modules.benefits_enabled === true;
 const availablePoints = journey?.points.available;
 const points = availablePoints === undefined

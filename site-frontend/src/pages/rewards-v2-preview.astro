@@ -223,7 +223,7 @@ const statusMessage = summary?.journey.state === "INVITED"
                   {summary.products.map((product) => (
                     <li>
                       <span class:list={["status-dot", `is-${product.status.toLowerCase()}`]} aria-hidden="true"></span>
-                      <div><strong>{product.product_type.replaceAll("_", " ")}</strong><small>{product.provider}</small></div>
+                      <div><strong>{product.product_type.replaceAll("_", " ")}</strong><small>{product.status}</small></div>
                       <span class="status-pill">{product.status}</span>
                     </li>
                   ))}

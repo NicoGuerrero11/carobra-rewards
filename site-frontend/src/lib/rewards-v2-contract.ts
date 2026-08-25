@@ -33,7 +33,6 @@ export interface RewardsJourneySummary {
     remaining_qualifying_activities: number | null;
   };
   products: Array<{
-    provider: string;
     product_type: string;
     status: RewardsV2ProductStatus;
     activated_at: string | null;

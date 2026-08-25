@@ -13,8 +13,8 @@ try {
 } catch {
   // The page can still explain its unavailable state safely.
 }
-const productValidated = journey?.journey.validation_status === "VALIDATED"
-  || eligibility?.sisca_validation_status === "VALIDATED";
+const productValidated = journey?.products.some((product) => product.status === "ACTIVE")
+  || eligibility?.afore_relation_status === "ACTIVE";
 const catalogEnabled = journey?.modules.benefits_enabled === true;
 ---
 
