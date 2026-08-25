@@ -29,6 +29,8 @@ El merge de Rewards V2 dejó coexistiendo dos caminos de ejecución: V2 protegid
 
 4. **Backfill idempotente por evidencia.** Una herramienta recorrerá clientes sin journey, creará `INVITED` con referencia estable y, si existe evidencia SISCA validada, sincronizará el producto/nivel V2. Reejecutarla no duplicará premios. El reporte separará migrados, ya existentes y errores.
 
+   Para evidencia histórica, la regla V2 se selecciona con la fecha de procesamiento del backfill (cuando V2 ya está vigente), mientras `registered_at`, `occurred_at` y `validated_at` conservan sus fechas reales. Así no se aplica retroactivamente una regla antes de su vigencia ni se pierde la cronología original.
+
 5. **Promoción de ramas, separación de ambientes.** Se valida primero en `uat`; después el mismo commit funcional se promueve a `main`. Las URLs y `DATABASE_URL` continúan siendo configuración de Railway/Vercel, no lógica de negocio.
 
 ## Risks / Trade-offs
