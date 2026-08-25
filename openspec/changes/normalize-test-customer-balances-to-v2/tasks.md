@@ -12,5 +12,5 @@
 
 - [x] 3.1 Add unit coverage for dry-run, apply, replay, and unsafe-account behavior
 - [x] 3.2 Run backend tests and strict OpenSpec validation
-- [ ] 3.3 Deploy the change to UAT and production
-- [ ] 3.4 Dry-run, apply, and verify normalization in both current test populations
+- [x] 3.3 Deploy the change to UAT and production
+- [x] 3.4 Dry-run, apply, and verify normalization in both current test populations
