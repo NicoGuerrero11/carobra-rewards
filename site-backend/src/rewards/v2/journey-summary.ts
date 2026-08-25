@@ -108,6 +108,8 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
         LEFT JOIN behavior_rule_versions AS rule ON rule.id = entry.rule_version_id
         LEFT JOIN rewards_v2_rule_versions AS v2_rule ON v2_rule.id = entry.v2_rule_version_id
         WHERE entry.account_id = $1
+          AND entry.rule_version_id IS NULL
+          AND entry.reason_code IS DISTINCT FROM 'V2_TEST_BALANCE_NORMALIZATION'
         ORDER BY entry.created_at DESC, entry.id DESC
         LIMIT 8
       `, [row.account_id]),
