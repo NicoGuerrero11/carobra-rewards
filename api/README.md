@@ -69,26 +69,29 @@ uv run python scripts/verify_sisca_uat.py
 ```
 
 El comando imprime solo la clasificación de la respuesta, código HTTP y
-`X-Request-ID`; no expone CURP, tokens ni cuerpos de respuesta. La integración
-real queda pendiente de que SISCA entregue endpoint, header de API Key y
-especificación definitiva. SISCA confirmó preliminarmente respuestas
-`success/codigo/mensaje/data`, `SIN_INFORMACION` con HTTP 200, fechas
-`DD/MM/AAAA`, 60 solicitudes por minuto y reconsultas permitidas.
+`X-Request-Id`; no expone CURP, tokens ni cuerpos de respuesta. El contrato
+confirmado usa `POST /afore/ws/ws_datos_por_curp.php`, autenticación mediante
+`X-API-Key`, trazabilidad con `X-Rewards-Id` y `X-Request-Id`, y el sobre
+`success/codigo/mensaje/data`. `SIN_INFORMACION` llega con HTTP 200. El registro
+más reciente usa `tipo_movimiento=TRASPASO`, `estatus=Certificado` y fecha
+`DD/MM/AAAA`. SISCA permite 60 solicitudes por minuto y reconsultas de una CURP.
 
 ### Railway UAT
 
 El directorio contiene `Dockerfile` y `railway.toml`. Al crear el servicio
 Railway, selecciona `api/` como directorio raíz y configura las variables en el
 panel; el archivo ejecuta `alembic upgrade head` antes del despliegue y exige
-que `/health` responda correctamente. Hasta recibir y validar la especificación
-final de SISCA, mantén `SISCA_ADAPTER=simulated`. Railway Pro hospeda el runtime;
-una IP estática sólo se habilitará si SISCA la exige expresamente.
+que `/health` responda correctamente. Mantén `SISCA_ADAPTER=simulated` hasta
+cargar el secreto UAT por el mecanismo seguro. Railway Pro hospeda el runtime;
+la especificación final no exige una IP estática, VPN ni certificado de cliente.
 
 Para las pruebas controladas, usa `APP_ENV=uat`, `SISCA_UAT_API_TOKEN` y
 `SISCA_UAT_ALLOWED_HOSTS`; este último debe contener únicamente el host que
 SISCA autorice, aunque sea su servicio operativo. El runtime ignora
 `SISCA_API_TOKEN` en ese ambiente. `SISCA_AUTH_MODE`, `SISCA_API_KEY_HEADER` y
-`SISCA_RESPONSE_FORMAT` permiten ajustar el adaptador sin mezclar secretos.
+`SISCA_RESPONSE_FORMAT` permiten ajustar el adaptador sin mezclar secretos. Los
+catálogos de movimiento y estatus también son configurables y fallan de forma
+cerrada ante valores desconocidos.
 Los checkpoints acelerados quedan apagados por defecto y requieren
 `SISCA_UAT_CONTROL_ENABLED=true` más una lista de identificadores internos en
 `SISCA_UAT_AUTHORIZED_OPERATORS`.

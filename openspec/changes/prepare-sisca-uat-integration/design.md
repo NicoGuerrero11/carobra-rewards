@@ -54,9 +54,9 @@ mismo artefacto versionado. Cada servicio tendrá una configuración, dominio,
 base de datos, credenciales, secretos y registros propios. La API UAT será el
 entorno persistente de pruebas de integración y sólo usará datos sintéticos.
 
-La identidad de salida de red se configurará conforme a la especificación final
-de SISCA. No se activará una IPv4 estática, VPN o red privada por suposición; la
-API Key exclusiva es el mecanismo de autenticación confirmado hasta ahora. La región, propietario
+La especificación final de SISCA no exige allowlist de IP, VPN, red privada ni
+certificado de cliente. No se activará una IPv4 estática sin un requisito
+posterior por escrito; la API Key exclusiva es el mecanismo de autenticación. La región, propietario
 operativo, presupuesto, mecanismo concreto de secretos, HTTPS, monitoreo,
 respaldos y reversión se registrarán antes del aprovisionamiento; la selección
 de Railway no autoriza todavía conexiones SISCA ni credenciales productivas.
@@ -98,8 +98,8 @@ catálogo antes de multiplicarlas.
 
 - La elección de hosting puede demorar el inicio; se mitiga convirtiéndola en
   el primer punto de decisión y usando criterios de aceptación concretos.
-- SISCA puede agregar requisitos de red o cambiar el contrato preliminar; el
-  adaptador real no se activa hasta recibir la especificación final y probar conectividad.
+- SISCA puede agregar requisitos de red o cambiar el contrato confirmado; el
+  adaptador real sólo se activa con configuración versionada y conectividad probada.
 - Un atajo de tiempo mal protegido podría afectar producción; por ello el
   controlador acelerado será UAT-only, autorizado y auditado.
 - El volumen o los límites de SISCA pueden producir errores transitorios; los
@@ -129,10 +129,6 @@ previamente aprobado.
 
 ## Open Questions
 
-- ¿Qué plataforma, región y responsable operativo aprobará Rewards para UAT y
-  producción?
-- ¿SISCA exigirá además de API Key una IP fija, VPN o red privada?
-- ¿Qué URL, header de API Key y catálogo final de errores entregará SISCA?
 - ¿Quiénes estarán autorizados para ejecutar checkpoints acelerados?
 - ¿Qué canal seguro se usará para compartir endpoint, credenciales e IDs de
   los clientes sintéticos?

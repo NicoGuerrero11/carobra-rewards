@@ -71,7 +71,7 @@ class Settings(BaseSettings):
         alias="SISCA_TRACE_IDENTIFIER",
     )
     sisca_trace_identifier_header: str = Field(
-        default="X-Rewards-ID",
+        default="X-Rewards-Id",
         alias="SISCA_TRACE_IDENTIFIER_HEADER",
     )
     sisca_api_token: SecretStr | None = Field(default=None, alias="SISCA_API_TOKEN")
@@ -107,12 +107,24 @@ class Settings(BaseSettings):
     )
     sisca_max_retries: int = Field(default=2, ge=0, le=10, alias="SISCA_MAX_RETRIES")
     sisca_known_movement_types: str = Field(
-        default="Traspaso NAP,Registro NAP",
+        default="TRASPASO,Traspaso NAP,Registro NAP",
         alias="SISCA_KNOWN_MOVEMENT_TYPES",
     )
     sisca_allowed_movement_types: str = Field(
-        default="Traspaso NAP,Registro NAP",
+        default="TRASPASO",
         alias="SISCA_ALLOWED_MOVEMENT_TYPES",
+    )
+    sisca_validated_statuses: str = Field(
+        default="Certificado,Aceptada Procesar",
+        alias="SISCA_VALIDATED_STATUSES",
+    )
+    sisca_pending_statuses: str = Field(
+        default="Aceptada Operaciones",
+        alias="SISCA_PENDING_STATUSES",
+    )
+    sisca_cancelled_statuses: str = Field(
+        default="Cancelada",
+        alias="SISCA_CANCELLED_STATUSES",
     )
     sisca_minimum_transfer_date: date | None = Field(
         default=None,
@@ -137,6 +149,18 @@ class Settings(BaseSettings):
     @property
     def parsed_sisca_allowed_movement_types(self) -> frozenset[str]:
         return _parse_csv_set(self.sisca_allowed_movement_types)
+
+    @property
+    def parsed_sisca_validated_statuses(self) -> frozenset[str]:
+        return _parse_csv_set(self.sisca_validated_statuses)
+
+    @property
+    def parsed_sisca_pending_statuses(self) -> frozenset[str]:
+        return _parse_csv_set(self.sisca_pending_statuses, required=False)
+
+    @property
+    def parsed_sisca_cancelled_statuses(self) -> frozenset[str]:
+        return _parse_csv_set(self.sisca_cancelled_statuses, required=False)
 
     @property
     def parsed_sisca_uat_allowed_hosts(self) -> frozenset[str]:
@@ -189,10 +213,17 @@ class Settings(BaseSettings):
                 raise ValueError(f"SISCA_BASE_URL host is not approved by {allowed_hosts_key}")
         if self.active_sisca_api_token is None:
             raise ValueError("An environment-specific SISCA authentication secret is required")
+        if self.sisca_trace_identifier is None or not self.sisca_trace_identifier.strip():
+            raise ValueError("SISCA_TRACE_IDENTIFIER must be configured for SISCA HTTP mode")
         _validate_http_header_name(self.sisca_api_key_header, key="SISCA_API_KEY_HEADER")
         _validate_http_header_name(
             self.sisca_trace_identifier_header,
             key="SISCA_TRACE_IDENTIFIER_HEADER",
+        )
+        _validate_sisca_status_catalog(
+            validated=self.parsed_sisca_validated_statuses,
+            pending=self.parsed_sisca_pending_statuses,
+            cancelled=self.parsed_sisca_cancelled_statuses,
         )
 
     @property
@@ -221,6 +252,20 @@ def _parse_csv_set(value: str, *, required: bool = True) -> frozenset[str]:
     if required and not parsed:
         raise ValueError("SISCA movement type configuration cannot be empty")
     return parsed
+
+
+def _validate_sisca_status_catalog(
+    *,
+    validated: frozenset[str],
+    pending: frozenset[str],
+    cancelled: frozenset[str],
+) -> None:
+    normalized = [
+        {" ".join(value.strip().upper().split()) for value in category}
+        for category in (validated, pending, cancelled)
+    ]
+    if any(normalized[index] & normalized[other] for index in range(3) for other in range(index)):
+        raise ValueError("SISCA status categories must not overlap")
 
 
 def _validate_http_header_name(value: str, *, key: str) -> None:

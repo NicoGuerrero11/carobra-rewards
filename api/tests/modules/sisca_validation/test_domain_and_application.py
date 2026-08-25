@@ -199,6 +199,29 @@ def test_known_but_disallowed_movement_is_not_eligible() -> None:
     assert result.outcome is ValidationCheckOutcome.MATCH_NOT_ELIGIBLE
 
 
+def test_confirmed_sisca_certified_transfer_is_validated() -> None:
+    result = normalize_gateway_result(
+        FoundSiscaValidation("TRASPASO", "Certificado", date(2026, 8, 24)),
+        known_movement_types=frozenset({"TRASPASO"}),
+        allowed_movement_types=frozenset({"TRASPASO"}),
+        minimum_transfer_date=None,
+    )
+
+    assert result.outcome is ValidationCheckOutcome.MATCH_VALIDATED
+
+
+def test_unknown_confirmed_sisca_status_fails_closed() -> None:
+    result = normalize_gateway_result(
+        FoundSiscaValidation("TRASPASO", "Estatus nuevo", date(2026, 8, 24)),
+        known_movement_types=frozenset({"TRASPASO"}),
+        allowed_movement_types=frozenset({"TRASPASO"}),
+        minimum_transfer_date=None,
+    )
+
+    assert result.outcome is ValidationCheckOutcome.TECHNICAL_FAILURE
+    assert result.error_category is TechnicalFailureCategory.UNKNOWN_CATALOG
+
+
 @pytest.mark.asyncio
 async def test_validation_rejects_an_orphan_customer_without_calling_sisca() -> None:
     repo = FakeRepository()

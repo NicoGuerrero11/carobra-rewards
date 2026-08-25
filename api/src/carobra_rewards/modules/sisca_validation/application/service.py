@@ -25,6 +25,9 @@ from carobra_rewards.modules.sisca_validation.domain.models import (
     require_utc,
 )
 from carobra_rewards.modules.sisca_validation.domain.rules import (
+    DEFAULT_CANCELLED_STATUSES,
+    DEFAULT_PENDING_STATUSES,
+    DEFAULT_VALIDATED_STATUSES,
     normalize_catalog_value,
     normalize_gateway_result,
 )
@@ -48,6 +51,9 @@ class ExecuteSiscaValidationCheck:
         allowed_movement_types: frozenset[str],
         minimum_transfer_date: date | None,
         max_retries: int,
+        validated_statuses: frozenset[str] = DEFAULT_VALIDATED_STATUSES,
+        pending_statuses: frozenset[str] = DEFAULT_PENDING_STATUSES,
+        cancelled_statuses: frozenset[str] = DEFAULT_CANCELLED_STATUSES,
         clock=utc_now,
     ) -> None:
         self._unit_of_work = unit_of_work
@@ -60,6 +66,15 @@ class ExecuteSiscaValidationCheck:
         )
         self._minimum_transfer_date = minimum_transfer_date
         self._max_retries = max(0, max_retries)
+        self._validated_statuses = frozenset(
+            normalize_catalog_value(value) for value in validated_statuses
+        )
+        self._pending_statuses = frozenset(
+            normalize_catalog_value(value) for value in pending_statuses
+        )
+        self._cancelled_statuses = frozenset(
+            normalize_catalog_value(value) for value in cancelled_statuses
+        )
         self._clock = clock
 
     async def __call__(
@@ -124,6 +139,9 @@ class ExecuteSiscaValidationCheck:
                     known_movement_types=self._known_movement_types,
                     allowed_movement_types=self._allowed_movement_types,
                     minimum_transfer_date=self._minimum_transfer_date,
+                    validated_statuses=self._validated_statuses,
+                    pending_statuses=self._pending_statuses,
+                    cancelled_statuses=self._cancelled_statuses,
                 )
                 await uow.validations.add_check(
                     SiscaValidationCheck(

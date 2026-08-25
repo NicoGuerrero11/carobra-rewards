@@ -2,7 +2,7 @@
 
 - [x] 1.1 Definir con el equipo de Rewards dónde se alojarán la API UAT y la API de producción, comparando las opciones disponibles con los criterios del diseño.
 - [x] 1.2 Registrar la decisión de hosting con plataforma, región, responsables, presupuesto/propietario, base de datos, secretos, HTTPS, monitoreo, respaldos y reversión.
-- [ ] 1.3 Confirmar si SISCA exige allowlist de IP, VPN o red privada y, sólo en ese caso, definir la identidad de salida de UAT y producción que deberá autorizar.
+- [x] 1.3 Confirmar si SISCA exige allowlist de IP, VPN o red privada y, sólo en ese caso, definir la identidad de salida de UAT y producción que deberá autorizar.
 - [ ] 1.4 Aprobar los responsables autorizados para operar UAT, ejecutar checkpoints acelerados y aprobar el paso a producción.
 
 ## 2. Preparación de entornos y despliegue

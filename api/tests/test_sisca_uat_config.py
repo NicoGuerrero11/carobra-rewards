@@ -24,6 +24,7 @@ def test_uat_http_configuration_accepts_partner_production_host_with_test_secret
         SISCA_UAT_ALLOWED_HOSTS="sisca-production.example.test",
         SISCA_API_TOKEN=SecretStr("must-not-be-used"),
         SISCA_UAT_API_TOKEN=SecretStr("uat-secret"),
+        SISCA_TRACE_IDENTIFIER="carobra-rewards-uat",
     )
 
     settings.validate_sisca_http_configuration()
@@ -51,3 +52,40 @@ def test_uat_http_configuration_requires_https_and_a_test_secret() -> None:
         insecure.validate_sisca_http_configuration()
     with pytest.raises(ValueError, match="authentication secret"):
         without_secret.validate_sisca_http_configuration()
+
+
+def test_uat_http_configuration_rejects_overlapping_status_categories() -> None:
+    settings = Settings(
+        APP_ENV="uat",
+        SISCA_ADAPTER="http",
+        SISCA_BASE_URL="https://sisca.example.test",
+        SISCA_UAT_ALLOWED_HOSTS="sisca.example.test",
+        SISCA_UAT_API_TOKEN=SecretStr("uat-secret"),
+        SISCA_TRACE_IDENTIFIER="carobra-rewards-uat",
+        SISCA_VALIDATED_STATUSES="Certificado",
+        SISCA_PENDING_STATUSES=" certificado ",
+    )
+
+    with pytest.raises(ValueError, match="must not overlap"):
+        settings.validate_sisca_http_configuration()
+
+
+def test_confirmed_sisca_catalog_is_available_by_default() -> None:
+    settings = Settings()
+
+    assert "TRASPASO" in settings.parsed_sisca_known_movement_types
+    assert "TRASPASO" in settings.parsed_sisca_allowed_movement_types
+    assert "Certificado" in settings.parsed_sisca_validated_statuses
+
+
+def test_uat_http_configuration_requires_rewards_trace_identifier() -> None:
+    settings = Settings(
+        APP_ENV="uat",
+        SISCA_ADAPTER="http",
+        SISCA_BASE_URL="https://sisca.example.test",
+        SISCA_UAT_ALLOWED_HOSTS="sisca.example.test",
+        SISCA_UAT_API_TOKEN=SecretStr("uat-secret"),
+    )
+
+    with pytest.raises(ValueError, match="SISCA_TRACE_IDENTIFIER"):
+        settings.validate_sisca_http_configuration()

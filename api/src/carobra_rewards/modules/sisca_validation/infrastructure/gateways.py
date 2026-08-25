@@ -45,7 +45,7 @@ class HttpSiscaValidationGateway:
         api_key_header: str = "X-API-Key",
         response_format: Literal["canonical", "business_envelope"] = "business_envelope",
         trace_identifier: str | None = None,
-        trace_identifier_header: str = "X-Rewards-ID",
+        trace_identifier_header: str = "X-Rewards-Id",
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -98,7 +98,7 @@ class HttpSiscaValidationGateway:
         headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "X-Request-ID": str(request.request_id),
+            "X-Request-Id": str(request.request_id),
             "X-Requested-At": request.requested_at.isoformat(),
         }
         if self._api_token is not None:

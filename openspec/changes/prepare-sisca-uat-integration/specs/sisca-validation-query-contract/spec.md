@@ -17,18 +17,33 @@ without exposing secret values.
 
 ### Requirement: The adapter must support the confirmed SISCA business envelope
 
-Rewards SHALL normalize the preliminary SISCA envelope containing `success`,
+Rewards SHALL normalize the confirmed SISCA envelope containing `success`,
 `codigo`, `mensaje` and `data`. HTTP 200 with `codigo=SIN_INFORMACION` and null
 data SHALL map to no information rather than technical failure. `codigo=OK`
-SHALL require one object with movement, status and transfer date. A list or
-ambiguous record set MUST fail closed until SISCA returns one deterministic
-latest record.
+SHALL require one object with `tipo_movimiento`, `estatus` and
+`fecha_traspaso`; `TRASPASO` with `Certificado` SHALL be a validated match. A
+list, unknown catalog value or ambiguous record set MUST fail closed. The UAT
+contract uses `POST /afore/ws/ws_datos_por_curp.php`, `X-API-Key`,
+`X-Rewards-Id` and `X-Request-Id`.
 
 #### Scenario: SISCA has no information for a test CURP
 
 - **WHEN** SISCA returns HTTP 200, `codigo=SIN_INFORMACION` and null data
 - **THEN** Rewards records the ordinary no-information outcome
 - **AND** does not classify the response as a connection or server failure
+
+#### Scenario: SISCA returns its confirmed certified transfer
+
+- **WHEN** SISCA returns HTTP 200, `codigo=OK`, `tipo_movimiento=TRASPASO` and
+  `estatus=Certificado` with a valid `DD/MM/YYYY` transfer date
+- **THEN** Rewards records the ordinary validated-match outcome
+
+#### Scenario: SISCA rejects or throttles a request
+
+- **WHEN** SISCA returns one of the documented HTTP 400, 401, 405, 429 or 500
+  error envelopes
+- **THEN** Rewards classifies it as a safe technical outcome without persisting
+  the response body, API Key or CURP in logs
 
 ### Requirement: UAT smoke must prove outbound correlation safely
 

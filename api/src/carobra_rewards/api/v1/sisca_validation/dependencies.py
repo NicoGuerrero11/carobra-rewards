@@ -105,6 +105,9 @@ def get_execute_validation_check(
         allowed_movement_types=settings.parsed_sisca_allowed_movement_types,
         minimum_transfer_date=settings.sisca_minimum_transfer_date,
         max_retries=settings.sisca_max_retries,
+        validated_statuses=settings.parsed_sisca_validated_statuses,
+        pending_statuses=settings.parsed_sisca_pending_statuses,
+        cancelled_statuses=settings.parsed_sisca_cancelled_statuses,
     )
 
 

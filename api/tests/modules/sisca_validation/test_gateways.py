@@ -47,7 +47,7 @@ async def _query(
             api_key_header="X-SISCA-API-Key",
             response_format=response_format,
             trace_identifier=trace_identifier,
-            trace_identifier_header="X-Rewards-ID",
+            trace_identifier_header="X-Rewards-Id",
             client=client,
         )
         return await gateway.query(_request())
@@ -100,7 +100,7 @@ async def test_http_gateway_keeps_no_information_distinct() -> None:
 
 
 @pytest.mark.asyncio
-async def test_http_gateway_supports_preliminary_sisca_business_envelope() -> None:
+async def test_http_gateway_supports_confirmed_sisca_business_envelope() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["x-sisca-api-key"] == "secret-token"
         assert request.headers["x-rewards-id"] == "rewards-integration"
@@ -112,9 +112,9 @@ async def test_http_gateway_supports_preliminary_sisca_business_envelope() -> No
                 "codigo": "OK",
                 "mensaje": "Consulta realizada correctamente",
                 "data": {
-                    "tipo_movimiento": "Traspaso NAP",
-                    "estatus": "ACEPTADA PROCESAR",
-                    "fecha_traspaso": "02/07/2026",
+                    "tipo_movimiento": "TRASPASO",
+                    "estatus": "Certificado",
+                    "fecha_traspaso": "24/08/2026",
                 },
             },
         )
@@ -127,7 +127,9 @@ async def test_http_gateway_supports_preliminary_sisca_business_envelope() -> No
     )
 
     assert isinstance(result, FoundSiscaValidation)
-    assert result.transfer_date.isoformat() == "2026-07-02"
+    assert result.movement_type == "TRASPASO"
+    assert result.sf_status == "Certificado"
+    assert result.transfer_date.isoformat() == "2026-08-24"
 
 
 @pytest.mark.asyncio
@@ -179,8 +181,11 @@ async def test_http_gateway_rejects_multiple_sisca_records() -> None:
 @pytest.mark.parametrize(
     ("status", "category", "retryable"),
     [
+        (400, TechnicalFailureCategory.MALFORMED_RESPONSE, False),
         (401, TechnicalFailureCategory.AUTHENTICATION, False),
+        (405, TechnicalFailureCategory.MALFORMED_RESPONSE, False),
         (429, TechnicalFailureCategory.RATE_LIMIT, True),
+        (500, TechnicalFailureCategory.SERVER, True),
         (503, TechnicalFailureCategory.SERVER, True),
     ],
 )
