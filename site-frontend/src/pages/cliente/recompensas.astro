@@ -45,29 +45,32 @@ interface DisplayMovement {
   occurredAt: string;
 }
 
-let journey: RewardsJourneySummary | null = null;
-let portal: RewardsCustomerPortal | null = null;
-let activityDetails: ActivityDetailsResponse | null = null;
-let movementDetails: MovementDetailsResponse | null = null;
-let unavailable = false;
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let journey: RewardsJourneySummary | null = portal?.journey ?? null;
+let activityDetails: ActivityDetailsResponse | null = portal?.activity_details ?? null;
+let movementDetails: MovementDetailsResponse | null = portal?.movement_details ?? null;
+let unavailable = portalLoadedWithContext && !portal;
 
-try {
-  const portalResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
-    headers: { cookie },
-  });
-  if (portalResponse.status === 401) {
-    return Astro.redirect("/login?error=unauthenticated");
-  }
-  if (portalResponse.ok) {
-    portal = (await portalResponse.json()) as RewardsCustomerPortal;
-    journey = portal.journey;
-    activityDetails = portal.activity_details;
-    movementDetails = portal.movement_details;
-  } else {
+if (!portalLoadedWithContext) {
+  try {
+    const portalResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
+      headers: { cookie },
+    });
+    if (portalResponse.status === 401) {
+      return Astro.redirect("/login?error=unauthenticated");
+    }
+    if (portalResponse.ok) {
+      portal = (await portalResponse.json()) as RewardsCustomerPortal;
+      journey = portal.journey;
+      activityDetails = portal.activity_details;
+      movementDetails = portal.movement_details;
+    } else {
+      unavailable = true;
+    }
+  } catch {
     unavailable = true;
   }
-} catch {
-  unavailable = true;
 }
 
 const derivedState: RewardsV2JourneyState = journey?.journey.state

@@ -110,6 +110,23 @@ async function routeRequest(
     if (method === "GET" && path === "/api/v1/me/validation-status") {
       return sendApiResult(response, await client.getValidationStatus(cookie), config);
     }
+    if (method === "GET" && path === "/api/v1/rewards/customer-context") {
+      const context = await client.getAuthenticatedCustomerContext(cookie);
+      const customerPortal = await loadCustomerPortalSafely(
+        rewardsCustomerPortalApplication,
+        rewardsV2JourneyApplication,
+        context.data.evidence,
+      );
+      return sendApiResult(response, {
+        status: 200,
+        data: {
+          customer: context.data.customer,
+          validation: { status: context.data.validation.status },
+          portal: customerPortal,
+        },
+        setCookies: context.setCookies,
+      }, config);
+    }
     if (method === "GET" && path === "/api/v1/rewards/journey") {
       if (!rewardsV2JourneyApplication) {
         throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
@@ -289,6 +306,32 @@ async function routeRequest(
     sendJson(response, 503, {
       error: { code: "api_unavailable", message: "The API is unavailable" },
     });
+  }
+}
+
+async function loadCustomerPortalSafely(
+  portal: RewardsCustomerPortalApplication | undefined,
+  journey: RewardsV2JourneyHttpApplication | undefined,
+  evidence: {
+    customer_id: string;
+    registered_at: string;
+    validation_status: string;
+    product_evidence: null | { source_id: string; validated_at: string };
+  },
+) {
+  if (!portal) return null;
+  try {
+    if (journey) await synchronizeJourneyEvidence(journey, evidence);
+    return await portal.getPortal(
+      asCustomerId(evidence.customer_id),
+      evidence.validation_status,
+    );
+  } catch (error: unknown) {
+    console.error(JSON.stringify({
+      event: "rewards_customer_context_unavailable",
+      error_name: error instanceof Error ? error.name : "UnknownError",
+    }));
+    return null;
   }
 }
 

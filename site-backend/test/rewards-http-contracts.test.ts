@@ -124,6 +124,17 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   ));
   const headers = { cookie: "carobra_session=secret", "content-type": "application/json" };
 
+  const contextRead = await fetch(`${bff}/api/v1/rewards/customer-context`, { headers });
+  assert.equal(contextRead.status, 200);
+  const context = await contextRead.json() as {
+    customer: { id: string };
+    validation: { status: string };
+    portal: RewardsCustomerPortalHttpResponse;
+  };
+  assert.equal(context.customer.id, customerId);
+  assert.deepEqual(context.validation, { status: "VALIDATED" });
+  assert.deepEqual(context.portal, portal.response);
+
   const read = await fetch(`${bff}/api/v1/rewards/portal`, { headers });
   assert.equal(read.status, 200);
   assert.deepEqual(await read.json(), portal.response);
@@ -155,6 +166,24 @@ test("authenticated customer portal routes bind reads and commands to API sessio
     assert.equal(response.status, 200);
   }
   assert.deepEqual(portal.commandCustomerIds, [customerId, customerId, customerId]);
+});
+
+test("customer context preserves authentication when the Rewards portal is unavailable", async (t) => {
+  const upstream = await profileServer(t);
+  const portal = new StubCustomerPortalApplication();
+  portal.failReads = true;
+  const bff = await start(t, createSiteBackendServer(
+    config(upstream), undefined, undefined, undefined, new StubJourneyApplication(), portal,
+  ));
+
+  const response = await fetch(`${bff}/api/v1/rewards/customer-context`, {
+    headers: { cookie: "carobra_session=secret" },
+  });
+
+  assert.equal(response.status, 200);
+  const context = await response.json() as { customer: { id: string }; portal: unknown };
+  assert.equal(context.customer.id, customerId);
+  assert.equal(context.portal, null);
 });
 
 test("authenticated V2 detail routes expose bounded safe activity and ledger data", async (t) => {
@@ -362,6 +391,7 @@ class StubCustomerPortalApplication implements RewardsCustomerPortalApplication 
   customerId: string | undefined;
   preferencesCustomerId: string | undefined;
   commandCustomerIds: string[] = [];
+  failReads = false;
   readonly response: RewardsCustomerPortalHttpResponse = {
     customer_id: customerId,
     journey: new StubJourneyApplication().summary,
@@ -372,7 +402,11 @@ class StubCustomerPortalApplication implements RewardsCustomerPortalApplication 
     preferences: { activity_updates: true, learning_updates: true, product_updates: true, updated_at: null },
     learning: { items: [] }, documents: { requests: [] }, help: [],
   };
-  async getPortal(id: CustomerId) { this.customerId = id; return this.response; }
+  async getPortal(id: CustomerId) {
+    this.customerId = id;
+    if (this.failReads) throw new Error("simulated portal failure");
+    return this.response;
+  }
   async updatePreferences(id: CustomerId, input: UpdatePreferencesInput) { this.preferencesCustomerId = id; return { ...input, updated_at: null }; }
   async markNotificationRead(id: CustomerId) { this.commandCustomerIds.push(id); }
   async completeAction(id: CustomerId) { this.commandCustomerIds.push(id); return true; }

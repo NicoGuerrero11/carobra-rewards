@@ -3,12 +3,15 @@ import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let portal: RewardsCustomerPortal | null = null;
-try {
-  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
-  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-} catch {}
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+if (!portalLoadedWithContext) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  } catch {}
+}
 const notifications = portal?.notifications.items ?? [];
 const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
 ---

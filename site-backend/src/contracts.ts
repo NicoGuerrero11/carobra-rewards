@@ -78,6 +78,12 @@ export interface RewardsIdentityEvidence {
   product_evidence: ValidationStatusResponse["product_evidence"];
 }
 
+export interface AuthenticatedCustomerContext {
+  customer: CustomerProfile;
+  validation: ValidationStatusResponse;
+  evidence: RewardsIdentityEvidence;
+}
+
 export type SiteErrorCode =
   | "duplicate_email"
   | "duplicate_curp"

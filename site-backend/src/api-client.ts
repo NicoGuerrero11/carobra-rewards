@@ -1,5 +1,6 @@
 import type { SiteBackendConfig } from "./config.js";
 import type {
+  AuthenticatedCustomerContext,
   CustomerProfile,
   LoginRequest,
   LoginResponse,
@@ -67,6 +68,17 @@ export class RewardsApiClient {
   async getRewardsIdentityEvidence(
     cookieHeader: string | undefined,
   ): Promise<ApiResult<RewardsIdentityEvidence>> {
+    const context = await this.getAuthenticatedCustomerContext(cookieHeader);
+    return {
+      status: context.status,
+      data: context.data.evidence,
+      setCookies: context.setCookies,
+    };
+  }
+
+  async getAuthenticatedCustomerContext(
+    cookieHeader: string | undefined,
+  ): Promise<ApiResult<AuthenticatedCustomerContext>> {
     const [profile, validation] = await Promise.all([
       this.getCurrentCustomer(cookieHeader),
       this.getValidationStatus(cookieHeader),
@@ -77,13 +89,17 @@ export class RewardsApiClient {
     return {
       status: 200,
       data: {
-        customer_id: profile.data.id,
-        customer_status: profile.data.customer_status,
-        validation_id: validation.data.validation_id,
-        validation_status: validation.data.status,
-        registered_at: validation.data.registered_at,
-        validated_at: validation.data.validated_at,
-        product_evidence: validation.data.product_evidence,
+        customer: profile.data,
+        validation: validation.data,
+        evidence: {
+          customer_id: profile.data.id,
+          customer_status: profile.data.customer_status,
+          validation_id: validation.data.validation_id,
+          validation_status: validation.data.status,
+          registered_at: validation.data.registered_at,
+          validated_at: validation.data.validated_at,
+          product_evidence: validation.data.product_evidence,
+        },
       },
       setCookies: [...profile.setCookies, ...validation.setCookies],
     };

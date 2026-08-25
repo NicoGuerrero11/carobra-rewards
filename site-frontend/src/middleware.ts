@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 
 import { getSiteBackendBaseUrl } from "./lib/api";
+import type { RewardsCustomerPortal } from "./lib/rewards-customer-portal-contract";
 
 const authPages = new Set(["/login", "/registro"]);
 const e2eBypassAuth =
@@ -52,6 +53,24 @@ interface ValidationStatusResponse {
   status: string;
 }
 
+interface CustomerContextResponse {
+  customer: CustomerProfileResponse;
+  validation: ValidationStatusResponse;
+  portal: RewardsCustomerPortal | null;
+}
+
+function mapCustomer(customer: CustomerProfileResponse) {
+  return {
+    id: customer.id,
+    firstName: customer.first_name,
+    lastName: customer.last_name,
+    email: customer.email,
+    rewardsId: customer.rewards_id,
+    customerStatus: customer.customer_status,
+    onboardingStatus: customer.onboarding_status,
+  };
+}
+
 async function fetchSession(cookieHeader: string | null) {
   if (!cookieHeader) {
     return null;
@@ -67,15 +86,25 @@ async function fetchSession(cookieHeader: string | null) {
       return null;
     }
 
-    const customer = (await response.json()) as CustomerProfileResponse;
+    return mapCustomer((await response.json()) as CustomerProfileResponse);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchCustomerContext(cookieHeader: string | null) {
+  if (!cookieHeader) return null;
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/customer-context`, {
+      method: "GET",
+      headers: { cookie: cookieHeader },
+    });
+    if (!response.ok) return null;
+    const context = (await response.json()) as CustomerContextResponse;
     return {
-      id: customer.id,
-      firstName: customer.first_name,
-      lastName: customer.last_name,
-      email: customer.email,
-      rewardsId: customer.rewards_id,
-      customerStatus: customer.customer_status,
-      onboardingStatus: customer.onboarding_status,
+      user: mapCustomer(context.customer),
+      validation: context.validation,
+      portal: context.portal,
     };
   } catch {
     return null;
@@ -124,12 +153,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
     context.request.headers.get(e2eUserRoleHeader)?.toLowerCase() !== "none";
   const cookieHeader = context.request.headers.get("cookie");
   const authContextStartedAt = performance.now();
+  const customerContext = !bypassRequested && isProtected
+    ? await fetchCustomerContext(cookieHeader)
+    : null;
   const [user, validation] = bypassRequested
     ? [e2eClientUser, null] as const
-    : await Promise.all([
-        fetchSession(cookieHeader),
-        isProtected ? fetchValidationStatus(cookieHeader) : Promise.resolve(null),
-      ]);
+    : customerContext
+      ? [customerContext.user, customerContext.validation] as const
+      : await Promise.all([
+          fetchSession(cookieHeader),
+          isProtected ? fetchValidationStatus(cookieHeader) : Promise.resolve(null),
+        ]);
   const authContextDuration = performance.now() - authContextStartedAt;
 
   if (isAuthPage && user) {
@@ -143,6 +177,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   context.locals.user = user;
+  if (customerContext) context.locals.rewardsPortal = customerContext.portal;
   const bypassRole = context.request.headers.get(e2eUserRoleHeader)?.toLowerCase();
   const validated = validation?.status === "VALIDATED";
   const rewardsEligibility: RewardsEligibilityResponse | null = bypassRequested

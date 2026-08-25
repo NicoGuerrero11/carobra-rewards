@@ -5,13 +5,16 @@ import type { RewardsJourneySummary } from "../../lib/rewards-v2-contract";
 
 const eligibility = Astro.locals.rewardsEligibility;
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let journey: RewardsJourneySummary | null = null;
-try {
-  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, { headers: { cookie } });
-  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-  if (response.ok) journey = (await response.json()) as RewardsJourneySummary;
-} catch {
-  // The page can still explain its unavailable state safely.
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let journey: RewardsJourneySummary | null = Astro.locals.rewardsPortal?.journey ?? null;
+if (!portalLoadedWithContext) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) journey = (await response.json()) as RewardsJourneySummary;
+  } catch {
+    // The page can still explain its unavailable state safely.
+  }
 }
 const productValidated = journey?.products.some((product) => product.status === "ACTIVE")
   || eligibility?.afore_relation_status === "ACTIVE";

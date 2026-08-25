@@ -156,6 +156,17 @@ const server = createServer(async (request, response) => {
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
+  if (method === "GET" && path === "/api/v1/rewards/customer-context") {
+    const authenticated = authenticatedProfile(request);
+    return authenticated
+      ? json(response, 200, {
+          customer: authenticated,
+          validation: { status: validationFor(authenticated).status },
+          portal: portalFor(authenticated),
+        })
+      : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
   if (method === "GET" && path === "/api/v1/rewards/journey") {
     const authenticated = authenticatedProfile(request);
     return authenticated

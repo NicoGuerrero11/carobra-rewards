@@ -110,3 +110,20 @@ test("portal persistence commands are replay-safe and always constrain customer 
   assert.match(calls[3]!.text, /WHERE customer_id = \$1 AND id = \$2/);
   assert.match(calls[3]!.text, /GREATEST\(progress, \$3\) = 100/);
 });
+
+test("portal level history reads the canonical reason_code column", async () => {
+  const queries: string[] = [];
+  const database = {
+    async query<TRow extends QueryResultRow>(text: string): Promise<QueryResult<TRow>> {
+      queries.push(text);
+      return { command: "SELECT", rowCount: 0, oid: 0, fields: [], rows: [] };
+    },
+  };
+
+  await new PostgresRewardsCustomerPortalStore(database).load(customerId);
+
+  const levelQuery = queries.find((query) => query.includes("FROM rewards_level_decisions"));
+  assert.ok(levelQuery);
+  assert.match(levelQuery, /decision\.reason_code AS reason/);
+  assert.doesNotMatch(levelQuery, /decision\.reason(?:\s|,)/);
+});

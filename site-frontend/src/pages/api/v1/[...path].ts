@@ -11,6 +11,7 @@ const allowedPaths = new Set([
   "rewards/journey",
   "rewards/activities",
   "rewards/movements",
+  "rewards/customer-context",
   "rewards/portal",
   "rewards/portal/preferences",
   "rewards/portal/notifications/read",

@@ -168,7 +168,8 @@ export class PostgresRewardsCustomerPortalStore implements RewardsCustomerPortal
         ORDER BY (status = 'REQUESTED') DESC, created_at DESC, id DESC LIMIT 20
       `, [customerId]),
       this.database.query<LevelRow>(`
-        SELECT decision.id::text, decision.resulting_level, decision.reason, decision.decided_at
+        SELECT decision.id::text, decision.resulting_level,
+          decision.reason_code AS reason, decision.decided_at
         FROM rewards_level_decisions AS decision
         JOIN rewards_v2_journeys AS journey ON journey.id = decision.journey_id
         WHERE journey.customer_id = $1
