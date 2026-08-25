@@ -12,7 +12,7 @@
 - [ ] 2.3 Configurar endpoint, autenticación, timeout, reintentos y catálogo SISCA de UAT mediante el mecanismo aprobado de secretos.
 - [x] 2.4 Implementar validaciones que impidan usar un endpoint SISCA productivo o secretos productivos desde UAT.
 - [x] 2.5 Automatizar el despliegue de la API y las migraciones para que UAT y producción usen el mismo artefacto versionado.
-- [ ] 2.6 Verificar salud, migraciones, HTTPS, registros seguros y conectividad saliente desde UAT antes de solicitar acceso a SISCA.
+- [x] 2.6 Verificar salud, migraciones, HTTPS, registros seguros y conectividad saliente desde UAT antes de solicitar acceso a SISCA.
 
 ## 3. Ejecución controlada de validaciones UAT
 
