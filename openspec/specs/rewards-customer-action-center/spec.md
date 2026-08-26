@@ -10,8 +10,10 @@ portal.
 ### Requirement: The portal must provide one truthful next action
 The system SHALL select a customer-safe primary action from the authenticated
 journey, configured activity assignments, document requests, and learning
-assignments. It MUST NOT promise points, level advancement, or completion credit
-unless an active approved rule provides that outcome.
+assignments. The Rewards home SHALL present that selection as its single
+dominant action and MUST NOT repeat the same assignment in another full action
+module on the same page. It MUST NOT promise points, level advancement, or
+completion credit unless an active approved rule provides that outcome.
 
 #### Scenario: Invited customer has no assigned activity
 - **WHEN** an invited customer opens Rewards while product validation remains
@@ -21,8 +23,13 @@ unless an active approved rule provides that outcome.
 
 #### Scenario: Customer has an assigned questionnaire
 - **WHEN** an authenticated customer has a pending configured questionnaire
-- **THEN** the portal presents the questionnaire as the primary actionable item
-  with its approved status and no invented point value
+- **THEN** the portal presents the questionnaire once as the primary actionable
+  item with its approved status and no invented point value
+
+#### Scenario: Customer needs additional action detail
+- **WHEN** the customer follows the primary action from Rewards home
+- **THEN** the site routes to the focused authenticated destination or section
+  that owns the assignment
 
 ### Requirement: Customer activities must have real assignment and completion state
 The system SHALL expose questionnaires, content, and document requests only from
