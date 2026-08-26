@@ -1,0 +1,65 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import { levelLabel } from "../../lib/rewards-v2-contract";
+
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+const journey = portal?.journey;
+const activities = portal?.activity_details.activities ?? [];
+const qualifyingActivities = activities.filter((activity) => activity.qualifies).length;
+const pendingActions = portal?.actions.filter((action) => action.status === "PENDING") ?? [];
+const positiveMovements = portal?.movement_details.movements.filter((movement) => BigInt(movement.points_delta) > 0n) ?? [];
+const targetLevel = journey?.progress.target_level ? levelLabel(journey.progress.target_level) : null;
+const registeredAt = journey?.journey.registered_at ? new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(journey.journey.registered_at)) : null;
+const actionHref = (href: string | null) => href?.startsWith("#") ? null : href;
+---
+
+<ClientShellLayout title="Ganar puntos | Carobra Rewards" description="Consulta tus formas confirmadas de avanzar y ganar puntos." currentPath="/cliente/ganar-puntos" sectionLabel="Ganar puntos">
+  <main class="portal-page earn-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Tu avance Rewards</p><h1>Ganar puntos</h1><p>Consulta las actividades y señales reales que construyen tu perfil, sin promesas pendientes de aprobación.</p></div><span>{pendingActions.length} {pendingActions.length === 1 ? "acción pendiente" : "acciones pendientes"}</span></header>
+
+    {unavailable && !portal ? (
+      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos actualizar tu avance</h2><p>Intenta de nuevo en unos minutos. No mostraremos metas o puntos estimados.</p></div></section>
+    ) : portal && (
+      <>
+        <section class="earn-hero" aria-labelledby="earn-title">
+          <div><p class="portal-eyebrow">Tu perfil</p><h2 id="earn-title">Cada acción confirmada cuenta.</h2><p>{journey?.journey.state === "INVITED" || journey?.journey.state === "BLOCKED" ? "Estamos confirmando tu primer producto. Mientras tanto, puedes consultar las actividades que Carobra asigne a tu cuenta." : targetLevel ? `Tu avance actual se dirige a ${targetLevel}. Solo mostraremos requisitos concretos cuando la regla esté disponible.` : "Aquí verás las acciones confirmadas para tu cuenta y su efecto aprobado."}</p></div>
+          <div class="earn-hero__stats"><article><strong>{activities.length}</strong><span>{activities.length === 1 ? "actividad registrada" : "actividades registradas"}</span></article><article><strong>{qualifyingActivities}</strong><span>{qualifyingActivities === 1 ? "actividad aporta a tu perfil" : "actividades aportan a tu perfil"}</span></article><article><strong>{positiveMovements.length}</strong><span>{positiveMovements.length === 1 ? "movimiento positivo" : "movimientos positivos"}</span></article></div>
+        </section>
+
+        <section class="portal-section" aria-labelledby="earning-paths-title">
+          <div class="portal-section-heading"><div><p class="portal-eyebrow">Formas de avanzar</p><h2 id="earning-paths-title">Lo que podemos confirmar hoy</h2></div><p>Los valores y requisitos aparecen únicamente cuando existe una regla activa.</p></div>
+          <div class="earning-paths">
+            <article><span>01</span><div><small>Perfilamiento</small><h3>Actividades asignadas</h3><p>Cuestionarios, contenidos o documentos aparecerán cuando correspondan a tu perfil.</p></div><strong>{activities.length ? `${activities.length} ${activities.length === 1 ? "registrada" : "registradas"}` : "Sin actividades registradas"}</strong></article>
+            <article><span>02</span><div><small>Permanencia</small><h3>Tu relación en el tiempo</h3><p>{registeredAt ? `Tu cuenta Rewards está registrada desde ${registeredAt}.` : "La fecha de inicio aparecerá cuando esté disponible."}</p></div><strong>{journey?.progress.rule_available ? "Regla disponible" : "Meta en actualización"}</strong></article>
+            <article><span>03</span><div><small>Productos</small><h3>Relación confirmada</h3><p>Los productos activos pueden influir en tu nivel cuando la regla vigente así lo determine.</p></div><a href="/cliente/productos">Ver mis productos →</a></article>
+            <article><span>04</span><div><small>Renovaciones</small><h3>Disponibilidad futura</h3><p>No mostraremos puntos o fechas de renovación hasta que la función esté aprobada para tu cuenta.</p></div><strong>{journey?.modules.renewals_enabled ? "Función habilitada" : "En preparación"}</strong></article>
+          </div>
+        </section>
+
+        <section class="portal-grid earn-page__detail">
+          <article class="portal-card" aria-labelledby="assigned-actions-title"><p class="portal-eyebrow">Acciones</p><h2 id="assigned-actions-title">Qué puedes hacer ahora</h2>{pendingActions.length ? <ul class="earn-actions">{pendingActions.map((action) => <li><div><strong>{action.title}</strong><p>{action.description}</p>{action.approved_points && <small>{action.approved_points} puntos aprobados</small>}</div>{actionHref(action.href) && <a href={actionHref(action.href)!}>Abrir</a>}</li>)}</ul> : <div class="earn-empty"><strong>Estás al día</strong><p>No hay actividades pendientes en este momento.</p></div>}</article>
+          <article class="portal-card portal-card--dark" aria-labelledby="earning-rules-title"><p class="portal-eyebrow">Reglas claras</p><h2 id="earning-rules-title">Sin cifras inventadas</h2><p>{journey?.progress.rule_available ? "Tu cuenta ya tiene requisitos concretos disponibles; consulta el resumen de avance para verlos." : "Los límites, puntos por acción y requisitos pendientes aparecerán solo cuando estén aprobados y disponibles para tu cuenta."}</p><a class="portal-text-link" href="/cliente/recompensas">Volver a mi resumen</a></article>
+        </section>
+      </>
+    )}
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+  <style>
+    .earn-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(18rem,.7fr);align-items:center;gap:2rem;min-height:21rem;padding:clamp(1.6rem,4vw,3rem);border-radius:2rem;background:radial-gradient(circle at 88% 10%,rgba(255,214,129,.6),transparent 12rem),linear-gradient(140deg,#eee8ff,#dff7f1);box-shadow:0 22px 48px rgba(69,73,126,.13)}.earn-hero h2{margin:.35rem 0 .8rem;font-size:clamp(2.5rem,5vw,4.5rem);line-height:.94;letter-spacing:-.05em}.earn-hero>div>p:not(.portal-eyebrow){max-width:42rem;margin:0;color:#5b778e;line-height:1.65}.earn-hero__stats{display:grid;gap:.65rem}.earn-hero__stats article{display:flex;align-items:center;gap:.8rem;padding:.9rem 1rem;border-radius:1rem;background:rgba(255,255,255,.8)}.earn-hero__stats strong{min-width:2.5rem;color:#6754a6;font-size:1.5rem}.earn-hero__stats span{color:#526f87;font-size:.82rem;font-weight:750}.earning-paths{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-top:1.4rem}.earning-paths article{min-height:15rem;display:flex;flex-direction:column;padding:1.15rem;border-radius:1rem;background:rgba(255,255,255,.85)}.earning-paths article:nth-child(1){background:#eee8ff}.earning-paths article:nth-child(2){background:#fff0ce}.earning-paths article:nth-child(3){background:#dff7f1}.earning-paths article:nth-child(4){background:#e2f3ff}.earning-paths article>span{color:#39809c;font-size:.7rem;font-weight:900}.earning-paths article>div{margin-top:1rem}.earning-paths small{color:#3d7c9c;font-size:.67rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.earning-paths h3{margin:.3rem 0;color:#173f68;font-size:1.2rem}.earning-paths p{margin:0;color:#607990;font-size:.84rem;line-height:1.55}.earning-paths article>strong,.earning-paths article>a{margin-top:auto;padding-top:1rem;color:#176f9e;font-size:.76rem;font-weight:900}.earn-actions{margin:1rem 0 0;padding:0;list-style:none}.earn-actions li{display:flex;justify-content:space-between;gap:1rem;padding:1rem 0;border-bottom:1px solid #e2eaf0}.earn-actions li:last-child{border:0}.earn-actions p{margin:.25rem 0;color:#607990;font-size:.84rem}.earn-actions small{color:#26769e;font-weight:800}.earn-actions a{align-self:center;color:#176f9e;font-weight:900}.earn-empty{margin-top:1rem;padding:1rem;border-radius:.9rem;background:#f3f7fa}.earn-empty p{margin:.25rem 0 0;color:#607990}.earn-page__detail{align-items:stretch}@media(max-width:900px){.earning-paths{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.earn-hero{grid-template-columns:1fr;min-height:auto;padding:1.35rem;border-radius:1.3rem}.earning-paths{grid-template-columns:1fr}.earn-actions li{flex-direction:column}.earn-actions a{align-self:flex-start}}
+  </style>
+</ClientShellLayout>

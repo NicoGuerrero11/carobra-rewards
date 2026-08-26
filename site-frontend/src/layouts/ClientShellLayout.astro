@@ -2,9 +2,11 @@
 import BaseLayout from "./BaseLayout.astro";
 
 interface NavItem {
-  id: "rewards" | "prizes" | "courses" | "giftCards";
+  id: "home" | "benefits" | "earn" | "products" | "activity";
   label: string;
   href: string;
+  activePaths: string[];
+  icon: string;
 }
 
 interface Props {
@@ -22,14 +24,15 @@ const {
 } = Astro.props as Props;
 
 const navItems: NavItem[] = [
-  { id: "rewards", label: "Rewards", href: "/cliente/recompensas" },
-  { id: "prizes", label: "Recompensas", href: "/cliente/beneficios" },
-  { id: "courses", label: "Cursos", href: "/cliente/cursos" },
-  { id: "giftCards", label: "Gift Cards", href: "/cliente/gift-cards" },
+  { id: "home", label: "Inicio", href: "/cliente/recompensas", activePaths: ["/cliente/recompensas"], icon: "⌂" },
+  { id: "benefits", label: "Beneficios", href: "/cliente/beneficios", activePaths: ["/cliente/beneficios", "/cliente/gift-cards", "/cliente/cursos"], icon: "✦" },
+  { id: "earn", label: "Ganar puntos", href: "/cliente/ganar-puntos", activePaths: ["/cliente/ganar-puntos"], icon: "+" },
+  { id: "products", label: "Productos", href: "/cliente/productos", activePaths: ["/cliente/productos"], icon: "◇" },
+  { id: "activity", label: "Actividad", href: "/cliente/activities", activePaths: ["/cliente/activities"], icon: "↻" },
 ];
 
 function isActive(item: NavItem) {
-  return currentPath.startsWith(item.href);
+  return item.activePaths.some((path) => currentPath === path || currentPath.startsWith(`${path}/`));
 }
 ---
 
@@ -65,10 +68,12 @@ function isActive(item: NavItem) {
             navItems.map((item) =>
               isActive(item) ? (
                 <span class:list={["client-shell__nav-link", "is-active"]} aria-current="page">
+                  <span class="client-shell__nav-icon" aria-hidden="true">{item.icon}</span>
                   <span>{item.label}</span>
                 </span>
               ) : (
                 <a href={item.href} class="client-shell__nav-link">
+                  <span class="client-shell__nav-icon" aria-hidden="true">{item.icon}</span>
                   <span>{item.label}</span>
                 </a>
               ),
@@ -115,10 +120,12 @@ function isActive(item: NavItem) {
             navItems.map((item) =>
               isActive(item) ? (
                 <span class:list={["client-shell__mobile-link", "is-active"]} aria-current="page">
+                  <span class="client-shell__nav-icon" aria-hidden="true">{item.icon}</span>
                   <span>{item.label}</span>
                 </span>
               ) : (
                 <a href={item.href} class="client-shell__mobile-link">
+                  <span class="client-shell__nav-icon" aria-hidden="true">{item.icon}</span>
                   <span>{item.label}</span>
                 </a>
               ),

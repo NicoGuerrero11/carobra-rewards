@@ -1,55 +1,61 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
-import type { RewardsJourneySummary } from "../../lib/rewards-v2-contract";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 
-const eligibility = Astro.locals.rewardsEligibility;
 const cookie = Astro.request.headers.get("cookie") ?? "";
 const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
-let journey: RewardsJourneySummary | null = Astro.locals.rewardsPortal?.journey ?? null;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let unavailable = portalLoadedWithContext && !portal;
+
 if (!portalLoadedWithContext) {
   try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, { headers: { cookie } });
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
     if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-    if (response.ok) journey = (await response.json()) as RewardsJourneySummary;
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+    else unavailable = true;
   } catch {
-    // The page can still explain its unavailable state safely.
+    unavailable = true;
   }
 }
-const productValidated = journey?.products.some((product) => product.status === "ACTIVE")
-  || eligibility?.afore_relation_status === "ACTIVE";
+const journey = portal?.journey;
+const productValidated = portal?.products.some((product) => product.status === "ACTIVE") ?? false;
 const catalogEnabled = journey?.modules.benefits_enabled === true;
+const balance = journey ? new Intl.NumberFormat("es-MX").format(BigInt(journey.points.available)) : "—";
 ---
 
-<ClientShellLayout title="Gift Cards | Carobra Rewards" description="Espacio de Gift Cards de Carobra Rewards." currentPath="/cliente/gift-cards" sectionLabel="Gift Cards">
+<ClientShellLayout title="Gift Cards | Beneficios Carobra" description="Consulta la disponibilidad de Gift Cards dentro de tus beneficios." currentPath="/cliente/gift-cards" sectionLabel="Beneficios · Gift Cards">
   <main class="portal-page">
-    <header class="portal-welcome">
-      <div><p class="portal-eyebrow">Carobra Rewards</p><h1>Gift Cards</h1><p>Este será el espacio para descubrir opciones y usar tus puntos de forma segura.</p></div>
-      <span>{catalogEnabled ? "Catálogo disponible" : "Catálogo en preparación"}</span>
-    </header>
+    <a class="giftcards-back" href="/cliente/beneficios"><span aria-hidden="true">←</span> Volver a Beneficios</a>
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Beneficios · Gift Cards</p><h1>Gift Cards</h1><p>Consulta el estado de esta categoría y los requisitos visibles de tu cuenta.</p></div><span>{catalogEnabled ? "Categoría disponible" : "Categoría en preparación"}</span></header>
 
-    <section class="giftcards-hero" aria-labelledby="giftcards-title">
-      <div><p class="portal-eyebrow">Beneficios y redenciones</p><h2 id="giftcards-title">Aquí estará tu sección de Gift Cards</h2><p>{catalogEnabled
-        ? "Tu catálogo ya está disponible para consulta."
-        : productValidated
-          ? "Tu producto ya fue validado. La estructura está lista y el catálogo aparecerá cuando la integración de beneficios sea habilitada."
-          : "Puedes conocer esta sección durante la validación. El canje requerirá un producto activo y un catálogo de beneficios habilitado."}</p><span class:list={["giftcards-access", productValidated && "is-validated"]}>{productValidated ? "Producto validado" : "Pendiente de validar producto"}</span></div>
-      <div class="giftcards-balance-card"><span aria-hidden="true">✦</span><p>Uso de puntos</p><strong>{catalogEnabled ? "Disponible" : "Aún no disponible"}</strong><small>No mostraremos opciones ni costos hasta recibirlos de la integración.</small></div>
-    </section>
+    {unavailable && !portal ? (
+      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos consultar esta categoría</h2><p>Intenta de nuevo en unos minutos. No se habilitará ningún canje sin información confirmada.</p></div></section>
+    ) : portal && (
+      <>
+        <section class="giftcards-hero" aria-labelledby="giftcards-title">
+          <div><p class="portal-eyebrow">Estado de acceso</p><h2 id="giftcards-title">{catalogEnabled ? "Tus opciones están listas para consultar" : "Esta categoría aún no está habilitada"}</h2><p>{catalogEnabled ? "Aquí verás únicamente las opciones y condiciones aprobadas para tu cuenta." : productValidated ? "Tu producto ya está confirmado y tu cuenta está preparada. Falta habilitar el catálogo antes de mostrar opciones o permitir canjes." : "Primero necesitamos confirmar un producto activo y después contar con un catálogo habilitado. Puedes seguir consultando tu avance mientras tanto."}</p><span class:list={["giftcards-access", productValidated && "is-validated"]}>{productValidated ? "Producto confirmado" : "Producto pendiente"}</span></div>
+          <article class="giftcards-balance-card"><span aria-hidden="true">✦</span><p>Saldo disponible</p><strong>{balance} pts</strong><small>{catalogEnabled ? "Revisa cada opción antes de confirmar." : "Tu saldo se conserva; el canje no está disponible todavía."}</small></article>
+        </section>
 
-    <section class="portal-section" aria-labelledby="giftcards-flow-title">
-      <div class="portal-section-heading"><div><p class="portal-eyebrow">Experiencia preparada</p><h2 id="giftcards-flow-title">Así se organizará la sección</h2></div><p>Sin inventar marcas, precios, vigencias ni recompensas.</p></div>
-      <div class="giftcards-flow-grid">
-        <article><span>01</span><h3>Explorar catálogo</h3><p>Las opciones disponibles llegarán desde la integración de beneficios.</p><small>Pendiente de contenido</small></article>
-        <article><span>02</span><h3>Revisar detalle</h3><p>Cada opción mostrará puntos, condiciones y vigencia antes de confirmar.</p><small>Pendiente de contenido</small></article>
-        <article><span>03</span><h3>Redimir con seguridad</h3><p>El cliente confirmará el canje y podrá consultar su resultado e historial.</p><small>Flujo aún deshabilitado</small></article>
-      </div>
-    </section>
+        <section class="portal-section" aria-labelledby="giftcards-requirements-title">
+          <div class="portal-section-heading"><div><p class="portal-eyebrow">Antes de canjear</p><h2 id="giftcards-requirements-title">Qué necesita esta categoría</h2></div><p>Solo avanzamos cuando cada condición está confirmada por el sistema.</p></div>
+          <div class="giftcards-flow-grid">
+            <article><span>01</span><h3>Producto confirmado</h3><p>Tu cuenta debe tener al menos un producto activo visible.</p><small>{productValidated ? "Listo" : "Pendiente"}</small></article>
+            <article><span>02</span><h3>Catálogo habilitado</h3><p>Las opciones, costos y condiciones deben llegar aprobadas.</p><small>{catalogEnabled ? "Listo" : "En preparación"}</small></article>
+            <article><span>03</span><h3>Confirmación segura</h3><p>Antes de usar puntos podrás revisar el detalle completo del canje.</p><small>{catalogEnabled ? "Consulta disponible" : "Flujo deshabilitado"}</small></article>
+          </div>
+        </section>
 
-    <section class="portal-card portal-empty-state"><span aria-hidden="true">◇</span><div><p class="portal-eyebrow">Catálogo</p><h2>No hay Gift Cards publicadas todavía</h2><p>Este estado cambiará únicamente cuando Bonda y el equipo definan el contenido y habiliten la integración.</p></div></section>
+        {!catalogEnabled && <section class="portal-card portal-empty-state"><span aria-hidden="true">◇</span><div><p class="portal-eyebrow">Sin catálogo publicado</p><h2>No hay Gift Cards disponibles todavía</h2><p>Mientras tanto puedes explorar otros beneficios o revisar cómo avanzar en Rewards.</p><div class="giftcards-next"><a href="/cliente/beneficios">Explorar Beneficios</a><a href="/cliente/ganar-puntos">Ver cómo avanzar</a></div></div></section>}
+      </>
+    )}
   </main>
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
   </script>
+  <style>
+    .giftcards-back{display:inline-flex;align-items:center;gap:.4rem;margin:.2rem 0 1rem;color:#176f9e;font-size:.8rem;font-weight:900}.giftcards-next{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}.giftcards-next a{padding:.65rem .85rem;border-radius:999px;color:#fff;background:#176f9e;font-size:.78rem;font-weight:850}.giftcards-next a+ a{color:#5e4a91;background:#eee8ff}
+  </style>
 </ClientShellLayout>
