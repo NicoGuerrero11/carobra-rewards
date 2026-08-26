@@ -7,9 +7,16 @@ test("pending customer enters the real invited Rewards experience", async ({ pag
   await expect(page.getByRole("heading", { name: "Invitado" })).toBeVisible();
   await expect(page.getByText("Saldo disponible")).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
-  await expect(page.getByText(/canje aún no está disponible/i)).toBeVisible();
+  await expect(page.getByText(/canje todavía no está habilitado/i)).toBeVisible();
+  await expect(page.getByText("Primero: validar tu producto", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lo disponible hoy" })).toBeVisible();
+
+  await page.goto("/cliente/productos");
   await expect(page.getByText("Aún no hay productos confirmados")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Beneficios" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Productos disponibles" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Skandia" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quálitas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Modalidad 40" })).toBeVisible();
 });
 
 test("eligible customer sees the production Rewards summary at exactly 320 pixels", async ({ page }) => {
@@ -21,12 +28,12 @@ test("eligible customer sees the production Rewards summary at exactly 320 pixel
   await expect(page.getByRole("heading", { name: "Bronce" })).toBeVisible();
   await expect(page.getByText("Saldo disponible")).toBeVisible();
   await expect(page.getByText("150 pts").first()).toBeVisible();
-  await expect(page.getByText("Primer producto validado")).toBeVisible();
-  await expect(page.getByText("Bienvenida a Carobra Rewards")).toBeVisible();
+  await expect(page.getByText("Producto confirmado").first()).toBeVisible();
+  await expect(page.getByText("Registro completado")).toBeVisible();
   await expect(page.getByText("Plan personal de retiro")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Tu espacio para redimir" })).toBeVisible();
-  await expect(page.getByText("Catálogo en preparación")).toBeVisible();
-  await expect(page.getByText("Recompensas destacadas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lo disponible hoy" })).toBeVisible();
+  await expect(page.getByText("Categoría en preparación")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Últimos movimientos de tu cuenta" })).toBeVisible();
   await expect(page.getByRole("button", { name: /canjear/i })).toHaveCount(0);
 
   const hasHorizontalOverflow = await page.evaluate(

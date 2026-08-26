@@ -13,6 +13,14 @@ export interface CustomerPortalAction {
   approved_points: string | null;
 }
 
+export interface CustomerTimelineEntry {
+  id: string;
+  type: "REGISTRATION" | "PRODUCT" | "LEVEL" | "POINTS" | "ACTIVITY" | "LEARNING" | "DOCUMENT";
+  title: string;
+  description: string;
+  occurred_at: string;
+}
+
 export interface RewardsCustomerPortal {
   customer_id: string;
   journey: RewardsJourneySummary;
@@ -24,7 +32,7 @@ export interface RewardsCustomerPortal {
   };
   primary_action: CustomerPortalAction;
   actions: CustomerPortalAction[];
-  timeline: Array<{ id: string; type: string; title: string; description: string; occurred_at: string }>;
+  timeline: CustomerTimelineEntry[];
   notifications: { unread_count: number; items: Array<{ id: string; title: string; message: string; occurred_at: string; read: boolean; href: string | null }> };
   products: Array<{ id: string; product_type: string; label: string; status: RewardsV2ProductStatus; status_label: string; activated_at: string | null; ended_at: string | null; level_impact: string; guidance: string }>;
   preferences: { activity_updates: boolean; learning_updates: boolean; product_updates: boolean; updated_at: string | null };

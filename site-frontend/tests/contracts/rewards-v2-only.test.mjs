@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("customer rewards page and BFF expose only V2 rewards contracts", async () => {
+test("concise customer rewards home and BFF expose only V2 rewards contracts", async () => {
   const page = await readFile(new URL("../../src/pages/cliente/recompensas.astro", import.meta.url), "utf8");
   const bff = await readFile(new URL("../../src/pages/api/v1/[...path].ts", import.meta.url), "utf8");
 
@@ -11,10 +11,11 @@ test("customer rewards page and BFF expose only V2 rewards contracts", async () 
   assert.match(page, /Astro\.locals\.rewardsPortal/);
   assert.doesNotMatch(page, /\/api\/v1\/rewards\/(?:journey|activities|movements)/);
   assert.equal((page.match(/\bfetch\(/g) ?? []).length, 1);
-  assert.match(page, /portal\.journey/);
-  assert.match(page, /portal\.activity_details/);
-  assert.match(page, /portal\.movement_details/);
-  assert.match(page, /unavailable && !journey/);
+  assert.match(page, /portal\?\.journey/);
+  assert.match(page, /portal\?\.timeline\.slice\(0, 3\)/);
+  assert.doesNotMatch(page, /portal\?\.activity_details/);
+  assert.doesNotMatch(page, /portal\?\.movement_details/);
+  assert.match(page, /unavailable && !portal/);
 
   assert.doesNotMatch(bff, /"rewards\/(?:account|eligibility)"/);
   assert.match(bff, /"rewards\/journey"/);

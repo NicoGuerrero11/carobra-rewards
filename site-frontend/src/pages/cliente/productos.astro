@@ -1,0 +1,89 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import type { RewardsV2ProductStatus } from "../../lib/rewards-v2-contract";
+
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+const products = portal?.products ?? [];
+const activeProducts = products.filter((product) => product.status === "ACTIVE").length;
+const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(value));
+const statusLabel = (status: RewardsV2ProductStatus) => ({ ACTIVE: "Activo", PENDING: "En validación", SIGNED: "Firmado", REJECTED: "No aprobado", CANCELLED: "Cancelado", ENDED: "Finalizado" })[status];
+const availableProducts = [
+  {
+    name: "Skandia",
+    category: "Planeación y protección",
+    description: "Explora soluciones para tus objetivos financieros y de protección a largo plazo con acompañamiento personalizado.",
+    symbol: "S",
+    className: "is-skandia",
+  },
+  {
+    name: "Quálitas",
+    category: "Seguro de auto",
+    description: "Conoce opciones para proteger tu automóvil y recibe orientación para encontrar una cobertura adecuada para ti.",
+    symbol: "Q",
+    className: "is-qualitas",
+  },
+  {
+    name: "Modalidad 40",
+    category: "Planeación para el retiro",
+    description: "Recibe orientación para evaluar esta alternativa y entender cómo podría encajar en tu estrategia de retiro.",
+    symbol: "40",
+    className: "is-modalidad",
+  },
+].map((product) => ({
+  ...product,
+  href: `mailto:soporte@carobra.mx?subject=${encodeURIComponent(`Quiero información sobre ${product.name}`)}`,
+}));
+---
+
+<ClientShellLayout title="Productos | Carobra Rewards" description="Consulta los productos vinculados a tu cuenta y su efecto visible." currentPath="/cliente/productos" sectionLabel="Productos">
+  <main class="portal-page products-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Tu relación con Carobra</p><h1>Productos</h1><p>Consulta el estado confirmado de tus productos y cómo participan en tu nivel.</p></div><span>{activeProducts} {activeProducts === 1 ? "producto activo" : "productos activos"}</span></header>
+
+    {unavailable && !portal ? (
+      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos cargar tus productos</h2><p>Tu información sigue protegida. Intenta de nuevo en unos minutos.</p></div></section>
+    ) : portal && (
+      <>
+        <section class="products-hero" aria-labelledby="products-hero-title"><div><p class="portal-eyebrow">Estado actual</p><h2 id="products-hero-title">{activeProducts ? "Tu relación activa, explicada con claridad." : "Tus productos aparecerán al ser confirmados."}</h2><p>{activeProducts ? "Cada ficha muestra únicamente el estado, la orientación y el efecto de nivel que Carobra tiene confirmados." : "No necesitas cargar evidencia aquí. Estamos esperando la confirmación de tu primer producto."}</p></div><div class="products-hero__count"><strong>{activeProducts}</strong><span>activos hoy</span></div></section>
+
+        <section class="portal-section" aria-labelledby="products-list-title"><div class="portal-section-heading"><div><p class="portal-eyebrow">Productos vinculados</p><h2 id="products-list-title">Información de tu cuenta</h2></div><p>No mostramos proveedores, referencias internas ni recomendaciones automáticas.</p></div>
+          {products.length ? <ul class="products-list">{products.map((product) => <li><span class:list={["products-list__dot", `is-${product.status.toLowerCase()}`]} aria-hidden="true"></span><div><div class="products-list__title"><h3>{product.label}</h3><span>{product.status_label || statusLabel(product.status)}</span></div><p>{product.guidance}</p><dl><div><dt>Efecto en tu nivel</dt><dd>{product.level_impact}</dd></div>{product.activated_at && <div><dt>Confirmado desde</dt><dd>{date(product.activated_at)}</dd></div>}{product.ended_at && <div><dt>Finalizado</dt><dd>{date(product.ended_at)}</dd></div>}</dl></div></li>)}</ul> : <div class="products-empty"><span aria-hidden="true">◇</span><div><strong>Aún no hay productos confirmados</strong><p>El primero aparecerá aquí cuando termine la validación. No necesitas repetir tu registro.</p></div></div>}
+        </section>
+
+        <section class="product-offer" aria-labelledby="available-products-title">
+          <div class="product-offer__heading"><div><p class="portal-eyebrow">Oferta Carobra</p><h2 id="available-products-title">Productos disponibles</h2></div><p>Conoce las opciones del MVP y habla con un asesor para saber cuál puede responder mejor a tus objetivos.</p></div>
+          <div class="product-offer__grid">
+            {availableProducts.map((product) => (
+              <article class:list={["product-offer__card", product.className]}>
+                <span class="product-offer__symbol" aria-hidden="true">{product.symbol}</span>
+                <div><p>{product.category}</p><h3>{product.name}</h3><span>{product.description}</span></div>
+                <a href={product.href}>Me interesa <span aria-hidden="true">→</span></a>
+              </article>
+            ))}
+          </div>
+          <p class="product-offer__note">La disponibilidad, requisitos y condiciones se confirman personalmente con un asesor antes de cualquier contratación.</p>
+        </section>
+
+        <section class="products-advisor" aria-labelledby="advisor-title"><div><p class="portal-eyebrow">Orientación personal</p><h2 id="advisor-title">¿No sabes cuál elegir?</h2><p>Cuéntanos qué objetivo tienes y un asesor Carobra te ayudará a comparar las opciones sin compromiso.</p></div><a href="mailto:soporte@carobra.mx?subject=Quiero%20orientaci%C3%B3n%20sobre%20productos%20Carobra">Hablar con un asesor</a></section>
+      </>
+    )}
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+  <style>
+    .products-hero{display:grid;grid-template-columns:minmax(0,1fr) 13rem;align-items:end;gap:2rem;min-height:21rem;padding:clamp(1.6rem,4vw,3rem);border-radius:2rem;color:#fff;background:radial-gradient(circle at 85% 12%,rgba(255,216,130,.55),transparent 12rem),linear-gradient(125deg,#173f68,#176f9e 58%,#36afa4);box-shadow:0 24px 52px rgba(17,55,88,.18)}.products-hero .portal-eyebrow{color:#a9d9ef}.products-hero h2{max-width:45rem;margin:.35rem 0 .8rem;font-size:clamp(2.4rem,5vw,4.4rem);line-height:.94;letter-spacing:-.05em}.products-hero>div>p:not(.portal-eyebrow){max-width:43rem;margin:0;color:#d8eaf3;line-height:1.65}.products-hero__count{display:grid;padding:1.4rem;border-radius:1.3rem;color:#173f68;background:#fff}.products-hero__count strong{font-size:3.5rem;line-height:1}.products-hero__count span{margin-top:.35rem;color:#607990;font-weight:800}.products-list{display:grid;gap:.8rem;margin:1.4rem 0 0;padding:0;list-style:none}.products-list>li{display:grid;grid-template-columns:auto 1fr;gap:1rem;padding:1.2rem;border-radius:1.1rem;background:rgba(255,255,255,.86)}.products-list__dot{width:.75rem;height:.75rem;margin-top:.4rem;border-radius:50%;background:#9aacba}.products-list__dot.is-active{background:#27a66d;box-shadow:0 0 0 4px rgba(39,166,109,.12)}.products-list__dot.is-cancelled,.products-list__dot.is-ended,.products-list__dot.is-rejected{background:#bf6a61}.products-list__title{display:flex;justify-content:space-between;gap:1rem}.products-list h3{margin:0;color:#244b70;font-size:1.25rem}.products-list__title>span{padding:.35rem .6rem;border-radius:999px;color:#26749e;background:#eaf5fb;font-size:.7rem;font-weight:850;white-space:nowrap}.products-list p{margin:.35rem 0;color:#607990}.products-list dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin:1rem 0 0}.products-list dl>div{padding:.75rem;border-radius:.8rem;background:#f2f7fa}.products-list dt{color:#71879a;font-size:.67rem;font-weight:900;text-transform:uppercase}.products-list dd{margin:.2rem 0 0;color:#244b70;font-size:.82rem;font-weight:750}.products-empty{display:flex;align-items:center;gap:1rem;margin-top:1.3rem;padding:1.2rem;border:1px dashed #bdcedb;border-radius:1rem;background:#f7fafc}.products-empty>span{width:2.5rem;height:2.5rem;display:grid;place-items:center;border-radius:50%;background:#e8f4f8}.products-empty p{margin:.3rem 0 0;color:#647d92}.product-offer{margin-top:1rem;padding:clamp(1.5rem,4vw,2.5rem);border-radius:1.7rem;background:linear-gradient(140deg,#fff,#f2efff 58%,#e7f8f4);box-shadow:0 16px 36px rgba(39,52,91,.07)}.product-offer__heading{display:flex;justify-content:space-between;align-items:end;gap:2rem}.product-offer__heading h2{margin:.3rem 0 0;color:#173f68;font-size:clamp(1.5rem,3vw,2.2rem)}.product-offer__heading>p{max-width:35rem;margin:0;color:#607990;line-height:1.6}.product-offer__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin-top:1.4rem}.product-offer__card{min-height:20rem;display:flex;flex-direction:column;padding:1.3rem;border-radius:1.2rem;overflow:hidden}.product-offer__card.is-skandia{background:linear-gradient(145deg,#eee8ff,#ddd4ff)}.product-offer__card.is-qualitas{background:linear-gradient(145deg,#dff7f1,#c9eee6)}.product-offer__card.is-modalidad{background:linear-gradient(145deg,#fff0ce,#ffe2b0)}.product-offer__symbol{width:3.2rem;height:3.2rem;display:grid;place-items:center;border-radius:1rem;color:#fff;background:#6754a6;font-size:1.05rem;font-weight:950;box-shadow:0 12px 24px rgba(63,55,112,.16)}.is-qualitas .product-offer__symbol{background:#168277}.is-modalidad .product-offer__symbol{background:#d87e57}.product-offer__card>div{margin-top:1.4rem}.product-offer__card>div>p{margin:0;color:#3c80a7;font-size:.68rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.product-offer__card h3{margin:.35rem 0 .6rem;color:#173f68;font-size:clamp(1.5rem,3vw,2rem)}.product-offer__card>div>span{color:#526f87;font-size:.88rem;line-height:1.6}.product-offer__card>a{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:1.2rem;color:#315f7e;font-size:.82rem;font-weight:900}.product-offer__note{margin:1rem 0 0;color:#6b8092;font-size:.76rem;line-height:1.5}.products-advisor{display:flex;justify-content:space-between;align-items:center;gap:2rem;margin-top:1rem;padding:clamp(1.5rem,4vw,2.5rem);border-radius:1.5rem;color:#fff;background:linear-gradient(125deg,#6653a8,#c8709c 58%,#ee9470);box-shadow:0 20px 44px rgba(87,67,139,.18)}.products-advisor .portal-eyebrow{color:#d9d0ff}.products-advisor h2{margin:.3rem 0;font-size:clamp(1.5rem,3vw,2.2rem)}.products-advisor p:not(.portal-eyebrow){max-width:44rem;margin:0;color:#f4e9f1}.products-advisor a{flex:0 0 auto;padding:.8rem 1rem;border-radius:999px;color:#5e4a91;background:#fff;font-size:.82rem;font-weight:900}@media(max-width:800px){.product-offer__grid{grid-template-columns:1fr}.product-offer__card{min-height:15rem}}@media(max-width:700px){.products-hero{grid-template-columns:1fr;min-height:auto;padding:1.35rem;border-radius:1.3rem}.products-hero__count{width:min(100%,13rem)}.products-list__title,.products-advisor,.product-offer__heading{align-items:flex-start;flex-direction:column}.products-list dl{grid-template-columns:1fr}.products-advisor a{width:100%;text-align:center}}
+  </style>
+</ClientShellLayout>

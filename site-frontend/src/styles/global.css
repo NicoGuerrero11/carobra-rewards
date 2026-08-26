@@ -143,6 +143,7 @@ a {
 .client-shell__nav-link {
   display: inline-flex;
   align-items: center;
+  gap: 0.38rem;
   border-radius: 999px;
   padding: 0.58rem 0.9rem;
   color: #3a526d;
@@ -151,6 +152,25 @@ a {
   letter-spacing: -0.01em;
   white-space: nowrap;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.client-shell__nav-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: currentColor;
+  background: rgba(64, 100, 131, 0.08);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.client-shell__nav-link.is-active .client-shell__nav-icon,
+.client-shell__mobile-link.is-active .client-shell__nav-icon {
+  background: rgba(255, 255, 255, 0.17);
 }
 
 .client-shell__nav-link:hover {
@@ -290,7 +310,9 @@ a {
 }
 
 .client-shell__mobile-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   border-radius: 0.72rem;
   padding: 0.64rem 0.72rem;
   color: #1e4169;

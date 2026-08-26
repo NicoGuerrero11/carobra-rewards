@@ -1,132 +1,49 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 
-const user = Astro.locals.user;
-
-const clientUser = {
-  id: user?.id ?? "",
-  firstName: user?.firstName ?? "",
-  lastName: user?.lastName ?? "",
-  email: user?.email ?? "",
-};
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+const timeline = portal?.timeline ?? [];
+const movements = portal?.movement_details.movements ?? [];
+const dateTime = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const points = (value: string) => new Intl.NumberFormat("es-MX").format(BigInt(value));
+const movementTitle = (code: string) => ({ V2_INVITED_REGISTRATION: "Bienvenida a Carobra Rewards", V2_INITIAL_PRODUCT_ACTIVE: "Primer producto validado", REGISTRATION_ACTIVATION: "Bienvenida a Carobra Rewards", ISSUANCE: "Puntos obtenidos", CONSUMPTION: "Canje de puntos", EXPIRATION: "Puntos vencidos", ADJUSTMENT: "Ajuste de puntos", REFUND: "Reembolso" })[code] ?? "Movimiento de puntos";
 ---
 
-<ClientShellLayout
-  title="Actividades | Carobra"
-  description="Historial de actividad del cliente en Carobra Rewards."
-  currentPath="/cliente/activities"
-  sectionLabel="Actividades"
->
-  <main
-    id="activities-root"
-    data-user={JSON.stringify(clientUser)}
-    class="client-page client-page--soft-separators client-activities-page"
-  >
-    <section class="client-card client-activities-hero client-section--roomy">
-      <h1 class="client-section-title">Historial de actividades</h1>
-      <p class="client-activities-hero__description">
-        Aquí puedes revisar en detalle los movimientos recientes de tu cuenta:
-        redenciones, actualizaciones de perfil y eventos operativos validados.
-      </p>
-    </section>
+<ClientShellLayout title="Actividad | Carobra Rewards" description="Historial y movimientos confirmados de tu cuenta Rewards." currentPath="/cliente/activities" sectionLabel="Actividad">
+  <main class="portal-page activity-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Tu historial</p><h1>Actividad</h1><p>Consulta cambios, confirmaciones y movimientos registrados en tu cuenta.</p></div><span>{timeline.length + movements.length} registros visibles</span></header>
 
-    <section class="client-card client-activities-timeline-wrap client-section--roomy">
-      <div class="client-activities-timeline-head">
-        <h2 class="text-2xl font-extrabold text-[#14355f]">Timeline</h2>
-        <a href="/cliente" class="client-section-link">Volver al dashboard</a>
-      </div>
-      <ul id="activities-list" class="client-activities-timeline"></ul>
-    </section>
+    {unavailable && !portal ? (
+      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos cargar tu actividad</h2><p>Tu historial sigue protegido. Intenta de nuevo en unos minutos.</p></div></section>
+    ) : portal && (
+      <>
+        <section class="activity-hero" aria-labelledby="activity-hero-title"><div><p class="portal-eyebrow">Cuenta Rewards</p><h2 id="activity-hero-title">Tu historia, en orden.</h2><p>Esta página reúne la línea de tiempo y los movimientos de puntos confirmados. No depende del historial de este navegador.</p></div><article><span aria-hidden="true">↻</span><strong>{timeline.length}</strong><small>eventos en tu línea de tiempo</small></article></section>
+
+        <section class="activity-layout">
+          <article class="portal-section" aria-labelledby="timeline-title"><div class="portal-section-heading"><div><p class="portal-eyebrow">Línea de tiempo</p><h2 id="timeline-title">Cambios en tu cuenta</h2></div><p>Del evento más reciente al más antiguo.</p></div>{timeline.length ? <ol class="activity-timeline">{timeline.map((entry) => <li><span aria-hidden="true"></span><div><div><strong>{entry.title}</strong><small>{dateTime(entry.occurred_at)}</small></div><p>{entry.description}</p></div></li>)}</ol> : <div class="activity-empty"><strong>Aún no hay eventos</strong><p>Las confirmaciones de cuenta aparecerán aquí cuando estén disponibles.</p></div>}</article>
+
+          <aside class="portal-card activity-movements" aria-labelledby="movements-title"><p class="portal-eyebrow">Puntos</p><h2 id="movements-title">Movimientos</h2>{movements.length ? <ul>{movements.map((movement) => <li><div><strong>{movementTitle(movement.code)}</strong><small>{dateTime(movement.occurred_at)}</small></div><span class:list={[BigInt(movement.points_delta) < 0n && "is-negative"]}>{BigInt(movement.points_delta) >= 0n ? "+" : ""}{points(movement.points_delta)} pts</span></li>)}</ul> : <div class="activity-empty"><strong>Sin movimientos</strong><p>Tus puntos aparecerán con fecha y motivo cuando exista actividad.</p></div>}{portal.journey.modules.expiry_policy_approved && portal.journey.points.next_expiration_at && <p class="activity-expiry">Próximo vencimiento: {dateTime(portal.journey.points.next_expiration_at)}</p>}</aside>
+        </section>
+      </>
+    )}
   </main>
-
   <script>
-    import { getActivityHistory, loadClientDemoState } from "../../lib/client-demo-state";
-    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
-
-    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-    const root = requireElement<HTMLElement>("#activities-root");
-    const logoutButton = requireElement<HTMLButtonElement>("#logout");
-    const activitiesList = requireElement<HTMLUListElement>("#activities-list");
-
-    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
-
-    const formatDateTime = new Intl.DateTimeFormat("es-MX", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    function getTypeLabel(type: string) {
-      if (type === "redencion") {
-        return "Redención";
-      }
-
-      if (type === "perfil") {
-        return "Perfil";
-      }
-
-      if (type === "notificacion") {
-        return "Notificación";
-      }
-
-      return "Actividad";
-    }
-
-    function getTypeClass(type: string) {
-      if (type === "redencion") {
-        return "is-redencion";
-      }
-
-      if (type === "perfil") {
-        return "is-perfil";
-      }
-
-      if (type === "notificacion") {
-        return "is-notificacion";
-      }
-
-      return "is-actividad";
-    }
-
-    function render() {
-      const state = loadClientDemoState(user);
-      const history = getActivityHistory(state);
-
-      activitiesList.innerHTML =
-        history.length === 0
-          ? `
-              <li class="client-activities-empty">
-                Aún no hay actividad registrada en esta sesión.
-              </li>
-            `
-          : history
-              .map(
-                (item) => `
-                  <li class="client-activities-item">
-                    <div class="client-activities-item__dot" aria-hidden="true"></div>
-                    <div class="client-activities-item__card">
-                      <div class="client-activities-item__head">
-                        <p class="client-activities-item__title">${item.title}</p>
-                        <div class="client-activities-item__badges">
-                          <span class="client-activities-badge ${getTypeClass(item.type)}">${getTypeLabel(item.type)}</span>
-                          <span class="client-activities-badge is-status">${item.status}</span>
-                        </div>
-                      </div>
-                      <p class="client-activities-item__description">${item.description}</p>
-                      <p class="client-activities-item__timestamp">${formatDateTime.format(new Date(item.createdAt))}</p>
-                    </div>
-                  </li>
-                `,
-              )
-              .join("");
-    }
-
-    attachLogoutHandler(logoutButton, API_BASE_URL);
-
-    void (async () => {
-      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
-      render();
-    })();
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
   </script>
+  <style>
+    .activity-hero{display:grid;grid-template-columns:minmax(0,1fr) 15rem;align-items:end;gap:2rem;min-height:20rem;padding:clamp(1.6rem,4vw,3rem);border-radius:2rem;color:#fff;background:radial-gradient(circle at 86% 12%,rgba(255,216,130,.5),transparent 12rem),linear-gradient(125deg,#173f68,#5b55a1 58%,#b76d99);box-shadow:0 24px 52px rgba(31,49,91,.18)}.activity-hero .portal-eyebrow{color:#a9d9ef}.activity-hero h2{margin:.35rem 0 .8rem;font-size:clamp(2.6rem,5vw,4.7rem);line-height:.92;letter-spacing:-.055em}.activity-hero>div>p:not(.portal-eyebrow){max-width:43rem;margin:0;color:#dcebf4;line-height:1.65}.activity-hero article{display:grid;padding:1.35rem;border-radius:1.3rem;color:#173f68;background:#fff}.activity-hero article>span{color:#6754a6;font-size:1.4rem}.activity-hero article strong{margin-top:.8rem;font-size:3rem;line-height:1}.activity-hero article small{margin-top:.25rem;color:#607990}.activity-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(18rem,.7fr);align-items:start;gap:1rem}.activity-timeline{margin:1.4rem 0 0;padding:0;list-style:none}.activity-timeline li{display:grid;grid-template-columns:auto 1fr;gap:.9rem;position:relative;padding-bottom:1.2rem}.activity-timeline li:not(:last-child)::before{content:"";position:absolute;left:.34rem;top:1rem;bottom:0;width:1px;background:#c9dde5}.activity-timeline li>span{position:relative;z-index:1;width:.72rem;height:.72rem;margin-top:.35rem;border:3px solid #fff;border-radius:50%;background:#3a94ad;box-shadow:0 0 0 2px #9cd9d4}.activity-timeline li>div>div{display:flex;justify-content:space-between;gap:1rem}.activity-timeline p{margin:.25rem 0;color:#607990;font-size:.84rem}.activity-timeline small{color:#8393a0;font-size:.72rem;white-space:nowrap}.activity-movements{margin-top:1rem}.activity-movements h2{margin:.3rem 0 0}.activity-movements ul{margin:1rem 0 0;padding:0;list-style:none}.activity-movements li{display:flex;justify-content:space-between;gap:1rem;padding:.9rem 0;border-bottom:1px solid #e2eaf0}.activity-movements li:last-child{border:0}.activity-movements li>div{display:grid;gap:.2rem}.activity-movements small{color:#8393a0}.activity-movements li>span{color:#14714a;font-weight:900;white-space:nowrap}.activity-movements li>span.is-negative{color:#913e3e}.activity-empty{margin-top:1rem;padding:1rem;border-radius:.9rem;background:#f3f7fa}.activity-empty p{margin:.3rem 0 0;color:#607990}.activity-expiry{margin:1rem 0 0;padding:.8rem;border-radius:.8rem;color:#665589;background:#eee8ff;font-size:.78rem;font-weight:800}@media(max-width:760px){.activity-hero{grid-template-columns:1fr;min-height:auto;padding:1.35rem;border-radius:1.3rem}.activity-hero article{width:min(100%,15rem)}.activity-layout{grid-template-columns:1fr}.activity-timeline li>div>div{align-items:flex-start;flex-direction:column;gap:.2rem}.activity-timeline small{white-space:normal}}
+  </style>
 </ClientShellLayout>

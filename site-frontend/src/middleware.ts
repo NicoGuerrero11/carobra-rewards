@@ -14,6 +14,9 @@ const customerEntryPaths = new Set([
   "/cliente/beneficios",
   "/cliente/cursos",
   "/cliente/gift-cards",
+  "/cliente/ganar-puntos",
+  "/cliente/productos",
+  "/cliente/activities",
   "/cliente/notificaciones",
   "/cliente/perfil",
   "/cliente/recompensas",
@@ -129,8 +132,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const requestStartedAt = performance.now();
   const pathname = context.url.pathname;
 
-  // Admin, benefits, activities and editable profile remain demo-only and are
-  // deliberately not exposed as MVP functionality.
+  // The admin workspace remains outside the authenticated customer MVP.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     return context.redirect("/");
   }
@@ -215,7 +217,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     (pathname.startsWith("/cliente/recompensas")
       || pathname === "/cliente/beneficios"
       || pathname === "/cliente/cursos"
-      || pathname === "/cliente/gift-cards")
+      || pathname === "/cliente/gift-cards"
+      || pathname === "/cliente/ganar-puntos"
+      || pathname === "/cliente/productos"
+      || pathname === "/cliente/activities")
     && customerInactive
   ) {
     return context.redirect("/cliente/validacion");
