@@ -90,10 +90,13 @@ export class PostgresRewardsEligibilityQuery implements RewardsEligibilityQuery 
 }
 
 function ineligibilityReason(row: EligibilityRow): RewardsIneligibilityReason | null {
-  if (row.customer_status !== "ACTIVE") return "customer_inactive";
+  if (row.customer_status === "INACTIVE" || row.customer_status === "BLOCKED") {
+    return "customer_inactive";
+  }
   if (row.sisca_validation_status !== "VALIDATED" || row.validated_at === null) {
     return "sisca_not_validated";
   }
+  if (row.customer_status !== "ACTIVE") return "customer_inactive";
   if (row.afore_relation_status !== "ACTIVE" || row.afore_relation_started_at === null) {
     return "afore_relation_inactive";
   }

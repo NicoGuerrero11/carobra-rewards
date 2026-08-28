@@ -30,21 +30,19 @@ if (!portalLoadedWithContext) {
 }
 
 const journey = portal?.journey ?? null;
-const state: RewardsV2JourneyState = journey?.journey.state
-  ?? (eligibility?.reason === "customer_inactive" ? "INACTIVE" : eligibility?.eligible ? "ACTIVE" : "INVITED");
+const state: RewardsV2JourneyState = journey?.journey.state === "ACTIVE" || eligibility?.eligible
+  ? "ACTIVE"
+  : "INVITED";
 const currentLevel: RewardsV2Level | null = journey?.journey.current_level ?? null;
 const activeProducts = portal?.products.filter((product) => product.status === "ACTIVE").length ?? 0;
 const points = (value: string | null | undefined) => value == null ? "—" : new Intl.NumberFormat("es-MX").format(BigInt(value));
 const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
-const levelTitle = state === "INVITED" ? "Invitado" : state === "BLOCKED" ? "En revisión" : state === "INACTIVE" ? "Sin producto activo" : currentLevel ? levelLabel(currentLevel) : "Nivel en actualización";
+const levelTitle = state === "INVITED" ? "Invitado" : currentLevel ? levelLabel(currentLevel) : "Nivel en actualización";
 const heroCopy = state === "INVITED"
-  ? "Tu registro está completo. Estamos validando tu primer producto para activar tu nivel."
-  : state === "BLOCKED"
-    ? "Nuestro equipo está revisando la validación. Conservamos tu avance y te avisaremos cuando exista una actualización."
-    : state === "INACTIVE"
-      ? "Tu historial sigue protegido. Volveremos a calcular tu nivel cuando recibamos una reactivación válida."
-      : currentLevel ? `Tu nivel ${levelLabel(currentLevel)} refleja la información vigente de tu cuenta.` : "Tus productos ya están validados y tu nivel se está actualizando.";
+  ? "Tu registro está completo. Puedes recorrer Rewards como Invitado hasta que exista un producto confirmado."
+  : currentLevel ? `Tu nivel ${levelLabel(currentLevel)} refleja la información vigente de tu cuenta.` : "Tus productos ya están validados y tu nivel se está actualizando.";
 const actionHref = portal?.primary_action.href ? portal.primary_action.href.startsWith("#") ? "/cliente/ganar-puntos" : portal.primary_action.href : null;
+const actionLabel = portal?.primary_action.type === "SUPPORT" ? "Contactar soporte" : "Continuar";
 const recentActivity = portal?.timeline.slice(0, 3) ?? [];
 const assignedCourses = portal?.learning.items.length ?? 0;
 const catalogEnabled = journey?.modules.benefits_enabled === true;
@@ -68,8 +66,7 @@ const progressTitle = journey?.progress.target_level ? `Camino a ${levelLabel(jo
         <section class:list={["rewards-home__hero", `is-${state.toLowerCase()}`]} aria-labelledby="home-level-title">
           <div class="rewards-home__hero-copy">
             <p class="rewards-home__eyebrow">Tu nivel actual</p><h2 id="home-level-title">{levelTitle}</h2><p>{heroCopy}</p>
-            <div class="rewards-home__tags"><span>{activeProducts} {activeProducts === 1 ? "producto activo" : "productos activos"}</span><span>{journey?.journey.validation_status === "VALIDATED" ? "Cuenta validada" : "Validación en proceso"}</span></div>
-            {state === "BLOCKED" && <a class="rewards-home__support" href="mailto:soporte@carobra.mx">Contactar soporte</a>}
+            <div class="rewards-home__tags"><span>{activeProducts} {activeProducts === 1 ? "producto activo" : "productos activos"}</span><span>{state === "ACTIVE" ? "Producto confirmado" : "Miembro Invitado"}</span></div>
           </div>
           <article class="rewards-home__balance" aria-label="Saldo disponible">
             <p>Saldo disponible</p><strong>{points(journey?.points.available)} <small>pts</small></strong><span>{journey?.redemption.eligible ? "Disponible para opciones habilitadas." : "El canje todavía no está habilitado."}</span><a href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a>
@@ -77,13 +74,13 @@ const progressTitle = journey?.progress.target_level ? `Camino a ${levelLabel(jo
         </section>
 
         <section class="rewards-home__action" aria-labelledby="home-action-title">
-          <span aria-hidden="true">→</span><div><p class="rewards-home__eyebrow">Tu siguiente acción</p><h2 id="home-action-title">{portal.primary_action.title}</h2><p>{portal.primary_action.description}</p></div>{actionHref && <a href={actionHref}>Continuar</a>}
+          <span aria-hidden="true">→</span><div><p class="rewards-home__eyebrow">Tu siguiente acción</p><h2 id="home-action-title">{portal.primary_action.title}</h2><p>{portal.primary_action.description}</p></div>{actionHref && <a href={actionHref}>{actionLabel}</a>}
         </section>
 
         <section class="rewards-home__decision-grid">
           <article class="rewards-home__panel rewards-home__panel--progress" aria-labelledby="home-progress-title">
             <div class="rewards-home__panel-heading"><div><p class="rewards-home__eyebrow">Tu avance</p><h2 id="home-progress-title">{progressTitle}</h2></div><a href="/cliente/ganar-puntos">Ver detalle</a></div>
-            {state === "INVITED" || state === "BLOCKED" ? (
+            {state === "INVITED" ? (
               <div class="rewards-home__message"><strong>Primero: validar tu producto</strong><p>No necesitas repetir tu registro ni cargar información adicional mientras Carobra completa la revisión.</p></div>
             ) : journey?.progress.rule_available ? (
               <ul class="rewards-home__metrics">

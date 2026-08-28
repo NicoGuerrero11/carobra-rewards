@@ -78,9 +78,14 @@ const eligibleValidation = {
 };
 
 const inactiveValidation = {
-  ...eligibleValidation,
+  ...validation,
   validation_id: "00000000-0000-0000-0000-000000000502",
   customer_id: inactiveProfile.id,
+  status: "CANCELLED",
+  next_checkpoint: null,
+  next_checkpoint_at: null,
+  last_checked_at: "2026-07-14T12:00:00Z",
+  last_check_outcome: "MATCH_NOT_ELIGIBLE",
 };
 
 const attentionValidation = {
@@ -262,12 +267,10 @@ function validationFor(candidate) {
 
 function journeyFor(candidate) {
   const active = candidate === eligibleProfile;
-  const blocked = candidate === attentionProfile;
-  const inactive = candidate === inactiveProfile;
   return {
     customer_id: candidate.id,
     journey: {
-      state: inactive ? "INACTIVE" : blocked ? "BLOCKED" : active ? "ACTIVE" : "INVITED",
+      state: active ? "ACTIVE" : "INVITED",
       current_level: active ? "BRONZE" : null,
       validation_status: validationFor(candidate).status,
       registered_at: validationFor(candidate).registered_at,
@@ -318,6 +321,7 @@ function journeyFor(candidate) {
 
 function portalFor(candidate) {
   const active = candidate === eligibleProfile;
+  const validationStatus = validationFor(candidate).status;
   const timeline = [{ id: `registration:${candidate.id}`, type: "REGISTRATION", title: "Registro completado", description: "Tu cuenta Carobra Rewards quedó creada.", occurred_at: "2026-07-09T23:30:00.000Z" }];
   if (active) timeline.unshift({ id: `product:${candidate.id}`, type: "PRODUCT", title: "Producto confirmado", description: "Tu producto está activo en Carobra Rewards.", occurred_at: "2026-07-14T12:00:00.000Z" });
   const actions = active ? [{ id: "00000000-0000-4000-8000-000000000701", type: "QUESTIONNAIRE", title: "Completa tu perfil financiero", description: "Responde un cuestionario breve para conocerte mejor.", status: "PENDING", href: "#actividad", approved_points: "20" }] : [];
@@ -326,7 +330,7 @@ function portalFor(candidate) {
     journey: journeyFor(candidate),
     activity_details: activityDetailsFor(candidate),
     movement_details: movementDetailsFor(candidate),
-    primary_action: actions[0] ?? { id: "journey:validation", type: "STATUS", title: "Estamos validando tu producto", description: "No necesitas hacer nada adicional. Te avisaremos cuando Carobra termine la revisión.", status: "INFORMATIONAL", href: null, approved_points: null },
+    primary_action: actions[0] ?? invitedPrimaryAction(validationStatus),
     actions,
     timeline,
     notifications: { unread_count: timeline.length, items: timeline.map((item) => ({ id: `notice:${item.id}`, title: item.title, message: item.description, occurred_at: item.occurred_at, read: false, href: null })) },
@@ -336,6 +340,16 @@ function portalFor(candidate) {
     documents: { requests: [] },
     help: [{ id: "levels", title: "¿Cómo se calcula mi nivel?", body: "Tu nivel considera productos activos, permanencia y actividades aprobadas; gastar puntos no lo reduce." }],
   };
+}
+
+function invitedPrimaryAction(validationStatus) {
+  if (validationStatus === "CANCELLED") {
+    return { id: "journey:invited", type: "STATUS", title: "Sigues siendo miembro Invitado", description: "Tu cuenta Rewards permanece disponible. Te avisaremos cuando podamos confirmar un producto activo.", status: "INFORMATIONAL", href: null, approved_points: null };
+  }
+  if (validationStatus === "REQUIRES_ATTENTION") {
+    return { id: "journey:review", type: "SUPPORT", title: "Tu cuenta sigue como Invitado", description: "Estamos revisando la información de tu producto. Puedes seguir consultando Rewards y contactar a soporte si necesitas ayuda.", status: "INFORMATIONAL", href: "mailto:soporte@carobra.mx", approved_points: null };
+  }
+  return { id: "journey:validation", type: "STATUS", title: "Estamos validando tu producto", description: "No necesitas hacer nada adicional. Te avisaremos cuando Carobra termine la revisión.", status: "INFORMATIONAL", href: null, approved_points: null };
 }
 
 function activityDetailsFor(candidate) {

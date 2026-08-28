@@ -145,7 +145,7 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
     }));
     const activeProductCount = products.filter((product) => product.status === "ACTIVE").length;
     const currentLevel = requireRewardsLevel(row.current_level);
-    const state = requireJourneyState(row.state);
+    const state = customerFacingJourneyState(row.state, activeProductCount);
     const redemptionEligible = row.redemption_eligible
       && activeProductCount > 0
       && modules.benefits_enabled;
@@ -199,6 +199,15 @@ function nextLevel(level: RewardsLevel | null): RewardsLevel | null {
     TITANIUM: null,
   };
   return levels[level];
+}
+
+export function customerFacingJourneyState(
+  persistedState: string,
+  activeProductCount: number,
+): RewardsJourneyState {
+  const state = requireJourneyState(persistedState);
+  if (state === "ACTIVE" && activeProductCount > 0) return "ACTIVE";
+  return "INVITED";
 }
 
 function requireJourneyState(value: string): RewardsJourneyState {

@@ -5,6 +5,7 @@ import type { QueryResult, QueryResultRow } from "pg";
 import { FixedClock } from "../src/rewards/shared/clock.js";
 import { asCustomerId } from "../src/rewards/shared/identifiers.js";
 import type { RewardsJourneySummaryHttpResponse } from "../src/rewards/v2/journey-summary-contract.js";
+import { journeyStateHelp } from "../src/rewards/v2/customer-portal-contract.js";
 import {
   DefaultRewardsCustomerPortalApplication,
   PostgresRewardsCustomerPortalStore,
@@ -12,6 +13,7 @@ import {
   type UpdateLearningProgressInput,
   type UpdatePreferencesInput,
 } from "../src/rewards/v2/customer-portal.js";
+import { customerFacingJourneyState } from "../src/rewards/v2/journey-summary.js";
 
 const customerId = asCustomerId("00000000-0000-4000-8000-000000000401");
 const now = new Date("2026-08-24T12:00:00.000Z");
@@ -72,6 +74,23 @@ test("portal projection selects the next action and exposes only customer-safe d
   assert.equal(portal.notifications.unread_count, portal.notifications.items.length);
   assert.ok(portal.timeline.some((entry) => entry.type === "POINTS"));
   assert.doesNotMatch(JSON.stringify(portal), /SISCA|provider|source_id|checkpoint|H24|H72|D3|D5/i);
+});
+
+test("customer-facing journey keeps every non-active product state invited", () => {
+  assert.equal(customerFacingJourneyState("INVITED", 0), "INVITED");
+  assert.equal(customerFacingJourneyState("INACTIVE", 0), "INVITED");
+  assert.equal(customerFacingJourneyState("BLOCKED", 0), "INVITED");
+  assert.equal(customerFacingJourneyState("ACTIVE", 0), "INVITED");
+  assert.equal(customerFacingJourneyState("ACTIVE", 1), "ACTIVE");
+});
+
+test("invited guidance remains customer-safe for terminal and attention outcomes", () => {
+  assert.match(journeyStateHelp("INVITED", null, "CANCELLED")[0]!.body, /Invitado/);
+  assert.match(journeyStateHelp("INVITED", null, "REQUIRES_ATTENTION")[0]!.body, /Invitado/);
+  assert.doesNotMatch(
+    JSON.stringify(journeyStateHelp("INVITED", null, "CANCELLED")),
+    /SISCA|cancelled|inactive|blocked/i,
+  );
 });
 
 test("portal commands validate inputs and keep resources customer-scoped", async () => {

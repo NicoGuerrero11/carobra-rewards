@@ -207,25 +207,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       : null;
   context.locals.rewardsEligibility = rewardsEligibility ?? undefined;
 
-  const customerInactive = rewardsEligibility?.reason === "customer_inactive"
-    || user.customerStatus === "INACTIVE";
-
   if (pathname === "/cliente") {
-    return context.redirect(customerInactive ? "/cliente/validacion" : "/cliente/recompensas");
-  }
-  if (
-    (pathname.startsWith("/cliente/recompensas")
-      || pathname === "/cliente/beneficios"
-      || pathname === "/cliente/cursos"
-      || pathname === "/cliente/gift-cards"
-      || pathname === "/cliente/ganar-puntos"
-      || pathname === "/cliente/productos"
-      || pathname === "/cliente/activities")
-    && customerInactive
-  ) {
-    return context.redirect("/cliente/validacion");
-  }
-  if (pathname === "/cliente/validacion" && !customerInactive) {
     return context.redirect("/cliente/recompensas");
   }
   const pageStartedAt = performance.now();

@@ -33,7 +33,9 @@ test("eligibility requires the authenticated customer and all three active facts
 });
 
 for (const [overrides, reason] of [
-  [{ customer_status: "PENDING_VALIDATION" }, "customer_inactive"],
+  [{ customer_status: "PENDING_VALIDATION", sisca_validation_status: "PENDING", validated_at: null }, "sisca_not_validated"],
+  [{ customer_status: "INACTIVE" }, "customer_inactive"],
+  [{ customer_status: "BLOCKED" }, "customer_inactive"],
   [{ sisca_validation_status: "PENDING", validated_at: null }, "sisca_not_validated"],
   [{ afore_relation_status: "INACTIVE", afore_relation_started_at: null }, "afore_relation_inactive"],
 ] as const) {

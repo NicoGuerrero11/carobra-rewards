@@ -271,7 +271,7 @@ function projectPortal(
   const primaryAction = pendingAction
     ?? (pendingDocument ? documentPrimaryAction(pendingDocument) : undefined)
     ?? (pendingLearning ? learningPrimaryAction(pendingLearning) : undefined)
-    ?? journeyPrimaryAction(summary.journey.state);
+    ?? journeyPrimaryAction(summary.journey.state, summary.journey.validation_status);
   const products = state.products.map((product) => mapProduct(product, summary.journey.current_level));
   const timeline = buildTimeline(summary, movements, activities, state);
   const notifications = timeline.slice(0, 8).map((entry) => ({
@@ -295,7 +295,11 @@ function projectPortal(
     preferences: state.preferences,
     learning: { items: state.learning },
     documents: { requests: state.documents },
-    help: journeyStateHelp(summary.journey.state, summary.journey.current_level),
+    help: journeyStateHelp(
+      summary.journey.state,
+      summary.journey.current_level,
+      summary.journey.validation_status,
+    ),
   });
 }
 
@@ -371,7 +375,16 @@ function mapAssignedAction(row: PortalActionRow): CustomerPortalAction {
   };
 }
 
-function journeyPrimaryAction(state: RewardsJourneyState): CustomerPortalAction {
+function journeyPrimaryAction(
+  state: RewardsJourneyState,
+  validationStatus: string,
+): CustomerPortalAction {
+  if (state === "INVITED" && validationStatus === "CANCELLED") {
+    return { id: "journey:invited", type: "STATUS", title: "Sigues siendo miembro Invitado", description: "Tu cuenta Rewards permanece disponible. Te avisaremos cuando podamos confirmar un producto activo.", status: "INFORMATIONAL", href: null, approved_points: null };
+  }
+  if (state === "INVITED" && validationStatus === "REQUIRES_ATTENTION") {
+    return { id: "journey:review", type: "SUPPORT", title: "Tu cuenta sigue como Invitado", description: "Estamos revisando la información de tu producto. Puedes seguir consultando Rewards y contactar a soporte si necesitas ayuda.", status: "INFORMATIONAL", href: "mailto:soporte@carobra.mx", approved_points: null };
+  }
   const actions: Record<RewardsJourneyState, CustomerPortalAction> = {
     INVITED: { id: "journey:validation", type: "STATUS", title: "Estamos validando tu producto", description: "No necesitas hacer nada adicional. Te avisaremos cuando Carobra termine la revisión.", status: "INFORMATIONAL", href: null, approved_points: null },
     ACTIVE: { id: "journey:profile", type: "CONTENT", title: "Sigue construyendo tu perfil", description: "Aquí aparecerán actividades, contenidos y documentos aprobados para ti.", status: "INFORMATIONAL", href: "#actividad", approved_points: null },
