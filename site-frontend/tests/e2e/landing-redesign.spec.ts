@@ -3,13 +3,15 @@ import { expect, test } from "@playwright/test";
 test("landing keeps dual CTA hierarchy and compliant copy", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /Comenzar ahora/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Cómo funciona/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Tu relación con Carobra ahora te da más/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Quiero ser parte/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Descubre cómo funciona/i })).toBeVisible();
 
   const trustSection = page.locator("#confianza");
-  await expect(trustSection.getByRole("link", { name: /Comienza tu viaje/i })).toBeVisible();
+  await expect(trustSection.getByRole("link", { name: /Únete a Carobra Rewards/i })).toBeVisible();
   await expect(trustSection.getByRole("link", { name: /Iniciar sesión/i })).toBeVisible();
 
+  await expect(page.getByText(/MVP/i)).toHaveCount(0);
   await expect(page.getByText(/Cashback/i)).toHaveCount(0);
   await expect(page.getByText(/Auditado Premium/i)).toHaveCount(0);
   await expect(page.getByText(/Privacidad Absoluta/i)).toHaveCount(0);

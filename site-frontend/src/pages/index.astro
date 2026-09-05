@@ -2,8 +2,8 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 const navLinks = [
-  { label: "Registro", href: "#beneficios" },
-  { label: "Validación", href: "#experiencia" },
+  { label: "Beneficios", href: "#beneficios" },
+  { label: "Cómo funciona", href: "#experiencia" },
   { label: "Confianza", href: "#confianza" },
 ];
 
@@ -17,18 +17,18 @@ const soporteLinks = [
 const timelineSteps = [
   {
     number: "01",
-    title: "Crea tu cuenta",
-    text: "Registra tus datos de identidad y contacto con email y contraseña, sin solicitar NSS.",
+    title: "Únete a Rewards",
+    text: "Crea tu cuenta para reunir en un solo lugar tu relación y tus avances con Carobra.",
   },
   {
     number: "02",
-    title: "Acepta los términos",
-    text: "Tu aceptación queda asociada al registro antes de iniciar el proceso de validación.",
+    title: "Validamos tu relación",
+    text: "Confirmamos tus productos Carobra de forma segura para mostrarte el nivel que te corresponde.",
   },
   {
     number: "03",
-    title: "Consulta tu validación",
-    text: "Después de iniciar sesión puedes consultar el estado pendiente de validación de tu AFORE.",
+    title: "Avanza y disfruta",
+    text: "Consulta tus puntos, descubre tus siguientes pasos y explora los beneficios habilitados para ti.",
   },
 ];
 
@@ -54,7 +54,7 @@ const timelineSteps = [
         </nav>
         <div class="landing-header__actions">
           <a href="/login" class="landing-header__signin">Iniciar sesión</a>
-          <a href="/registro" class="btn-primary btn-compact">Abrir cuenta</a>
+          <a href="/registro" class="btn-primary btn-compact">Únete a Rewards</a>
         </div>
       </div>
     </header>
@@ -63,40 +63,40 @@ const timelineSteps = [
       <section class="landing-hero">
         <div class="shell landing-hero__grid">
           <div class="landing-hero__copy">
-            <span class="pill">Carobra Rewards Program</span>
+            <span class="pill">El programa de lealtad de Carobra</span>
             <h1>
-              Registra tu cuenta Carobra Rewards
-              <span>e inicia tu validación AFORE.</span>
+              Tu relación con Carobra
+              <span>ahora te da más.</span>
             </h1>
             <p>
-              Completa tus datos, acepta los términos e inicia sesión para consultar
-              el estado real de tu proceso de validación.
+              Carobra Rewards reconoce tu confianza y cada paso que das con nosotros.
+              Consulta tu nivel, suma puntos y descubre beneficios pensados para acompañar tus metas.
             </p>
             <div class="landing-hero__actions">
               <a href="/registro" class="btn-primary">
-                Comenzar ahora <span aria-hidden="true">→</span>
+                Quiero ser parte <span aria-hidden="true">→</span>
               </a>
-              <a href="#experiencia" class="btn-secondary">Cómo funciona</a>
+              <a href="#experiencia" class="btn-secondary">Descubre cómo funciona</a>
             </div>
           </div>
 
-          <aside class="hero-preview" aria-label="Vista de estado del cliente">
-            <div class="hero-preview__badge">Proceso de registro</div>
-            <h2>Validación AFORE</h2>
+          <aside class="hero-preview" aria-label="Vista del progreso en Carobra Rewards">
+            <div class="hero-preview__badge">Tu experiencia Rewards</div>
+            <h2>Crece con Carobra</h2>
             <div class="hero-preview__points">
-              <p>Estado inicial</p>
-              <strong>Pendiente</strong>
+              <p>Tu nivel</p>
+              <strong>Siempre visible</strong>
             </div>
             <div class="hero-preview__meta">
-              <span>Cuenta</span>
-              <span>Registrada</span>
+              <span>Progreso</span>
+              <span>En un solo lugar</span>
             </div>
             <div class="hero-preview__track" role="presentation">
               <span style="width: 66%"></span>
             </div>
             <div class="hero-preview__foot">
-              <span>Siguiente paso</span>
-              <span>Resultado AFORE</span>
+              <span>Siguiente meta</span>
+              <span>Una experiencia para ti</span>
             </div>
           </aside>
         </div>
@@ -105,19 +105,19 @@ const timelineSteps = [
       <section id="beneficios" class="capabilities">
         <div class="shell">
           <header class="section-heading">
-            <h2>Lo que puedes hacer en esta versión</h2>
-            <p>Registro, acceso seguro y consulta del estado de validación desde una interfaz clara.</p>
+            <h2>Más valor en cada paso con Carobra</h2>
+            <p>Una experiencia que reúne tu progreso, tus puntos y las oportunidades disponibles para ti.</p>
           </header>
 
           <div class="capabilities-grid">
             <article class="capability-card capability-card--wide">
               <div class="capability-card__content">
                 <div class="capability-card__icon">▣</div>
-                <h3>Registro con datos del MVP</h3>
+                <h3>Tu relación sí cuenta</h3>
                 <p>
-                  Capturamos CURP, identidad, contacto y ubicación para crear tu cuenta e iniciar la validación.
+                  Cada producto confirmado y cada actividad aprobada ayudan a construir tu experiencia dentro de Rewards.
                 </p>
-                <a href="/registro" class="capability-card__link">Crear mi cuenta</a>
+                <a href="/registro" class="capability-card__link">Comenzar mi experiencia</a>
               </div>
               <div class="capability-visual" aria-hidden="true">
                 <div class="capability-visual__head">
@@ -139,41 +139,41 @@ const timelineSteps = [
 
             <article class="capability-card capability-card--dark">
               <div class="capability-card__icon">◉</div>
-              <h3>Privacidad y control</h3>
-              <p>Tus datos se gestionan con protección y visibilidad clara de cada interacción relevante.</p>
+              <h3>Beneficios para disfrutar</h3>
+              <p>Explora las experiencias y opciones que se encuentren habilitadas para tu cuenta.</p>
             </article>
 
             <article class="capability-card">
               <div class="capability-card__icon">◌</div>
-              <h3>Estado con contexto</h3>
-              <p>Consulta si la validación asociada a tu cuenta continúa pendiente o recibió una actualización.</p>
+              <h3>Progreso que puedes ver</h3>
+              <p>Conoce tu nivel, revisa tus puntos y entiende qué puedes hacer para seguir avanzando.</p>
               <div class="capability-chips" aria-hidden="true">
                 <span></span>
                 <span></span>
                 <span></span>
-                <span class="is-active">MVP</span>
+                <span class="is-active">Rewards</span>
               </div>
             </article>
 
             <article class="capability-card capability-card--split">
               <div class="capability-control">
                 <div class="capability-card__icon">⛨</div>
-                <h3>Acceso a tu cuenta</h3>
-                <p>Inicia sesión con email y contraseña para revisar el estado de tu registro.</p>
-                <a href="/login" class="btn-primary btn-compact capability-control__button">Consultar estado</a>
+                <h3>Todo en un solo lugar</h3>
+                <p>Entra de forma segura para consultar tus productos, movimientos y oportunidades Rewards.</p>
+                <a href="/login" class="btn-primary btn-compact capability-control__button">Entrar a mi cuenta</a>
               </div>
               <div class="split-stats">
                 <div class="split-stats__block">
-                  <span>Registro</span>
-                  <strong>Completo</strong>
+                  <span>Tu nivel</span>
+                  <strong>Claro</strong>
                 </div>
                 <div class="split-stats__block">
-                  <span>Validación</span>
-                  <strong>Pendiente</strong>
+                  <span>Tus puntos</span>
+                  <strong>Al día</strong>
                 </div>
                 <div class="split-stats__status">
-                  <span>Consulta</span>
-                  <strong>Disponible al iniciar sesión</strong>
+                  <span>Tu siguiente paso</span>
+                  <strong>Siempre a la vista</strong>
                 </div>
               </div>
             </article>
@@ -185,12 +185,12 @@ const timelineSteps = [
         <div class="shell experience-grid">
           <aside class="experience-intro">
             <h2>
-              Cómo avanza tu
-              <span>experiencia</span>
+              Empieza hoy y
+              <span>crece con nosotros</span>
             </h2>
-            <p>Un proceso claro desde el registro hasta la consulta de la validación.</p>
+            <p>Un camino sencillo para convertir tu relación con Carobra en una experiencia con más valor.</p>
             <blockquote>
-              "Tu cuenta se crea primero y la validación AFORE comienza con estado pendiente."
+              "Tu progreso se construye paso a paso. Nosotros te ayudamos a verlo y aprovecharlo."
             </blockquote>
           </aside>
 
@@ -209,12 +209,12 @@ const timelineSteps = [
 
       <section id="confianza" class="trust">
         <div class="shell trust__inner">
-          <h2>Confianza antes de cada acción</h2>
+          <h2>Un programa que crece contigo</h2>
           <p>
-            Diseñada para registrar tu cuenta y mostrar el estado de validación sin presentar funciones futuras como disponibles.
+            Tú ves información clara y beneficios disponibles para tu cuenta. Carobra protege tus datos y confirma cada avance antes de mostrarlo.
           </p>
           <div class="trust__actions">
-            <a href="/registro" class="btn-primary trust__cta">Comienza tu viaje</a>
+            <a href="/registro" class="btn-primary trust__cta">Únete a Carobra Rewards</a>
             <a href="/login" class="btn-secondary btn-secondary--dark trust__cta-secondary">Iniciar sesión</a>
           </div>
         </div>
@@ -233,7 +233,7 @@ const timelineSteps = [
               decoding="async"
             />
           </a>
-          <p>Registro y seguimiento de validación para clientes de Carobra Rewards.</p>
+          <p>El programa que reconoce tu confianza y te acompaña a avanzar con Carobra.</p>
           <p class="landing-footer__copy">© 2026 Carobra Rewards. Todos los derechos reservados.</p>
         </section>
 
@@ -241,8 +241,8 @@ const timelineSteps = [
           <h3>Legal</h3>
           <a href="#terminos">Términos de uso</a>
           <a href="#privacidad">Política de privacidad</a>
-          <p id="terminos" class="landing-footer__meta">Consulta las condiciones del programa antes de registrarte.</p>
-          <p id="privacidad" class="landing-footer__meta">Privacidad y control de datos visibles en toda la experiencia.</p>
+          <p id="terminos" class="landing-footer__meta">Consulta las condiciones de participación y uso del programa.</p>
+          <p id="privacidad" class="landing-footer__meta">Conoce cómo protegemos y utilizamos tus datos.</p>
         </section>
 
         <section id="ayuda">
