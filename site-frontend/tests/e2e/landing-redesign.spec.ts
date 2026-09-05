@@ -24,3 +24,10 @@ test("footer exposes explicit legal and support paths", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Política de privacidad" })).toBeVisible();
   await expect(page.locator("footer a[href='mailto:soporte@carobra.mx']")).toBeVisible();
 });
+
+test("browser chrome uses the Carobra brand icon", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator("link[rel='icon']")).toHaveAttribute("href", "/favicon.png");
+  await expect(page.locator("link[rel='apple-touch-icon']")).toHaveAttribute("href", "/apple-touch-icon.png");
+});
