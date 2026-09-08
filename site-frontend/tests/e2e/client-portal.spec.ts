@@ -6,28 +6,19 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Invitado" })).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
-  const mobileMenu = page.getByRole("button", { name: "Abrir menú de navegación" });
-  const isMobile = await mobileMenu.isVisible();
-  if (isMobile) {
-    await expect(async () => {
-      if ((await mobileMenu.getAttribute("aria-expanded")) !== "true") {
-        await mobileMenu.click();
-      }
-      await expect(mobileMenu).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
-    }).toPass({ timeout: 10_000 });
-  }
+  const isMobile = await page.getByRole("navigation", { name: /Navegación móvil/ }).isVisible();
   await expect(page.getByRole("link", { name: /Beneficios/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Ganar puntos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Productos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Actividad/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Gift Cards/ })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Ver notificaciones" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Ver notificaciones" })).not.toHaveAttribute("data-astro-prefetch", "hover");
+  await expect(page.getByRole("link", { name: /^Ver notificaciones/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Ver notificaciones/ })).not.toHaveAttribute("data-astro-prefetch", "hover");
   await expect(page.getByText("Avisos", { exact: true })).toHaveCount(0);
   const activeNavigation = page.getByRole("navigation", { name: isMobile ? /Navegación móvil/ : /Navegación cliente/ });
   await expect(activeNavigation.getByText("Inicio", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Estamos validando tu producto" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contrata tu primer producto y activa tu camino Rewards" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
   const rendered = await page.reload();
   expect(rendered?.headers()["server-timing"]).toMatch(/auth-context;dur=\d+\.\d, page-render;dur=\d+\.\d, total;dur=\d+\.\d/);
@@ -80,12 +71,13 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await page.goto("/cliente/ganar-puntos");
   await expect(page.getByRole("heading", { name: "Ganar puntos", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cada acción confirmada cuenta." })).toBeVisible();
-  await expect(page.getByText("actividad registrada", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cómo puedes ganar puntos" })).toBeVisible();
+  await expect(page.getByText("+20 pts", { exact: true })).toBeVisible();
 
   await page.goto("/cliente/productos");
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cuenta de retiro" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Productos disponibles" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nuestras soluciones" })).toBeVisible();
   for (const product of ["Skandia", "Quálitas", "Modalidad 40"]) {
     const card = page.locator(".product-offer__card").filter({ hasText: product });
     await expect(card.getByRole("heading", { name: product })).toBeVisible();
@@ -110,7 +102,6 @@ test("portal navigation remains usable without horizontal overflow on mobile", a
   await page.setViewportSize({ width: 320, height: 800 });
   await login(page, "eligible@example.com");
 
-  await page.getByRole("button", { name: "Abrir menú de navegación" }).click();
   const mobileNav = page.getByRole("navigation", { name: /Navegación móvil/ });
   await expect(mobileNav.getByText("Inicio", { exact: true })).toBeVisible();
   await expect(mobileNav.getByRole("link", { name: /Beneficios/ })).toBeVisible();

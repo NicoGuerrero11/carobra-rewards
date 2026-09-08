@@ -7,14 +7,15 @@ test("pending customer enters the real invited Rewards experience", async ({ pag
   await expect(page.getByRole("heading", { name: "Invitado", exact: true })).toBeVisible();
   await expect(page.getByText("Saldo disponible")).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
-  await expect(page.getByText(/canje todavía no está habilitado/i)).toBeVisible();
-  await expect(page.getByText("Primero: validar tu producto", { exact: true })).toBeVisible();
+  await expect(page.getByText(/saldo se conserva mientras se habilitan opciones/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contrata tu primer producto y activa tu camino Rewards" })).toBeVisible();
+  await expect(page.getByText(/1 de 3 pasos hacia Bronce/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Lo disponible hoy" })).toBeVisible();
 
   await assertCustomerSectionsAreReachable(page);
   await page.goto("/cliente/productos");
   await expect(page.getByText("Aún no hay productos confirmados")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Productos disponibles" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nuestras soluciones" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Skandia" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quálitas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Modalidad 40" })).toBeVisible();
@@ -66,7 +67,7 @@ test("rejected customer remains invited and can browse every customer section", 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Invitado", exact: true })).toBeVisible();
   await expect(page.getByText("Miembro Invitado", { exact: true })).toBeVisible();
-  await expect(page.getByText(/canje todavía no está habilitado/i)).toBeVisible();
+  await expect(page.getByText(/saldo se conserva mientras se habilitan opciones/i)).toBeVisible();
 
   await assertCustomerSectionsAreReachable(page);
 });
@@ -94,6 +95,7 @@ async function login(page: Page, email: string) {
 async function assertCustomerSectionsAreReachable(page: Page) {
   for (const path of [
     "/cliente/beneficios",
+    "/cliente/ayuda",
     "/cliente/ganar-puntos",
     "/cliente/productos",
     "/cliente/activities",
