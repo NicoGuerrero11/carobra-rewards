@@ -12,6 +12,7 @@ const customerEntryPaths = new Set([
   "/cliente",
   "/cliente/validacion",
   "/cliente/beneficios",
+  "/cliente/ayuda",
   "/cliente/cursos",
   "/cliente/gift-cards",
   "/cliente/ganar-puntos",

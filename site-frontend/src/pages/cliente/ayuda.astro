@@ -1,0 +1,48 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+
+const cookie = Astro.request.headers.get("cookie") ?? "";
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let unavailable = portalLoadedWithContext && !portal;
+
+if (!portalLoadedWithContext) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+    else unavailable = true;
+  } catch {
+    unavailable = true;
+  }
+}
+
+const helpItems = portal?.help ?? [];
+---
+
+<ClientShellLayout title="Ayuda | Carobra Rewards" description="Respuestas y soporte para tu experiencia Rewards." currentPath="/cliente/ayuda" sectionLabel="Ayuda">
+  <main class="portal-page help-page">
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Estamos para ayudarte</p><h1>Ayuda</h1><p>Encuentra respuestas sobre tu cuenta, tus productos y el uso de Rewards.</p></div><a href="mailto:soporte@carobra.mx">Contactar soporte</a></header>
+
+    {unavailable && !portal ? (
+      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos cargar las respuestas</h2><p>Puedes escribirnos directamente y nuestro equipo te ayudará.</p><a class="portal-text-link" href="mailto:soporte@carobra.mx">Escribir a soporte</a></div></section>
+    ) : (
+      <div class="help-layout">
+        <section class="help-list" aria-labelledby="help-list-title">
+          <div class="portal-section-heading"><div><p class="portal-eyebrow">Preguntas frecuentes</p><h2 id="help-list-title">Información para tu cuenta</h2></div></div>
+          {helpItems.length ? helpItems.map((item) => <details><summary>{item.title}</summary><p>{item.body}</p></details>) : <div class="portal-card"><h3>Tu cuenta Rewards</h3><p>Los estados, puntos y productos que ves corresponden a la información confirmada para tu cuenta.</p></div>}
+        </section>
+        <aside class="portal-card portal-card--dark"><p class="portal-eyebrow">Atención personal</p><h2>¿Necesitas hablar con alguien?</h2><p>Un asesor puede ayudarte a revisar tu cuenta o explicarte las opciones disponibles.</p><a class="portal-text-link" href="mailto:soporte@carobra.mx">Contactar a Carobra</a></aside>
+      </div>
+    )}
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+  <style>
+    .help-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(17rem,.65fr);align-items:start;gap:1rem}.help-list{padding:clamp(1.4rem,4vw,2.2rem);border:1px solid #cbd7df;border-radius:1.15rem;background:#fff;box-shadow:0 8px 18px rgba(4,28,44,.07)}.help-list details{border-bottom:1px solid #dce5eb}.help-list details:last-child{border-bottom:0}.help-list summary{padding:1rem 2rem 1rem 0;color:#041c2c;font-weight:750;cursor:pointer}.help-list details p{margin:0;padding:0 0 1rem;color:#536878;line-height:1.65}.help-list>.portal-card{margin-top:1rem}.portal-welcome>a{color:#004b87;font-weight:750}@media(max-width:720px){.help-layout{grid-template-columns:1fr}}
+  </style>
+</ClientShellLayout>
