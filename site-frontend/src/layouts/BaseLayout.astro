@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+import "../styles/brand-app.css";
+import "../styles/brand-public.css";
 
 interface Props {
   title?: string;
@@ -10,6 +12,9 @@ const {
   title = "Carobra Rewards | Tu relación con Carobra te da más",
   description = "Únete a Carobra Rewards, consulta tu nivel, suma puntos y descubre los beneficios disponibles para ti.",
 } = Astro.props as Props;
+
+const isApplicationSurface = Astro.url.pathname !== "/";
+const isPublicLanding = Astro.url.pathname === "/";
 ---
 
 <!doctype html>
@@ -23,7 +28,7 @@ const {
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>{title}</title>
   </head>
-  <body>
+  <body class:list={{ "carobra-app": isApplicationSurface, "carobra-public": isPublicLanding }}>
     <slot />
   </body>
 </html>

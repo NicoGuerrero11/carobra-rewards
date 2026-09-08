@@ -1,0 +1,1469 @@
+@import "@fontsource-variable/montserrat/index.css";
+
+/*
+ * Carobra product design system
+ * Scoped to non-landing routes through BaseLayout. The public landing page
+ * intentionally keeps the visual system it shipped with.
+ */
+
+body.carobra-app {
+  --carobra-navy: #041c2c;
+  --carobra-navy-raised: #082d46;
+  --carobra-blue: #004b87;
+  --carobra-blue-hover: #003d70;
+  --carobra-cyan: #00a3e0;
+  --carobra-cyan-soft: #dff5fd;
+  --carobra-gold: #b88416;
+  --carobra-gold-strong: #8f6508;
+  --carobra-gold-soft: #fff5d8;
+  --carobra-cool-gray: #a7a8aa;
+  --carobra-ink: #0b2233;
+  --carobra-ink-muted: #536878;
+  --carobra-canvas: #f3f6f8;
+  --carobra-canvas-strong: #e9eff3;
+  --carobra-surface: #ffffff;
+  --carobra-surface-blue: #f2f8fc;
+  --carobra-border: #cbd7df;
+  --carobra-border-strong: #9eb5c5;
+  --carobra-focus: #00a3e0;
+  --carobra-success: #19734a;
+  --carobra-success-soft: #e9f7ef;
+  --carobra-warning: #8a5b12;
+  --carobra-warning-soft: #fff6df;
+  --carobra-danger: #9b3036;
+  --carobra-danger-soft: #fff0f1;
+  --carobra-radius-sm: 0.55rem;
+  --carobra-radius-md: 0.85rem;
+  --carobra-radius-lg: 1.15rem;
+  --carobra-shadow-sm: 0 8px 18px rgba(4, 28, 44, 0.07);
+  --carobra-shadow-md: 0 18px 44px rgba(4, 28, 44, 0.11);
+  --carobra-shadow-strong: 0 26px 64px rgba(4, 28, 44, 0.18);
+  --cb-bg: var(--carobra-canvas);
+  --cb-bg-soft: var(--carobra-canvas-strong);
+  --cb-surface: var(--carobra-surface);
+  --cb-surface-soft: var(--carobra-surface-blue);
+  --cb-surface-deep: var(--carobra-navy);
+  --cb-ink: var(--carobra-ink);
+  --cb-ink-soft: var(--carobra-ink-muted);
+  --cb-primary: var(--carobra-blue);
+  --cb-primary-strong: var(--carobra-navy-raised);
+  --cb-primary-deep: var(--carobra-navy);
+  --cb-primary-bright: var(--carobra-cyan);
+  --cb-stroke: var(--carobra-border);
+  --cb-shadow-soft: var(--carobra-shadow-sm);
+  --cb-shadow-strong: var(--carobra-shadow-strong);
+  min-width: 320px;
+  background: var(--carobra-canvas);
+  color: var(--carobra-ink);
+  font-family: "Montserrat Variable", "Montserrat", "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 470;
+  letter-spacing: -0.005em;
+}
+
+body.carobra-app ::selection {
+  background: rgba(0, 163, 224, 0.24);
+  color: var(--carobra-navy);
+}
+
+body.carobra-app :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgba(0, 163, 224, 0.42);
+  outline-offset: 3px;
+}
+
+body.carobra-app :where(h1, h2, h3, h4, strong) {
+  text-wrap: balance;
+}
+
+body.carobra-app :where(input, select, textarea, button) {
+  font: inherit;
+}
+
+/* Shared controls */
+
+body.carobra-app .btn-primary,
+body.carobra-app .admin-home__action-btn,
+body.carobra-app .mark-read {
+  border: 1px solid var(--carobra-blue);
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-blue);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0, 75, 135, 0.18);
+  font-weight: 720;
+  letter-spacing: 0.005em;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+body.carobra-app .btn-primary:hover,
+body.carobra-app .admin-home__action-btn:hover,
+body.carobra-app .mark-read:hover {
+  border-color: var(--carobra-blue-hover);
+  background: var(--carobra-blue-hover);
+  box-shadow: 0 12px 24px rgba(0, 75, 135, 0.22);
+  filter: none;
+  transform: translateY(-1px);
+}
+
+body.carobra-app .btn-primary:disabled,
+body.carobra-app .admin-home__action-btn:disabled,
+body.carobra-app button:disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.55;
+  transform: none;
+}
+
+body.carobra-app .btn-secondary,
+body.carobra-app .auth-oauth-btn {
+  border-color: var(--carobra-border-strong);
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-surface);
+  color: var(--carobra-blue);
+  box-shadow: none;
+  font-weight: 680;
+}
+
+body.carobra-app .btn-secondary:hover,
+body.carobra-app .auth-oauth-btn:hover {
+  border-color: var(--carobra-blue);
+  background: var(--carobra-surface-blue);
+  color: var(--carobra-navy);
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .pill,
+body.carobra-app .portal-eyebrow,
+body.carobra-app .rewards-home__eyebrow,
+body.carobra-app .benefits-page__eyebrow,
+body.carobra-app .eyebrow {
+  color: var(--carobra-blue);
+  font-weight: 760;
+  letter-spacing: 0.11em;
+}
+
+body.carobra-app :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+body.carobra-app .admin-home__search-input {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-surface);
+  color: var(--carobra-ink);
+  box-shadow: 0 1px 0 rgba(4, 28, 44, 0.03) inset;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+body.carobra-app :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):hover,
+body.carobra-app .admin-home__search-input:hover {
+  border-color: var(--carobra-border-strong);
+}
+
+body.carobra-app :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus,
+body.carobra-app .admin-home__search-input:focus {
+  border-color: var(--carobra-cyan);
+  box-shadow: 0 0 0 4px rgba(0, 163, 224, 0.14);
+  outline: none;
+}
+
+body.carobra-app :where(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--carobra-danger);
+  box-shadow: 0 0 0 4px rgba(155, 48, 54, 0.1);
+}
+
+body.carobra-app input[type="checkbox"],
+body.carobra-app input[type="radio"] {
+  accent-color: var(--carobra-blue);
+}
+
+/* Customer application shell */
+
+body.carobra-app .client-shell {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(0, 163, 224, 0.035) 0 8%, transparent 8% 100%),
+    var(--carobra-canvas);
+}
+
+body.carobra-app .client-shell::before {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  top: 4.6rem;
+  right: -7rem;
+  width: 22rem;
+  height: 0.42rem;
+  background: linear-gradient(90deg, transparent, rgba(0, 75, 135, 0.14), rgba(0, 163, 224, 0.38));
+  transform: rotate(-42deg);
+  transform-origin: right center;
+  pointer-events: none;
+}
+
+body.carobra-app .client-shell__topnav {
+  border-bottom: 1px solid rgba(4, 28, 44, 0.16);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 7px 22px rgba(4, 28, 44, 0.055);
+  backdrop-filter: blur(18px);
+}
+
+body.carobra-app .client-shell__topnav-inner {
+  width: min(76rem, calc(100% - 2.2rem));
+  min-height: 4.85rem;
+}
+
+body.carobra-app .client-shell__brand-link {
+  padding: 0.35rem 0.55rem 0.35rem 0;
+}
+
+body.carobra-app .client-shell__brand-logo {
+  width: clamp(12rem, 18vw, 17.5rem);
+  height: auto;
+  object-fit: contain;
+}
+
+body.carobra-app .client-shell__nav {
+  gap: 0.25rem;
+}
+
+body.carobra-app .client-shell__nav-link,
+body.carobra-app .client-shell__mobile-link {
+  border-radius: var(--carobra-radius-sm);
+  color: #36556b;
+  font-size: 0.82rem;
+  font-weight: 680;
+}
+
+body.carobra-app .client-shell__nav-icon {
+  border-radius: 0.38rem;
+  background: rgba(0, 75, 135, 0.08);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .client-shell__nav-link .client-shell__nav-icon {
+  display: none;
+}
+
+body.carobra-app .client-shell__notification-count {
+  position: absolute;
+  top: -0.38rem;
+  right: -0.38rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  display: grid;
+  place-items: center;
+  padding: 0 0.22rem;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--carobra-danger);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 820;
+  line-height: 1;
+}
+
+body.carobra-app .client-shell__bottom-nav {
+  display: none;
+}
+
+body.carobra-app .client-shell__nav-link:hover,
+body.carobra-app .client-shell__mobile-link:hover {
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .client-shell__nav-link.is-active,
+body.carobra-app .client-shell__mobile-link.is-active {
+  background: var(--carobra-navy);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(4, 28, 44, 0.18);
+}
+
+body.carobra-app .client-shell__nav-link.is-active .client-shell__nav-icon,
+body.carobra-app .client-shell__mobile-link.is-active .client-shell__nav-icon {
+  background: rgba(0, 163, 224, 0.2);
+  color: #fff;
+}
+
+body.carobra-app .client-shell__notification-link,
+body.carobra-app .client-shell__user-toggle,
+body.carobra-app .client-shell__menu-toggle {
+  border-color: var(--carobra-border);
+  background: #fff;
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .client-shell__notification-link:hover,
+body.carobra-app .client-shell__notification-link:focus-visible,
+body.carobra-app .client-shell__notification-link.is-active,
+body.carobra-app .client-shell__user-toggle:hover,
+body.carobra-app .client-shell__menu-toggle:hover {
+  border-color: var(--carobra-cyan);
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-navy);
+  transform: none;
+}
+
+body.carobra-app .client-shell__user-icon {
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .client-shell__user-menu,
+body.carobra-app .client-shell__mobile-menu {
+  border-color: var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .client-shell__user-menu-link,
+body.carobra-app .client-shell__user-menu-button {
+  color: var(--carobra-ink);
+}
+
+body.carobra-app .client-shell__user-menu-link:hover,
+body.carobra-app .client-shell__user-menu-button:hover {
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .client-shell__content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Customer pages */
+
+body.carobra-app :where(.client-page, .portal-page, .rewards-home, .benefits-page) {
+  color: var(--carobra-ink);
+}
+
+body.carobra-app :where(.client-page, .portal-page, .rewards-home, .benefits-page) :where(h1, h2, h3) {
+  color: var(--carobra-navy);
+}
+
+body.carobra-app :where(.client-page, .portal-page, .rewards-home, .benefits-page) p {
+  color: var(--carobra-ink-muted);
+}
+
+body.carobra-app :where(.client-card, .portal-card, .rewards-home__panel, .rewards-home__action, .rewards-home__recent, .benefit-card, .product-offer, .products-advisor, .benefits-page__wallet, .account-card, .notification-list > li, .activity-timeline > li) {
+  border-color: var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: var(--carobra-surface);
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app :where(.portal-welcome, .benefits-page__welcome, .rewards-home__welcome) {
+  color: var(--carobra-blue);
+  font-size: 0.78rem;
+  font-weight: 760;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+body.carobra-app :where(.portal-section-heading, .benefits-page__section-heading, .rewards-home__panel-heading, .rewards-home__recent-heading) {
+  border-bottom-color: var(--carobra-border);
+}
+
+body.carobra-app :where(.rewards-home__hero-copy, .benefits-page__hero, .activity-hero, .earn-hero, .products-hero, .giftcards-hero, .learning-hero, .client-home-hero) {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--carobra-navy-raised);
+  border-radius: var(--carobra-radius-lg);
+  background:
+    linear-gradient(121deg, transparent 0 74%, rgba(0, 163, 224, 0.15) 74% 78%, transparent 78%),
+    linear-gradient(121deg, transparent 0 82%, rgba(255, 255, 255, 0.11) 82% 86%, transparent 86%),
+    linear-gradient(125deg, var(--carobra-navy) 0%, var(--carobra-blue) 100%);
+  color: #fff;
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app :where(.rewards-home__hero-copy, .benefits-page__hero, .activity-hero, .earn-hero, .products-hero, .giftcards-hero, .learning-hero, .client-home-hero) :where(h1, h2, h3, strong) {
+  color: #fff;
+}
+
+body.carobra-app :where(.rewards-home__hero-copy, .benefits-page__hero, .activity-hero, .earn-hero, .products-hero, .giftcards-hero, .learning-hero, .client-home-hero) p {
+  color: #dcecf5;
+}
+
+body.carobra-app :where(.rewards-home__hero-copy, .benefits-page__hero, .activity-hero, .earn-hero, .products-hero, .giftcards-hero, .learning-hero, .client-home-hero) :where(.portal-eyebrow, .benefits-page__eyebrow, .rewards-home__eyebrow, .client-home-hero__kicker) {
+  color: #79d5f5;
+}
+
+body.carobra-app .rewards-home__balance,
+body.carobra-app .giftcards-balance-card,
+body.carobra-app .earn-hero__stats,
+body.carobra-app .products-hero__count {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(4, 28, 44, 0.42);
+  color: #fff;
+  box-shadow: none;
+}
+
+body.carobra-app .rewards-home__balance :where(p, span, small),
+body.carobra-app .giftcards-balance-card :where(p, span, small),
+body.carobra-app .earn-hero__stats :where(p, span, small),
+body.carobra-app .products-hero__count :where(p, span, small) {
+  color: #d7edf7;
+}
+
+body.carobra-app :where(.rewards-home__tags, .benefits-page__tags) span,
+body.carobra-app .journey-tags span {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+body.carobra-app :where(.rewards-home__metrics, .rewards-home__decision-grid, .benefits-page__available-grid, .benefits-page__family-grid, .portal-grid) {
+  gap: 1rem;
+}
+
+body.carobra-app :where(.rewards-home__action, .benefit-card, .product-offer) {
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+body.carobra-app :where(.rewards-home__action, .benefit-card, .product-offer):hover {
+  border-color: var(--carobra-cyan);
+  box-shadow: var(--carobra-shadow-md);
+  transform: translateY(-2px);
+}
+
+body.carobra-app :where(.portal-text-link, .products-list__title a, .giftcards-back, .client-section-link) {
+  color: var(--carobra-blue);
+  font-weight: 720;
+  text-decoration-color: rgba(0, 163, 224, 0.5);
+  text-underline-offset: 0.2em;
+}
+
+body.carobra-app :where(.portal-text-link, .products-list__title a, .giftcards-back, .client-section-link):hover {
+  color: var(--carobra-blue-hover);
+}
+
+body.carobra-app .portal-card--dark {
+  border-color: var(--carobra-navy);
+  background: var(--carobra-navy);
+  color: #fff;
+}
+
+body.carobra-app .portal-card--dark :where(h2, h3, strong) {
+  color: #fff;
+}
+
+body.carobra-app .portal-card--dark p {
+  color: #d8e8f1;
+}
+
+body.carobra-app :where(.course-progress span, .rewards-home progress, .rewards-home__progress-fill) {
+  background: var(--carobra-cyan);
+}
+
+body.carobra-app .benefit-card--learning,
+body.carobra-app .benefit-card--status {
+  background: var(--carobra-surface-blue);
+}
+
+body.carobra-app :where(.portal-empty-state, .benefits-page__empty, .products-empty, .earn-empty, .rewards-empty) {
+  border-color: var(--carobra-border);
+  background: var(--carobra-surface-blue);
+  color: var(--carobra-ink-muted);
+}
+
+/* Route-local styles are Astro-scoped, so these selectors intentionally carry
+ * a stronger application scope while keeping the original markup intact. */
+
+body.carobra-app .rewards-home .rewards-home__hero,
+body.carobra-app .portal-page .portal-status-hero {
+  border: 1px solid var(--carobra-navy-raised);
+  border-radius: var(--carobra-radius-lg);
+  background:
+    linear-gradient(121deg, transparent 0 72%, rgba(0, 163, 224, 0.18) 72% 77%, transparent 77%),
+    linear-gradient(121deg, transparent 0 80%, rgba(255, 255, 255, 0.11) 80% 84%, transparent 84%),
+    linear-gradient(125deg, var(--carobra-navy), var(--carobra-blue));
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .rewards-home .rewards-home__hero.is-blocked,
+body.carobra-app .rewards-home .rewards-home__hero.is-inactive {
+  background: linear-gradient(125deg, #263d4c, #536878);
+}
+
+body.carobra-app .rewards-home .rewards-home__action {
+  border: 1px solid var(--carobra-border);
+  border-left: 0.3rem solid var(--carobra-cyan);
+  border-radius: var(--carobra-radius-md);
+  background: #fff;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .rewards-home .rewards-home__action > span {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-navy);
+}
+
+body.carobra-app .rewards-home .rewards-home__action > a {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-blue);
+  color: #fff;
+}
+
+body.carobra-app .rewards-home .rewards-home__panel,
+body.carobra-app .rewards-home .rewards-home__recent {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: #fff;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .rewards-home .rewards-home__message,
+body.carobra-app .rewards-home .rewards-home__metrics li,
+body.carobra-app .rewards-home .rewards-home__benefit-list li,
+body.carobra-app .rewards-home .rewards-home__recent li {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-surface-blue);
+}
+
+body.carobra-app .rewards-home .rewards-home__benefit-list > li > span {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-cyan-soft) !important;
+  color: var(--carobra-blue) !important;
+}
+
+body.carobra-app .rewards-home .rewards-home__recent li > span {
+  background: var(--carobra-blue);
+  box-shadow: 0 0 0 3px var(--carobra-cyan-soft);
+}
+
+body.carobra-app .rewards-home .rewards-home__balance a,
+body.carobra-app .rewards-home .rewards-home__panel-heading > a,
+body.carobra-app .rewards-home .rewards-home__recent-heading > a,
+body.carobra-app .rewards-home .rewards-home__welcome > a {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .rewards-home .rewards-home__balance strong,
+body.carobra-app .benefits-page .benefits-page__wallet strong,
+body.carobra-app .portal-page .giftcards-balance-card strong {
+  color: var(--carobra-gold-strong);
+}
+
+body.carobra-app .portal-page .portal-welcome > span,
+body.carobra-app .benefits-page .benefits-page__welcome > span {
+  background: var(--carobra-cyan-soft) !important;
+  color: var(--carobra-blue) !important;
+}
+
+body.carobra-app .benefits-page .benefits-page__hero,
+body.carobra-app .portal-page .earn-hero,
+body.carobra-app .portal-page .products-hero,
+body.carobra-app .portal-page .activity-hero,
+body.carobra-app .portal-page .giftcards-hero,
+body.carobra-app .portal-page .learning-hero {
+  border: 1px solid var(--carobra-navy-raised);
+  border-radius: var(--carobra-radius-lg);
+  background:
+    linear-gradient(121deg, transparent 0 72%, rgba(0, 163, 224, 0.18) 72% 77%, transparent 77%),
+    linear-gradient(121deg, transparent 0 80%, rgba(255, 255, 255, 0.11) 80% 84%, transparent 84%),
+    linear-gradient(125deg, var(--carobra-navy), var(--carobra-blue)) !important;
+  color: #fff;
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .benefits-page .benefits-page__hero :where(h2, h3),
+body.carobra-app .portal-page :where(.earn-hero, .products-hero, .activity-hero, .giftcards-hero, .learning-hero) :where(h2, h3) {
+  color: #fff;
+}
+
+body.carobra-app .benefits-page .benefits-page__hero > div > p:not(.benefits-page__eyebrow),
+body.carobra-app .portal-page .earn-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .products-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .activity-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .giftcards-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .learning-hero > div > p:not(.portal-eyebrow) {
+  color: #dcecf5;
+}
+
+body.carobra-app .benefits-page .benefits-page__hero .benefits-page__eyebrow,
+body.carobra-app .portal-page :where(.earn-hero, .products-hero, .activity-hero, .giftcards-hero, .learning-hero) .portal-eyebrow {
+  color: #79d5f5;
+}
+
+body.carobra-app .benefits-page .benefits-page__wallet,
+body.carobra-app .portal-page .products-hero__count,
+body.carobra-app .portal-page .activity-hero article,
+body.carobra-app .portal-page .giftcards-balance-card {
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: var(--carobra-radius-md);
+  background: #fff;
+  color: var(--carobra-navy);
+  box-shadow: 0 16px 34px rgba(4, 28, 44, 0.18);
+}
+
+body.carobra-app .benefits-page .benefits-page__wallet > span,
+body.carobra-app .portal-page .activity-hero article > span,
+body.carobra-app .portal-page .giftcards-balance-card > span {
+  color: var(--carobra-cyan);
+}
+
+body.carobra-app .benefits-page .benefits-page__wallet a,
+body.carobra-app .portal-page .giftcards-next a + a {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .benefits-page .benefits-page__section,
+body.carobra-app .products-page .product-offer {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-lg);
+  background: #fff;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .benefits-page .benefit-card--learning > span,
+body.carobra-app .benefits-page .benefit-card--status > span,
+body.carobra-app .benefits-page .benefits-page__family-grid > article > span,
+body.carobra-app .benefits-page .benefits-page__family-grid > a > span {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .benefits-page .benefits-page__family-grid > article,
+body.carobra-app .benefits-page .benefits-page__family-grid > a {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: #fff !important;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .benefits-page .benefits-page__family-grid > article:nth-child(even),
+body.carobra-app .benefits-page .benefits-page__family-grid > a {
+  background: var(--carobra-surface-blue) !important;
+}
+
+body.carobra-app .portal-page .earn-hero__stats article {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--carobra-radius-sm);
+  background: rgba(4, 28, 44, 0.38);
+}
+
+body.carobra-app .portal-page .earn-hero__stats article strong {
+  color: #79d5f5;
+}
+
+body.carobra-app .portal-page .earn-hero__stats article span {
+  color: #e5f2f7;
+}
+
+body.carobra-app .portal-page .earning-paths article {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: #fff !important;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .portal-page .earning-paths article:nth-child(even) {
+  background: var(--carobra-surface-blue) !important;
+}
+
+body.carobra-app .portal-page .earning-paths :where(article > strong, article > a, article strong) {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .products-page .product-offer__card.is-skandia {
+  background: linear-gradient(145deg, #fff, #e7f3fa);
+}
+
+body.carobra-app .products-page .product-offer__card.is-qualitas {
+  background: linear-gradient(145deg, #fff, var(--carobra-cyan-soft));
+}
+
+body.carobra-app .products-page .product-offer__card.is-modalidad {
+  background: linear-gradient(145deg, #fff, #dcecf5);
+}
+
+body.carobra-app .products-page .product-offer__card .product-offer__symbol {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-blue);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(0, 75, 135, 0.18);
+}
+
+body.carobra-app .products-page .products-advisor {
+  border: 1px solid var(--carobra-navy-raised);
+  border-radius: var(--carobra-radius-lg);
+  background:
+    linear-gradient(121deg, transparent 0 78%, rgba(0, 163, 224, 0.2) 78% 84%, transparent 84%),
+    linear-gradient(125deg, var(--carobra-navy), var(--carobra-blue));
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .products-page .products-advisor .portal-eyebrow {
+  color: #79d5f5;
+}
+
+body.carobra-app .products-page .products-advisor a {
+  border-radius: var(--carobra-radius-sm);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .activity-page .activity-hero article > span {
+  color: var(--carobra-cyan) !important;
+}
+
+body.carobra-app .activity-page .activity-expiry {
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .portal-page .giftcards-next a {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-blue);
+}
+
+body.carobra-app .portal-page .giftcards-next a + a {
+  border: 1px solid var(--carobra-border-strong);
+  background: #fff !important;
+  color: var(--carobra-blue) !important;
+}
+
+body.carobra-app .portal-page .learning-hero__visual {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--carobra-radius-md);
+  background: rgba(4, 28, 44, 0.46);
+  box-shadow: none;
+  transform: none;
+}
+
+body.carobra-app .portal-page .learning-hero__visual span {
+  color: var(--carobra-blue);
+  background: #fff;
+}
+
+body.carobra-app .portal-page .learning-grid article,
+body.carobra-app .portal-page .giftcards-flow-grid article,
+body.carobra-app .products-page .product-offer__card {
+  border: 1px solid var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: #fff;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .portal-page .learning-grid article:nth-child(2),
+body.carobra-app .portal-page .giftcards-flow-grid article:nth-child(2) {
+  background: var(--carobra-surface-blue);
+}
+
+body.carobra-app .portal-page .learning-grid article:nth-child(3),
+body.carobra-app .portal-page .giftcards-flow-grid article:nth-child(3) {
+  background: linear-gradient(145deg, #fff, var(--carobra-cyan-soft));
+}
+
+body.carobra-app .products-page .product-offer__symbol,
+body.carobra-app .portal-page .portal-feature-icon,
+body.carobra-app .portal-page .portal-empty-state > span {
+  border-radius: var(--carobra-radius-sm);
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .activity-page .activity-timeline::before,
+body.carobra-app .activity-page .activity-timeline > li::before {
+  background: var(--carobra-border-strong);
+}
+
+body.carobra-app .activity-page .activity-timeline > li > span,
+body.carobra-app .activity-page .activity-timeline .activity-dot {
+  background: var(--carobra-blue);
+  box-shadow: 0 0 0 4px var(--carobra-cyan-soft);
+}
+
+/* Authentication */
+
+body.carobra-app .auth-page {
+  position: relative;
+  isolation: isolate;
+  padding-block: clamp(2rem, 5vw, 4.5rem);
+  background:
+    linear-gradient(132deg, transparent 0 72%, rgba(0, 163, 224, 0.13) 72% 77%, transparent 77%),
+    linear-gradient(132deg, transparent 0 79%, rgba(0, 75, 135, 0.16) 79% 84%, transparent 84%),
+    linear-gradient(145deg, #e9eff3 0%, #f8fafb 46%, #dfeaf1 100%);
+}
+
+body.carobra-app .auth-page::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0 auto 0 0;
+  width: clamp(0.4rem, 1vw, 0.75rem);
+  background: linear-gradient(180deg, var(--carobra-navy) 0 34%, var(--carobra-blue) 34% 68%, var(--carobra-cyan) 68% 100%);
+}
+
+body.carobra-app .auth-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(4, 28, 44, 0.15);
+  border-radius: var(--carobra-radius-lg);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--carobra-shadow-strong);
+  backdrop-filter: blur(14px);
+}
+
+body.carobra-app .auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0.34rem;
+  background: linear-gradient(90deg, var(--carobra-navy) 0 34%, var(--carobra-blue) 34% 70%, var(--carobra-cyan) 70% 100%);
+}
+
+body.carobra-app .auth-brand {
+  display: flex;
+  width: min(12.5rem, 60%);
+  margin: 0.45rem 0 1.4rem;
+}
+
+body.carobra-app .auth-brand img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+body.carobra-app .auth-card h1 {
+  color: var(--carobra-navy);
+  font-weight: 790;
+  letter-spacing: -0.03em;
+}
+
+body.carobra-app .auth-card :where(p, label) {
+  color: var(--carobra-ink-muted);
+}
+
+body.carobra-app .auth-card label {
+  color: #25485f;
+  font-weight: 670;
+}
+
+body.carobra-app .auth-card a:not(.btn-secondary):not(.auth-brand) {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .auth-back-link {
+  margin-bottom: 0.4rem;
+}
+
+/* Administration */
+
+body.carobra-app .admin-home {
+  isolation: isolate;
+  gap: 1.25rem;
+}
+
+body.carobra-app .admin-home::before,
+body.carobra-app .admin-home::after {
+  border-radius: 0;
+  filter: none;
+  opacity: 1;
+}
+
+body.carobra-app .admin-home::before {
+  width: 21rem;
+  height: 0.55rem;
+  right: -8rem;
+  top: 9rem;
+  background: linear-gradient(90deg, transparent, rgba(0, 75, 135, 0.2), rgba(0, 163, 224, 0.5));
+  transform: rotate(-42deg);
+}
+
+body.carobra-app .admin-home::after {
+  width: 17rem;
+  height: 0.35rem;
+  left: -7rem;
+  bottom: 5rem;
+  background: linear-gradient(90deg, rgba(4, 28, 44, 0.25), rgba(0, 75, 135, 0.16), transparent);
+  transform: rotate(-42deg);
+}
+
+body.carobra-app .admin-home__topbar {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 10;
+  border-color: rgba(4, 28, 44, 0.16);
+  border-radius: var(--carobra-radius-md);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--carobra-shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+body.carobra-app .admin-home__brand-logo {
+  width: clamp(7.7rem, 12vw, 9.7rem);
+  height: auto;
+  object-fit: contain;
+}
+
+body.carobra-app .admin-home__topbar-link {
+  border-color: transparent;
+  border-radius: var(--carobra-radius-sm);
+  background: transparent;
+  color: #405f74;
+  font-weight: 710;
+}
+
+body.carobra-app .admin-home__topbar-link:hover {
+  border-color: transparent;
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .admin-home__topbar-link.is-active {
+  border-color: var(--carobra-navy);
+  background: var(--carobra-navy);
+  color: #fff;
+}
+
+body.carobra-app .admin-home__profile-toggle,
+body.carobra-app .admin-home__profile-menu {
+  border-color: var(--carobra-border);
+  border-radius: var(--carobra-radius-sm);
+  background: #fff;
+}
+
+body.carobra-app .admin-home__avatar {
+  background: var(--carobra-cyan-soft);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .admin-home__profile-name,
+body.carobra-app .admin-home__title,
+body.carobra-app .admin-home__panel-title,
+body.carobra-app .admin-home__kpi-value,
+body.carobra-app .admin-home__module-card-title,
+body.carobra-app .admin-home__quick-title,
+body.carobra-app .admin-home__pending-title,
+body.carobra-app .admin-home__activity-title {
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .admin-home__title {
+  font-weight: 790;
+  letter-spacing: -0.035em;
+}
+
+body.carobra-app .admin-home__session,
+body.carobra-app .admin-home__profile-email,
+body.carobra-app .admin-home__helper-text,
+body.carobra-app .admin-home__module-card-meta,
+body.carobra-app .admin-home__module-card-copy,
+body.carobra-app .admin-home__quick-desc,
+body.carobra-app .admin-home__pending-ref,
+body.carobra-app .admin-home__activity-meta {
+  color: var(--carobra-ink-muted);
+}
+
+body.carobra-app .admin-home__kpi-card,
+body.carobra-app .admin-home__panel,
+body.carobra-app .admin-home__module-card,
+body.carobra-app .admin-home__quick-item,
+body.carobra-app .admin-home__pending-card,
+body.carobra-app .admin-home__activity-item,
+body.carobra-app .admin-home__empty {
+  border-color: var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .admin-home__kpi-card {
+  position: relative;
+  overflow: hidden;
+}
+
+body.carobra-app .admin-home__kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.24rem;
+  background: var(--carobra-blue);
+}
+
+body.carobra-app .admin-home__kpi-card--emphasis::before {
+  background: var(--carobra-cyan);
+}
+
+body.carobra-app .admin-home__kpi-icon {
+  border-color: rgba(0, 75, 135, 0.2);
+  background: var(--carobra-cyan-soft);
+}
+
+body.carobra-app .admin-home__panel {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+body.carobra-app .admin-home__module-card--focus {
+  border-color: var(--carobra-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 163, 224, 0.28) inset, var(--carobra-shadow-sm);
+}
+
+body.carobra-app .admin-home__panel-link,
+body.carobra-app .admin-home__inline-link,
+body.carobra-app .admin-home__quick-link {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .admin-home__action-btn {
+  padding: 0.36rem 0.62rem;
+}
+
+body.carobra-app .admin-home__badge--info,
+body.carobra-app .admin-home__feedback.is-ok {
+  border-color: rgba(0, 75, 135, 0.24);
+  background: var(--carobra-surface-blue);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .admin-home__badge--ok,
+body.carobra-app .admin-home__check-item.is-ok {
+  border-color: rgba(25, 115, 74, 0.24);
+  background: var(--carobra-success-soft);
+  color: var(--carobra-success);
+}
+
+body.carobra-app .admin-home__badge--warning,
+body.carobra-app .admin-home__pending-card--media {
+  border-color: rgba(138, 91, 18, 0.25);
+  background: var(--carobra-warning-soft);
+  color: var(--carobra-warning);
+}
+
+body.carobra-app .admin-home__badge--danger,
+body.carobra-app .admin-home__feedback.is-error,
+body.carobra-app .admin-home__pending-card--alta,
+body.carobra-app .admin-home__check-item.is-warning {
+  border-color: rgba(155, 48, 54, 0.24);
+  background: var(--carobra-danger-soft);
+  color: var(--carobra-danger);
+}
+
+/* Internal Rewards V2 preview */
+
+body.carobra-app .v2-preview {
+  min-height: 100svh;
+  background: var(--carobra-canvas);
+  color: var(--carobra-ink);
+}
+
+body.carobra-app .v2-preview .preview-notice {
+  background: var(--carobra-navy);
+  color: #fff;
+}
+
+body.carobra-app .v2-preview .preview-notice span {
+  background: var(--carobra-cyan);
+  box-shadow: 0 0 0 4px rgba(0, 163, 224, 0.2);
+}
+
+body.carobra-app .v2-preview .preview-header {
+  border-color: var(--carobra-border);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .v2-preview .preview-header img {
+  height: auto;
+  object-fit: contain;
+}
+
+body.carobra-app .v2-preview .preview-header :where(strong, small),
+body.carobra-app .v2-preview .preview-intro h1,
+body.carobra-app .v2-preview .scenario-option strong,
+body.carobra-app .v2-preview .summary-card h2,
+body.carobra-app .v2-preview .disabled-modules h2 {
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .v2-preview .preview-intro aside,
+body.carobra-app .v2-preview .scenario-option,
+body.carobra-app .v2-preview .journey-steps article,
+body.carobra-app .v2-preview .summary-card,
+body.carobra-app .v2-preview .disabled-modules {
+  border-color: var(--carobra-border);
+  border-radius: var(--carobra-radius-md);
+  background: #fff;
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .v2-preview .preview-intro aside strong,
+body.carobra-app .v2-preview .scenario-option.is-active strong {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .v2-preview .scenario-option:hover {
+  border-color: var(--carobra-cyan);
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .v2-preview .scenario-option.is-active {
+  border-color: var(--carobra-blue);
+  background: var(--carobra-surface-blue);
+  box-shadow: 0 0 0 1px var(--carobra-blue) inset;
+}
+
+body.carobra-app .v2-preview .scenario-option.is-active > span,
+body.carobra-app .v2-preview .journey-steps .is-complete > span {
+  border-color: var(--carobra-blue);
+  background: var(--carobra-blue);
+  color: #fff;
+}
+
+body.carobra-app .v2-preview .journey-hero {
+  border: 1px solid var(--carobra-navy-raised);
+  border-radius: var(--carobra-radius-lg);
+  background:
+    linear-gradient(121deg, transparent 0 72%, rgba(0, 163, 224, 0.18) 72% 77%, transparent 77%),
+    linear-gradient(125deg, var(--carobra-navy), var(--carobra-blue));
+  box-shadow: var(--carobra-shadow-md);
+}
+
+body.carobra-app .v2-preview .journey-hero.is-inactive {
+  background: linear-gradient(125deg, #263d4c, #536878);
+}
+
+body.carobra-app .v2-preview .journey-copy .eyebrow {
+  color: #79d5f5;
+}
+
+body.carobra-app .v2-preview .balance-panel {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(4, 28, 44, 0.46);
+}
+
+/* Responsive and motion */
+
+@media (max-width: 980px) {
+  body.carobra-app .client-shell__topnav-inner {
+    width: min(100%, calc(100% - 1.4rem));
+  }
+
+  body.carobra-app .client-shell__brand-logo {
+    width: 11rem;
+  }
+
+  body.carobra-app .client-shell__nav--center {
+    display: none;
+  }
+
+  body.carobra-app .client-shell__content {
+    padding-bottom: calc(5.4rem + env(safe-area-inset-bottom));
+  }
+
+  body.carobra-app .client-shell__bottom-nav {
+    position: fixed;
+    z-index: 40;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0.35rem max(0.35rem, env(safe-area-inset-right)) calc(0.35rem + env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-left));
+    border-top: 1px solid rgba(4, 28, 44, 0.16);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 -10px 26px rgba(4, 28, 44, 0.1);
+    backdrop-filter: blur(16px);
+  }
+
+  body.carobra-app .client-shell__bottom-link {
+    min-width: 0;
+    display: grid;
+    place-items: center;
+    gap: 0.2rem;
+    padding: 0.42rem 0.16rem;
+    border-radius: var(--carobra-radius-sm);
+    color: #536878;
+    font-size: clamp(0.54rem, 1.5vw, 0.66rem);
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  body.carobra-app .client-shell__bottom-link .client-shell__nav-icon {
+    width: 1.75rem;
+    height: 1.55rem;
+    background: transparent;
+    color: currentColor;
+  }
+
+  body.carobra-app .client-shell__bottom-link.is-active {
+    background: var(--carobra-cyan-soft);
+    color: var(--carobra-navy);
+  }
+}
+
+@media (max-width: 760px) {
+  body.carobra-app {
+    letter-spacing: 0;
+  }
+
+  body.carobra-app .client-shell::before {
+    opacity: 0.55;
+  }
+
+  body.carobra-app .client-shell__topnav {
+    backdrop-filter: blur(12px);
+  }
+
+  body.carobra-app .client-shell__mobile-menu {
+    border-radius: 0;
+    box-shadow: 0 14px 28px rgba(4, 28, 44, 0.12);
+  }
+
+  body.carobra-app .client-shell__content {
+    padding-bottom: calc(5.4rem + env(safe-area-inset-bottom));
+  }
+
+  body.carobra-app .client-shell__bottom-nav {
+    position: fixed;
+    z-index: 40;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0.35rem max(0.35rem, env(safe-area-inset-right)) calc(0.35rem + env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-left));
+    border-top: 1px solid rgba(4, 28, 44, 0.16);
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 -10px 26px rgba(4, 28, 44, 0.1);
+    backdrop-filter: blur(16px);
+  }
+
+  body.carobra-app .client-shell__bottom-link {
+    min-width: 0;
+    display: grid;
+    place-items: center;
+    gap: 0.2rem;
+    padding: 0.42rem 0.16rem;
+    border-radius: var(--carobra-radius-sm);
+    color: #536878;
+    font-size: clamp(0.54rem, 2.4vw, 0.66rem);
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  body.carobra-app .client-shell__bottom-link .client-shell__nav-icon {
+    width: 1.75rem;
+    height: 1.55rem;
+    background: transparent;
+    color: currentColor;
+  }
+
+  body.carobra-app .client-shell__bottom-link.is-active {
+    background: var(--carobra-cyan-soft);
+    color: var(--carobra-navy);
+  }
+
+  body.carobra-app :where(.client-page, .portal-page, .rewards-home, .benefits-page) {
+    width: min(100% - 1rem, 75rem);
+  }
+
+  body.carobra-app .portal-page .portal-welcome {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  body.carobra-app .portal-page .portal-welcome > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.carobra-app .auth-page {
+    padding: 1rem 0.75rem 2rem 1rem;
+    align-items: flex-start;
+  }
+
+  body.carobra-app .auth-card {
+    border-radius: var(--carobra-radius-md);
+  }
+
+  body.carobra-app .admin-home {
+    width: min(100% - 1rem, 70rem);
+    padding-block: 1rem !important;
+  }
+
+  body.carobra-app .admin-home__topbar {
+    top: 0.35rem;
+  }
+}
+
+/* Platform retro: functional color and calm destination surfaces */
+
+body.carobra-app .benefits-page .benefits-page__hero,
+body.carobra-app .portal-page .earn-hero,
+body.carobra-app .portal-page .products-hero,
+body.carobra-app .portal-page .activity-hero,
+body.carobra-app .portal-page .giftcards-hero,
+body.carobra-app .portal-page .learning-hero {
+  min-height: auto;
+  border: 1px solid var(--carobra-border);
+  background: var(--carobra-surface) !important;
+  color: var(--carobra-ink);
+  box-shadow: var(--carobra-shadow-sm);
+}
+
+body.carobra-app .benefits-page .benefits-page__hero :where(h2, h3),
+body.carobra-app .portal-page :where(.earn-hero, .products-hero, .activity-hero, .giftcards-hero, .learning-hero) :where(h2, h3, strong) {
+  color: var(--carobra-navy);
+}
+
+body.carobra-app .benefits-page .benefits-page__hero > div > p:not(.benefits-page__eyebrow),
+body.carobra-app .portal-page .earn-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .products-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .activity-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .giftcards-hero > div > p:not(.portal-eyebrow),
+body.carobra-app .portal-page .learning-hero > div > p:not(.portal-eyebrow) {
+  color: var(--carobra-ink-muted);
+}
+
+body.carobra-app .benefits-page .benefits-page__hero .benefits-page__eyebrow,
+body.carobra-app .portal-page :where(.earn-hero, .products-hero, .activity-hero, .giftcards-hero, .learning-hero) .portal-eyebrow {
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .benefits-page .benefits-page__tags span {
+  border-color: var(--carobra-border);
+  background: var(--carobra-surface-blue);
+  color: var(--carobra-blue);
+}
+
+body.carobra-app .benefits-page .benefits-page__wallet,
+body.carobra-app .portal-page .products-hero__count,
+body.carobra-app .portal-page .activity-hero article,
+body.carobra-app .portal-page .giftcards-balance-card {
+  border-color: var(--carobra-border);
+  background: var(--carobra-surface-blue);
+  color: var(--carobra-navy);
+  box-shadow: none;
+}
+
+body.carobra-app .portal-page .earn-hero__stats {
+  background: transparent;
+  color: var(--carobra-ink);
+}
+
+body.carobra-app .portal-page .earn-hero__stats article {
+  border-color: var(--carobra-border);
+  background: var(--carobra-surface-blue);
+}
+
+body.carobra-app .portal-page .earn-hero__stats article strong,
+body.carobra-app .portal-page .earn-hero__stats article span {
+  color: var(--carobra-ink);
+}
+
+body.carobra-app :where(.points-value, .reward-value, .is-reward) {
+  color: var(--carobra-gold-strong);
+}
+
+body.carobra-app :where(.status-available, .status-complete) {
+  color: var(--carobra-success);
+  background: var(--carobra-success-soft);
+}
+
+body.carobra-app :where(.status-future, .status-unavailable) {
+  color: #5f6c75;
+  background: #edf0f2;
+}
+
+body.carobra-app :where(.status-expiring, .status-error) {
+  color: var(--carobra-danger);
+  background: var(--carobra-danger-soft);
+}
+
+body.carobra-app .products-page .product-offer__card.is-skandia {
+  border-color: #cfc2e8;
+  background: linear-gradient(145deg, #fff, #f0ebfa);
+}
+
+body.carobra-app .products-page .product-offer__card.is-qualitas {
+  border-color: #add8c7;
+  background: linear-gradient(145deg, #fff, #e8f6ef);
+}
+
+body.carobra-app .products-page .product-offer__card.is-modalidad {
+  border-color: #e8c49f;
+  background: linear-gradient(145deg, #fff, #fff0df);
+}
+
+body.carobra-app .products-page .product-offer__card.is-skandia .product-offer__symbol { background: #5f438f; }
+body.carobra-app .products-page .product-offer__card.is-qualitas .product-offer__symbol { background: #19734a; }
+body.carobra-app .products-page .product-offer__card.is-modalidad .product-offer__symbol { background: #c46a24; }
+
+body.carobra-app .rewards-home .rewards-home__hero-copy {
+  position: static;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.carobra-app .rewards-home .rewards-home__balance .rewards-home__expiry.status-future {
+  background: rgba(255, 255, 255, 0.14);
+  color: #dcecf5;
+}
+
+body.carobra-app .rewards-home .rewards-home__balance .rewards-home__expiry.status-expiring {
+  background: #fff0f1;
+  color: var(--carobra-danger);
+}
+
+body.carobra-app .rewards-home .rewards-home__balance a {
+  color: #79d5f5;
+}
+
+body.carobra-app :where(.portal-welcome, .benefits-page__welcome, .rewards-home__welcome) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+@media (max-width: 360px) {
+  body.carobra-app .client-shell__topnav-inner {
+    width: calc(100% - 0.8rem);
+    gap: 0.35rem;
+  }
+
+  body.carobra-app .client-shell__brand-logo {
+    width: 5.25rem;
+  }
+
+  body.carobra-app .client-shell__brand-link {
+    padding-right: 0.15rem;
+  }
+
+  body.carobra-app .client-shell__notification-link {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  body.carobra-app .client-shell__user-toggle {
+    padding-right: 0.35rem;
+  }
+
+  body.carobra-app .client-shell__user-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  body.carobra-app .portal-page .portal-welcome h1 {
+    max-width: 100%;
+    font-size: clamp(2rem, 10vw, 2.2rem);
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.carobra-app *,
+  body.carobra-app *::before,
+  body.carobra-app *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
