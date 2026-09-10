@@ -45,6 +45,14 @@ const attentionProfile = {
   email: "attention@example.com",
 };
 
+const bronzeCoupons = [
+  coupon("cinepolis", "Cinépolis", "2x1", "Entretenimiento", "Beneficio en entradas participantes.", "https://cuponstar-ar.s3.amazonaws.com/public/files/uploads/assets/65b0172b3f7b3.gif"),
+  coupon("toks", "Toks", "15%", "Restaurantes", "Descuento en consumo participante."),
+  coupon("benavides", "Farmacias Benavides", "10%", "Salud", "Ahorra en productos participantes."),
+  coupon("smart-fit", "Smart Fit", "PROMO", "Bienestar", "Condiciones preferenciales en planes seleccionados."),
+  coupon("chopo", "Laboratorio Chopo", "20%", "Salud", "Descuento en estudios seleccionados."),
+];
+
 const validation = {
   validation_id: "00000000-0000-0000-0000-000000000302",
   customer_id: profile.id,
@@ -170,6 +178,72 @@ const server = createServer(async (request, response) => {
           portal: portalFor(authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
+  if (method === "GET" && path === "/api/v1/rewards/coupons") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const active = authenticated === eligibleProfile;
+    const accountUnavailable = authenticated === inactiveProfile || authenticated === attentionProfile;
+    return json(response, 200, {
+      current_level: active ? "BRONZE" : null,
+      access_state: active ? "AVAILABLE" : accountUnavailable ? "ACCOUNT_UNAVAILABLE" : "NO_LEVEL",
+      affiliate_state: active ? "ACTIVE" : "DISABLED",
+      items: active ? bronzeCoupons : [],
+      refreshed_at: active ? "2026-09-10T12:00:00.000Z" : null,
+      page: 1,
+      page_size: 50,
+      total: active ? bronzeCoupons.length : 0,
+      next_page: null,
+    });
+  }
+
+  if (method === "GET" && path === "/api/v1/rewards/coupons/affiliate-status") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    return json(response, 200, {
+      state: authenticated === eligibleProfile ? "ACTIVE" : "DISABLED",
+      can_request_codes: authenticated === eligibleProfile,
+      retry_scheduled: false,
+    });
+  }
+
+  if (method === "GET" && path === "/api/v1/rewards/coupons/history") {
+    const authenticated = authenticatedProfile(request);
+    return authenticated
+      ? json(response, 200, { items: [] })
+      : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
+  const codeMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/code$/);
+  if (method === "POST" && codeMatch) {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const payload = await readJson(request);
+    return json(response, 200, {
+      request_id: payload.request_id,
+      status: "ISSUED",
+      code: `CAROBRA-${codeMatch[1].toUpperCase()}`,
+      instructions: "Presenta este código antes de pagar.",
+      receipt_id: `receipt-${codeMatch[1]}`,
+    });
+  }
+
+  const detailMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)$/);
+  if (method === "GET" && detailMatch) {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const item = bronzeCoupons.find((candidate) => candidate.id === detailMatch[1]);
+    return json(response, 200, {
+      access_state: item ? "AVAILABLE" : "COUPON_UNAVAILABLE",
+      affiliate_state: "ACTIVE",
+      item: item ? {
+        ...item,
+        description: item.shortDescription,
+        usageInstructions: "Solicita tu código y preséntalo antes de pagar.",
+        legalTerms: "Sujeto a disponibilidad y establecimientos participantes.",
+      } : null,
+    });
   }
 
   if (method === "GET" && path === "/api/v1/rewards/journey") {
@@ -311,6 +385,7 @@ function journeyFor(candidate) {
     }],
     modules: {
       benefits_enabled: false,
+      coupons_enabled: active,
       expiry_policy_approved: false,
       ave_enabled: false,
       referrals_enabled: false,
@@ -370,6 +445,21 @@ function movementDetailsFor(candidate) {
       ...movement,
       entry_type: "ISSUANCE",
     })),
+  };
+}
+
+function coupon(id, name, discount, category, shortDescription, imageUrl = null) {
+  return {
+    id,
+    name,
+    discount,
+    shortDescription,
+    expirationAt: "2027-12-31T23:59:59.000Z",
+    imageUrl,
+    category,
+    channels: ["ONLINE", "ONSITE"],
+    minimumLevel: "BRONZE",
+    displayOrder: ["cinepolis", "toks", "benavides", "smart-fit", "chopo"].indexOf(id) + 1,
   };
 }
 

@@ -25,9 +25,9 @@ test("pending customer can navigate the complete provider-neutral portal safely"
 
   await page.goto("/cliente/beneficios");
   await expect(page.getByRole("heading", { name: "Beneficios", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Todo en un solo lugar." })).toBeVisible();
-  await expect(page.getByText("Producto pendiente")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Próximas experiencias" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tu nivel abre nuevas experiencias." })).toBeVisible();
+  await expect(page.getByText("Nivel Invitado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Tus descuentos comienzan en Bronce")).toBeVisible();
   await expect(page.getByRole("button", { name: /canjear|redimir/i })).toHaveCount(0);
 
   await page.goto("/cliente/cursos");
@@ -63,10 +63,23 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.getByRole("heading", { name: "Elige qué actualizaciones recibir" })).toBeVisible();
 
   await page.goto("/cliente/beneficios");
-  await expect(page.getByText("Cuenta preparada", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nivel Bronce", { exact: true })).toBeVisible();
   await expect(page.getByText("150 pts")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Gift Cards" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Próximas experiencias" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "5 beneficios para ti" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cinépolis" })).toBeVisible();
+  await expect(page.locator(".coupon-card__visual img")).toHaveAttribute("src", /cuponstar-ar\.s3\.amazonaws\.com/);
+  await expect(page.getByText("Tu saldo no cambia al usar estos beneficios.")).toBeVisible();
+  await expect(page.getByText("Gift Cards · Próximamente")).toBeVisible();
+  await page.getByRole("button", { name: "Ver beneficio" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Cinépolis" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "Ver beneficio" }).first().click();
+  await page.getByRole("button", { name: "Quiero este beneficio" }).click();
+  await expect(page.getByText("Esta acción no consume puntos.")).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar solicitud" }).click();
+  await expect(page.getByText("CAROBRA-CINEPOLIS")).toBeVisible();
 
   await page.goto("/cliente/ganar-puntos");
   await expect(page.getByRole("heading", { name: "Ganar puntos", exact: true })).toBeVisible();

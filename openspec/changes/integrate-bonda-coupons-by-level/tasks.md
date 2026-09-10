@@ -32,11 +32,11 @@
 ## 5. Customer benefits experience
 
 - [x] 5.1 Add frontend contracts and same-origin proxy allowlist entries for the new coupon endpoints without exposing Bonda configuration.
-- [ ] 5.2 Integrate responsive level context, cumulative benefit cards, approved category/channel filters, and truthful empty/loading/unavailable states into the Carobra redesign without importing the discarded prototype styling.
-- [ ] 5.3 Implement coupon detail and explicit code-request confirmation in the Carobra redesign with safe instructions, legal terms, expiration, code-copy behavior, and recent coupon history.
-- [ ] 5.4 Present affiliate-pending, partner-unavailable, limit-reached, inventory-unavailable, and verification-required outcomes in plain customer language in the Carobra redesign.
-- [ ] 5.5 Keep the redesigned gift-card page and point-redemption controls disabled and visually separate from free coupons.
-- [ ] 5.6 Add accessibility, keyboard, mobile, desktop, contract, and end-to-end coverage for the redesigned experience using the fake Bonda adapter.
+- [x] 5.2 Integrate responsive level context, cumulative benefit cards, approved category/channel filters, and truthful empty/loading/unavailable states into the Carobra redesign without importing the discarded prototype styling.
+- [x] 5.3 Implement coupon detail and explicit code-request confirmation in the Carobra redesign with safe instructions, legal terms, expiration, code-copy behavior, and recent coupon history.
+- [x] 5.4 Present affiliate-pending, partner-unavailable, limit-reached, inventory-unavailable, and verification-required outcomes in plain customer language in the Carobra redesign.
+- [x] 5.5 Keep the redesigned gift-card page and point-redemption controls disabled and visually separate from free coupons.
+- [x] 5.6 Add accessibility, keyboard, mobile, desktop, contract, and end-to-end coverage for the redesigned experience using the fake Bonda adapter.
 
 ## 6. Catalog reconciliation and controlled activation
 
