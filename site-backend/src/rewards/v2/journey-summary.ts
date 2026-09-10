@@ -56,6 +56,7 @@ interface ExpirationRow extends QueryResultRow {
 
 const featureCodes = {
   V2_REDEMPTION: "benefits_enabled",
+  V2_BONDA_COUPONS: "coupons_enabled",
   V2_EXPIRY: "expiry_policy_approved",
   V2_AVE: "ave_enabled",
   V2_REFERRALS: "referrals_enabled",
@@ -118,6 +119,7 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
 
     const modules = {
       benefits_enabled: false,
+      coupons_enabled: false,
       expiry_policy_approved: false,
       ave_enabled: false,
       referrals_enabled: false,

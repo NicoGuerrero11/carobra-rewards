@@ -1,11 +1,27 @@
 export type CookieSameSite = "lax" | "strict" | "none";
 
+export interface BondaConfig {
+  baseUrl: string;
+  allowedHosts: readonly string[];
+  allowedImageHosts: readonly string[];
+  micrositeId?: string;
+  couponApiKey?: string;
+  affiliateToken?: string;
+  requestTimeoutMs: number;
+  catalogCacheTtlMs: number;
+  catalogCacheMaxStaleMs: number;
+  catalogEnabled: boolean;
+  affiliateProvisioningEnabled: boolean;
+  couponRequestsEnabled: boolean;
+}
+
 export interface SiteBackendConfig {
   apiBaseUrl: string;
   databaseUrl?: string;
   host: string;
   port: number;
   apiRequestTimeoutMs: number;
+  bonda?: BondaConfig;
   referralIdentityHmacSecret?: string;
   rewardsV2TestMode?: {
     accessKey: string;
@@ -62,6 +78,7 @@ export function loadConfig(
       1,
       120_000,
     ),
+    bonda: loadBondaConfig(environment),
     sessionCookie,
   };
   const nodeEnvironment = (environment.NODE_ENV ?? "development").trim().toLowerCase();
@@ -97,6 +114,88 @@ export function loadConfig(
   return config;
 }
 
+function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
+  const allowedHosts = parseHostList(
+    "BONDA_ALLOWED_HOSTS",
+    environment.BONDA_ALLOWED_HOSTS ?? "apiv1.cuponstar.com",
+  );
+  const baseUrl = parseBaseUrl(
+    environment.BONDA_BASE_URL ?? "https://apiv1.cuponstar.com",
+  );
+  const parsedBondaBaseUrl = new URL(baseUrl);
+  if (parsedBondaBaseUrl.protocol !== "https:") {
+    throw new Error("BONDA_BASE_URL must use https");
+  }
+  const baseHost = parsedBondaBaseUrl.hostname.toLowerCase();
+  if (!allowedHosts.includes(baseHost)) {
+    throw new Error("BONDA_BASE_URL host must be included in BONDA_ALLOWED_HOSTS");
+  }
+
+  const catalogEnabled = parseBoolean(
+    "BONDA_CATALOG_ENABLED",
+    environment.BONDA_CATALOG_ENABLED ?? "false",
+  );
+  const affiliateProvisioningEnabled = parseBoolean(
+    "BONDA_AFFILIATE_PROVISIONING_ENABLED",
+    environment.BONDA_AFFILIATE_PROVISIONING_ENABLED ?? "false",
+  );
+  const couponRequestsEnabled = parseBoolean(
+    "BONDA_COUPON_REQUESTS_ENABLED",
+    environment.BONDA_COUPON_REQUESTS_ENABLED ?? "false",
+  );
+  const micrositeId = optionalValue(environment.BONDA_MICROSITE_ID);
+  const couponApiKey = optionalValue(environment.BONDA_COUPON_API_KEY);
+  const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN);
+
+  if ((catalogEnabled || couponRequestsEnabled) && (!micrositeId || !couponApiKey)) {
+    throw new Error(
+      "Enabled Bonda coupon features require BONDA_MICROSITE_ID and BONDA_COUPON_API_KEY",
+    );
+  }
+  if (affiliateProvisioningEnabled && (!micrositeId || !affiliateToken)) {
+    throw new Error(
+      "Enabled Bonda affiliate provisioning requires BONDA_MICROSITE_ID and BONDA_AFFILIATE_TOKEN",
+    );
+  }
+
+  const config: BondaConfig = {
+    baseUrl,
+    allowedHosts,
+    allowedImageHosts: parseHostList(
+      "BONDA_ALLOWED_IMAGE_HOSTS",
+      environment.BONDA_ALLOWED_IMAGE_HOSTS ?? "cuponstar-ar.s3.amazonaws.com",
+    ),
+    requestTimeoutMs: parseInteger(
+      "BONDA_REQUEST_TIMEOUT_MS",
+      environment.BONDA_REQUEST_TIMEOUT_MS ?? "5000",
+      250,
+      30_000,
+    ),
+    catalogCacheTtlMs: parseInteger(
+      "BONDA_CATALOG_CACHE_TTL_MS",
+      environment.BONDA_CATALOG_CACHE_TTL_MS ?? "60000",
+      1_000,
+      300_000,
+    ),
+    catalogCacheMaxStaleMs: parseInteger(
+      "BONDA_CATALOG_CACHE_MAX_STALE_MS",
+      environment.BONDA_CATALOG_CACHE_MAX_STALE_MS ?? "300000",
+      1_000,
+      3_600_000,
+    ),
+    catalogEnabled,
+    affiliateProvisioningEnabled,
+    couponRequestsEnabled,
+  };
+  if (config.catalogCacheMaxStaleMs < config.catalogCacheTtlMs) {
+    throw new Error("BONDA_CATALOG_CACHE_MAX_STALE_MS must be greater than or equal to BONDA_CATALOG_CACHE_TTL_MS");
+  }
+  if (micrositeId) config.micrositeId = micrositeId;
+  if (couponApiKey) config.couponApiKey = couponApiKey;
+  if (affiliateToken) config.affiliateToken = affiliateToken;
+  return config;
+}
+
 function parseBaseUrl(value: string): string {
   const url = new URL(value);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
@@ -112,6 +211,29 @@ function requiredValue(name: string, value: string): string {
     throw new Error(`${name} cannot be empty`);
   }
   return normalized;
+}
+
+function optionalValue(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function parseHostList(name: string, value: string): readonly string[] {
+  const hosts = value
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  if (hosts.length === 0 || hosts.some((host) => !isHostname(host))) {
+    throw new Error(`${name} must contain valid comma-separated hostnames`);
+  }
+  return [...new Set(hosts)];
+}
+
+function isHostname(value: string): boolean {
+  if (value.length > 253 || value.includes(":") || value.includes("/")) return false;
+  return value.split(".").every(
+    (label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+  );
 }
 
 function parseBoolean(name: string, value: string): boolean {

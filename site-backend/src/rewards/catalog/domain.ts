@@ -1,4 +1,4 @@
-import type { CatalogMode, InventoryMode } from "../shared/enums.js";
+import type { CatalogMode, InventoryMode, RewardsLevel } from "../shared/enums.js";
 
 export interface CatalogItemPolicy {
   code: string;
@@ -10,6 +10,7 @@ export interface CatalogItemPolicy {
   inventoryMode: InventoryMode;
   fulfillmentMode: string;
   partnerDependency: string | null;
+  partnerItemReference?: string | null;
   effectiveFrom: Date;
   effectiveTo: Date | null;
   disabledReason: string | null;
@@ -21,6 +22,20 @@ export interface CatalogInventoryState {
   fulfilledQuantity: number;
   releasedQuantity: number;
 }
+
+export interface BondaCouponCatalogPolicy {
+  minimumLevel: RewardsLevel;
+  cumulative: true;
+  displayOrder: number;
+}
+
+const bondaLevelRanks: Readonly<Record<RewardsLevel, number>> = {
+  BRONZE: 1,
+  SILVER: 2,
+  GOLD: 3,
+  PLATINUM: 4,
+  TITANIUM: 5,
+};
 
 export type CatalogAvailabilityCode =
   | "AVAILABLE"
@@ -60,6 +75,44 @@ export function validateCatalogItemPolicy(item: CatalogItemPolicy): void {
   if (!item.enabled && !item.disabledReason?.trim()) {
     throw new Error("Disabled catalog items require a reason");
   }
+  if (item.partnerDependency === "BONDA") {
+    if (item.mode !== "FREE_ENTITLEMENT"
+      || item.inventoryMode !== "UNLIMITED"
+      || item.fulfillmentMode !== "BONDA_COUPON_CODE") {
+      throw new Error("Bonda coupons must use the free coupon catalog policy");
+    }
+    if (item.enabled && !item.partnerItemReference?.trim()) {
+      throw new Error("Enabled Bonda coupons require a stable partner identifier");
+    }
+    readBondaCouponPolicy(item.eligibilityRule);
+  }
+}
+
+export function readBondaCouponPolicy(
+  eligibilityRule: Readonly<Record<string, unknown>>,
+): BondaCouponCatalogPolicy {
+  const minimumLevel = eligibilityRule.minimumLevel;
+  const cumulative = eligibilityRule.cumulative;
+  const displayOrder = eligibilityRule.displayOrder;
+  if (typeof minimumLevel !== "string" || !(minimumLevel in bondaLevelRanks)) {
+    throw new Error("Bonda coupon minimum level is invalid");
+  }
+  if (cumulative !== true) throw new Error("Bonda coupon access must be cumulative");
+  if (!Number.isInteger(displayOrder) || (displayOrder as number) < 0) {
+    throw new Error("Bonda coupon display order must be a non-negative integer");
+  }
+  return {
+    minimumLevel: minimumLevel as RewardsLevel,
+    cumulative: true,
+    displayOrder: displayOrder as number,
+  };
+}
+
+export function hasCumulativeBondaCouponAccess(
+  currentLevel: RewardsLevel,
+  minimumLevel: RewardsLevel,
+): boolean {
+  return bondaLevelRanks[currentLevel] >= bondaLevelRanks[minimumLevel];
 }
 
 export function validateCatalogInventory(

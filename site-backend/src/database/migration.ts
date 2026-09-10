@@ -21,6 +21,8 @@ import { rewardsV2Foundation } from "./migrations/018-rewards-v2-foundation.js";
 import { rewardsV2LiveJourney } from "./migrations/019-rewards-v2-live-journey.js";
 import { rewardsCustomerPortal } from "./migrations/020-rewards-customer-portal.js";
 import { rewardsV2Canonical } from "./migrations/021-rewards-v2-canonical.js";
+import { bondaCoupons } from "./migrations/022-bonda-coupons.js";
+import { bondaCouponCandidates } from "./migrations/023-bonda-coupon-candidates.js";
 
 export interface Migration {
   id: string;
@@ -50,6 +52,8 @@ export const migrations: readonly Migration[] = [
   rewardsV2LiveJourney,
   rewardsCustomerPortal,
   rewardsV2Canonical,
+  bondaCoupons,
+  bondaCouponCandidates,
 ];
 
 export async function migrate(client: PoolClient): Promise<void> {

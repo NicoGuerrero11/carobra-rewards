@@ -6,10 +6,14 @@ import {
   createReferralHttpApplication,
   createRewardsV2JourneyHttpApplication,
   createRewardsCustomerPortalApplication,
+  createBondaIntegrations,
 } from "./rewards/accounts/composition.js";
 
 const config = loadConfig();
 const database = config.databaseUrl ? createDatabase(config.databaseUrl) : undefined;
+const bonda = database && config.bonda
+  ? createBondaIntegrations(database, config.bonda)
+  : undefined;
 const server = createSiteBackendServer(
   config,
   undefined,
@@ -19,6 +23,8 @@ const server = createSiteBackendServer(
     : undefined,
   database ? createRewardsV2JourneyHttpApplication(database) : undefined,
   database ? createRewardsCustomerPortalApplication(database) : undefined,
+  bonda?.affiliateProvisioning,
+  bonda?.coupons,
 );
 if (database) {
   server.on("close", () => void database.end());

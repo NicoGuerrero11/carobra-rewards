@@ -21,7 +21,7 @@ const allowedPaths = new Set([
 
 const proxy: APIRoute = async ({ params, request }) => {
   const path = params.path ?? "";
-  if (!allowedPaths.has(path)) {
+  if (!isAllowedPath(path)) {
     return siteError(404, "not_found", "Route not found");
   }
 
@@ -43,7 +43,11 @@ const proxy: APIRoute = async ({ params, request }) => {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${getSiteBackendBaseUrl()}/api/v1/${path}`, init);
+    const incomingUrl = new URL(request.url);
+    upstream = await fetch(
+      `${getSiteBackendBaseUrl()}/api/v1/${path}${incomingUrl.search}`,
+      init,
+    );
   } catch {
     return siteError(503, "api_unavailable", "The site backend is unavailable");
   }
@@ -62,6 +66,11 @@ const proxy: APIRoute = async ({ params, request }) => {
     headers: responseHeaders,
   });
 };
+
+function isAllowedPath(path: string): boolean {
+  if (allowedPaths.has(path)) return true;
+  return /^rewards\/coupons(?:\/affiliate-status|\/history|\/[^/]{1,200}(?:\/code)?)?$/.test(path);
+}
 
 export const GET = proxy;
 export const POST = proxy;
