@@ -40,6 +40,7 @@ export interface RewardsJourneySummaryHttpResponse {
   }>;
   modules: {
     benefits_enabled: boolean;
+    coupons_enabled: boolean;
     expiry_policy_approved: boolean;
     ave_enabled: boolean;
     referrals_enabled: boolean;

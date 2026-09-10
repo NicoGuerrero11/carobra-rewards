@@ -70,6 +70,7 @@ export interface ValidationStatusResponse {
 
 export interface RewardsIdentityEvidence {
   customer_id: string;
+  rewards_id: string;
   customer_status: string;
   validation_id: string;
   validation_status: string;
