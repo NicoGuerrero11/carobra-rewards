@@ -54,6 +54,7 @@ test("Rewards evidence keeps only safe customer and SISCA identity facts", async
   assert.deepEqual(paths.sort(), ["/api/v1/me", "/api/v1/me/validation-status"]);
   assert.deepEqual(result.data, {
     customer_id: "customer-1",
+    rewards_id: "RWD-test",
     customer_status: "ACTIVE",
     validation_id: "validation-1",
     validation_status: "VALIDATED",
