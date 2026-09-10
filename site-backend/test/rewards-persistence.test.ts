@@ -19,6 +19,8 @@ import { rewardsV2Foundation } from "../src/database/migrations/018-rewards-v2-f
 import { rewardsV2LiveJourney } from "../src/database/migrations/019-rewards-v2-live-journey.js";
 import { rewardsCustomerPortal } from "../src/database/migrations/020-rewards-customer-portal.js";
 import { rewardsV2Canonical } from "../src/database/migrations/021-rewards-v2-canonical.js";
+import { bondaCoupons } from "../src/database/migrations/022-bonda-coupons.js";
+import { bondaCouponCandidates } from "../src/database/migrations/023-bonda-coupon-candidates.js";
 
 test("ledger foundation migration declares required tables and business constraints", () => {
   for (const table of [
@@ -325,4 +327,32 @@ test("canonical V2 migration retires V1 issuance and approves only the live V2 r
   }
   assert.match(rewardsV2Canonical.up, /approved_for_production = true/);
   assert.doesNotMatch(rewardsV2Canonical.up, /DELETE FROM (?:ledger_entries|reward_events|point_lots|rewards_accounts)/);
+});
+
+test("Bonda coupon persistence is additive, replay-safe, and disabled by default", () => {
+  assert.match(bondaCoupons.up, /ADD COLUMN partner_item_reference/);
+  assert.match(bondaCoupons.up, /CREATE TABLE bonda_affiliate_provisioning/);
+  assert.match(bondaCoupons.up, /PRIMARY KEY REFERENCES customers/);
+  assert.match(bondaCoupons.up, /uq_bonda_affiliate_rewards_id/);
+  assert.match(bondaCoupons.up, /CREATE TABLE bonda_coupon_requests/);
+  assert.match(bondaCoupons.up, /uq_bonda_coupon_requests_external_id/);
+  assert.match(bondaCoupons.up, /VERIFICATION_REQUIRED/);
+  assert.match(bondaCoupons.up, /safe_result_metadata jsonb/);
+  assert.match(bondaCoupons.up, /'V2_BONDA_COUPONS', 1, false, false/);
+  assert.doesNotMatch(bondaCoupons.up, /email|phone|curp|api_key|affiliate_token/i);
+  assert.doesNotMatch(bondaCoupons.up, /ledger_entries|point_lots|point_allocations/);
+  assert.match(bondaCoupons.down, /DROP TABLE bonda_coupon_requests/);
+  assert.match(bondaCoupons.down, /DROP TABLE bonda_affiliate_provisioning/);
+});
+
+test("approved-presentation Bonda candidates are disabled and exclude gift cards", () => {
+  assert.equal((bondaCouponCandidates.up.match(/BONDA_CANDIDATE_/g) ?? []).length, 25);
+  for (const level of ["BRONZE", "SILVER", "GOLD", "PLATINUM", "TITANIUM"]) {
+    assert.equal((bondaCouponCandidates.up.match(new RegExp(`minimumLevel\\":\\"${level}`, "g")) ?? []).length, 5);
+  }
+  assert.match(bondaCouponCandidates.up, /Cinépolis/);
+  assert.match(bondaCouponCandidates.up, /Aeroméxico Premier/);
+  assert.doesNotMatch(bondaCouponCandidates.up, /Despegar|GIFT_CARD|INVITED/i);
+  assert.match(bondaCouponCandidates.up, /FREE_ENTITLEMENT', false, NULL/);
+  assert.match(bondaCouponCandidates.up, /partner_item_reference/);
 });

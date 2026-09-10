@@ -26,7 +26,7 @@ const summary: RewardsJourneySummaryHttpResponse = {
   progress: { target_level: "SILVER", rule_available: false, remaining_active_products: null, remaining_registration_months: null, remaining_qualifying_activities: null },
   products: [{ product_type: "AFORE", status: "ACTIVE", activated_at: "2026-02-01T12:00:00.000Z" }],
   recent_movements: [],
-  modules: { benefits_enabled: false, expiry_policy_approved: false, ave_enabled: false, referrals_enabled: false, renewals_enabled: false },
+  modules: { benefits_enabled: false, coupons_enabled: false, expiry_policy_approved: false, ave_enabled: false, referrals_enabled: false, renewals_enabled: false },
 };
 
 function store(): RewardsCustomerPortalStore {

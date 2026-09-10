@@ -11,6 +11,20 @@ import type {
   ReferralHttpApplication,
 } from "../src/rewards/referrals/http-application.js";
 import type { CustomerId } from "../src/rewards/shared/identifiers.js";
+import type {
+  BondaAffiliateProvisioningHttpApplication,
+  BondaRegistrationIdentity,
+} from "../src/rewards/bonda/affiliate-provisioning.js";
+import type {
+  BondaCouponCustomerIdentity,
+  BondaCouponHttpApplication,
+} from "../src/rewards/bonda/catalog-application.js";
+import type {
+  BondaCouponCatalogHttpResponse,
+  BondaCouponCodeHttpResponse,
+  BondaCouponDetailHttpResponse,
+  BondaReceivedCouponsHttpResponse,
+} from "../src/rewards/bonda/contracts.js";
 
 const runningServers = new Set<Server>();
 
@@ -93,6 +107,61 @@ test("captures a referral token after registration without forwarding it to Fast
   assert.equal(response.status, 201);
   assert.equal(referrals.capture?.token, token);
   assert.equal(referrals.capture?.referredCustomerId, profile.id);
+});
+
+test("successful registration schedules Rewards-ID-only Bonda provisioning", async (t) => {
+  const upstream = await startServer((_request, response) => {
+    json(response, 201, {
+      customer: profile,
+      validation_id: "00000000-0000-0000-0000-000000000302",
+      validation_status: "PENDING",
+      registered_at: "2026-09-10T12:00:00.000Z",
+    });
+  });
+  const affiliate = new CapturingBondaAffiliateApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, undefined, affiliate);
+
+  const response = await fetch(`${bff.url}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(registrationPayload),
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(affiliate.registration, {
+    customerId: profile.id,
+    rewardsId: profile.rewards_id,
+  });
+});
+
+test("authenticated coupon routes bind customer and Rewards ID from API evidence", async (t) => {
+  const upstream = await startServer((request, response) => {
+    if (request.url === "/api/v1/me") return json(response, 200, profile);
+    if (request.url === "/api/v1/me/validation-status") {
+      return json(response, 200, {
+        validation_id: "00000000-0000-0000-0000-000000000302",
+        customer_id: profile.id,
+        status: "PENDING",
+        registered_at: "2026-09-10T12:00:00.000Z",
+        validated_at: null,
+        product_evidence: null,
+      });
+    }
+    return json(response, 404, {});
+  });
+  const coupons = new CapturingBondaCouponApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, undefined, undefined, coupons);
+
+  const response = await fetch(`${bff.url}/api/v1/rewards/coupons?page=2&page_size=5`, {
+    headers: { cookie: "carobra_session=api-secret" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(coupons.catalogRequest, {
+    identity: { customerId: profile.id, rewardsId: profile.rewards_id },
+    page: 2,
+    pageSize: 5,
+  });
 });
 
 test("returns authenticated referral progress without another customer's identity", async (t) => {
@@ -305,6 +374,8 @@ async function startBff(
   cookieOverrides?: Partial<SiteBackendConfig["sessionCookie"]>,
   timeout = 1_000,
   referralApplication?: ReferralHttpApplication,
+  bondaAffiliateApplication?: BondaAffiliateProvisioningHttpApplication,
+  bondaCouponApplication?: BondaCouponHttpApplication,
 ): Promise<RunningServer> {
   const config: SiteBackendConfig = {
     apiBaseUrl,
@@ -320,10 +391,67 @@ async function startBff(
     },
   };
   const running = await listen(
-    createSiteBackendServer(config, undefined, undefined, referralApplication),
+    createSiteBackendServer(
+      config,
+      undefined,
+      undefined,
+      referralApplication,
+      undefined,
+      undefined,
+      bondaAffiliateApplication,
+      bondaCouponApplication,
+    ),
   );
   t.after(() => close(running.server));
   return running;
+}
+
+class CapturingBondaAffiliateApplication implements BondaAffiliateProvisioningHttpApplication {
+  registration: BondaRegistrationIdentity | null = null;
+
+  async afterRegistration(identity: BondaRegistrationIdentity) {
+    this.registration = identity;
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+
+  async ensureForBenefits(_identity: BondaRegistrationIdentity) {
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+
+  async status(_customerId: CustomerId) {
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+}
+
+class CapturingBondaCouponApplication implements BondaCouponHttpApplication {
+  catalogRequest: { identity: BondaCouponCustomerIdentity; page: number; pageSize: number } | null = null;
+
+  async getCatalog(identity: BondaCouponCustomerIdentity, page = 1, pageSize = 20): Promise<BondaCouponCatalogHttpResponse> {
+    this.catalogRequest = { identity, page, pageSize };
+    return {
+      current_level: null,
+      access_state: "NO_LEVEL",
+      affiliate_state: "DISABLED",
+      items: [],
+      refreshed_at: null,
+      page,
+      page_size: pageSize,
+      total: 0,
+      next_page: null,
+    };
+  }
+
+  async getDetail(): Promise<BondaCouponDetailHttpResponse> {
+    throw new Error("not used");
+  }
+
+  async requestCode(): Promise<BondaCouponCodeHttpResponse> {
+    throw new Error("not used");
+  }
+
+  async getHistory(): Promise<BondaReceivedCouponsHttpResponse> {
+    return { items: [] };
+  }
 }
 
 class CapturingReferralApplication implements ReferralHttpApplication {
