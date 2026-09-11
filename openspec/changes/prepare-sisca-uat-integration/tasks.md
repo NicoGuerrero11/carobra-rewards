@@ -43,6 +43,6 @@
 ## 6. Cierre UAT y preparación de producción
 
 - [x] 6.1 Verificar la puerta de salida UAT: conectividad, contrato, 100 casos conciliados, evidencia completa, errores resueltos y aceptación de responsables.
-- [ ] 6.2 Configurar de forma separada los secretos, endpoint y red de SISCA para producción después de aprobar la salida UAT.
-- [ ] 6.3 Ejecutar el despliegue productivo con el mismo artefacto aprobado y verificar salud sin usar el controlador acelerado.
-- [ ] 6.4 Documentar el plan de reversión productiva, la operación regular de validaciones y el monitoreo posterior a la habilitación.
+- [x] 6.2 Configurar de forma separada los secretos, endpoint y red de SISCA para producción después de aprobar la salida UAT.
+- [x] 6.3 Ejecutar el despliegue productivo con el mismo artefacto aprobado y verificar salud sin usar el controlador acelerado.
+- [x] 6.4 Documentar el plan de reversión productiva, la operación regular de validaciones y el monitoreo posterior a la habilitación.
