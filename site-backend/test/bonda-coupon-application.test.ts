@@ -49,6 +49,51 @@ test("applies cumulative Carobra policy over live Bonda content", async () => {
   assert.deepEqual(result.items.map((item) => item.minimumLevel), ["BRONZE", "SILVER"]);
 });
 
+test("uses the approved technical affiliate for catalog reads while customer code requests remain gated", async () => {
+  const gateway = new CountingGateway({
+    coupons: [fakeBondaCoupon({ id: "bronze" })],
+  });
+  const application = createApplication(
+    { state: "ACTIVE", currentLevel: "BRONZE" },
+    gateway,
+    policies,
+    new MemoryRequestStore(),
+    { affiliateState: "ACTION_REQUIRED", catalogAffiliateCode: "990910001" },
+  );
+
+  const catalog = await application.getCatalog(identity);
+
+  assert.equal(catalog.access_state, "AVAILABLE");
+  assert.equal(catalog.affiliate_state, "ACTION_REQUIRED");
+  assert.deepEqual(gateway.catalogAffiliateCodes, ["990910001"]);
+  await assert.rejects(
+    application.requestCode(identity, "bronze", "request-technical-catalog"),
+    (error: unknown) => error instanceof BondaCouponApplicationError
+      && error.code === "affiliate_pending",
+  );
+  assert.equal(gateway.codeRequests.length, 0);
+});
+
+test("keeps distinct Bonda coupon IDs as separate cards even when the brand repeats", async () => {
+  const devlynPolicies = [policy("5850", "SILVER", 1), policy("5849", "SILVER", 2), policy("4749", "SILVER", 3)];
+  const gateway = new FakeBondaGateway({
+    coupons: [
+      fakeBondaCoupon({ id: "5850", name: "Ópticas Devlyn", shortDescription: "10% en clínicas" }),
+      fakeBondaCoupon({ id: "5849", name: "Ópticas Devlyn", shortDescription: "15% en aparatos auditivos" }),
+      fakeBondaCoupon({ id: "4749", name: "Ópticas Devlyn", shortDescription: "20% en productos ópticos" }),
+    ],
+  });
+
+  const result = await createApplication(
+    { state: "ACTIVE", currentLevel: "SILVER" },
+    gateway,
+    devlynPolicies,
+  ).getCatalog(identity);
+
+  assert.deepEqual(result.items.map((item) => item.id), ["5850", "5849", "4749"]);
+  assert.equal(result.items.length, 3);
+});
+
 for (const [level, expectedCount] of [
   ["BRONZE", 1],
   ["SILVER", 2],
@@ -112,6 +157,19 @@ test("rejects a higher-level coupon before asking Bonda for a code", async () =>
       && error.code === "coupon_unavailable",
   );
   assert.equal(gateway.codeRequests.length, 0);
+});
+
+test("loads optional branch information separately from the initial detail", async () => {
+  const gateway = new FakeBondaGateway({
+    coupons: [fakeBondaCoupon({ id: "bronze" })],
+    branches: { bronze: [{ id: "branch-1", name: "Centro", address: "Reforma 100", city: "CDMX", state: null, latitude: 19.43, longitude: -99.16 }] },
+  });
+  const application = createApplication({ state: "ACTIVE", currentLevel: "BRONZE" }, gateway);
+  const result = await application.getDetail(identity, "bronze");
+  const branches = await application.getBranches(identity, "bronze");
+
+  assert.deepEqual(result.item?.branches, []);
+  assert.equal(branches.items[0]?.name, "Centro");
 });
 
 test("audits successful requests without a points dependency", async () => {
@@ -194,17 +252,27 @@ function createApplication(
   gateway: FakeBondaGateway,
   configuredPolicies = policies,
   requests = new MemoryRequestStore(),
+  options: {
+    affiliateState?: "ACTIVE" | "PENDING" | "ACTION_REQUIRED";
+    catalogAffiliateCode?: string;
+  } = {},
 ): BondaCouponApplication {
   const journeyQuery: BondaCouponJourneyQuery = { get: async () => journey };
   return new BondaCouponApplication(
     gateway,
     { listEffective: async () => configuredPolicies },
     journeyQuery,
-    { ensureForBenefits: async () => ({ state: "ACTIVE", can_request_codes: true, retry_scheduled: false }) },
+    { ensureForBenefits: async () => ({
+      state: options.affiliateState ?? "ACTIVE",
+      can_request_codes: (options.affiliateState ?? "ACTIVE") === "ACTIVE",
+      retry_scheduled: options.affiliateState === "PENDING",
+    }) },
     requests,
     new EnabledRuleLookup(),
     new FixedClock(now),
     () => "generated-request",
+    undefined,
+    options.catalogAffiliateCode,
   );
 }
 
@@ -219,9 +287,11 @@ function policy(id: string, minimumLevel: BondaCouponPolicyRecord["minimumLevel"
 
 class CountingGateway extends FakeBondaGateway {
   catalogCalls = 0;
+  catalogAffiliateCodes: string[] = [];
 
   override async listCoupons(affiliateCode: string) {
     this.catalogCalls += 1;
+    this.catalogAffiliateCodes.push(affiliateCode);
     return super.listCoupons(affiliateCode);
   }
 }

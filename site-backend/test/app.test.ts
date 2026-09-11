@@ -445,6 +445,10 @@ class CapturingBondaCouponApplication implements BondaCouponHttpApplication {
     throw new Error("not used");
   }
 
+  async getBranches() {
+    return { items: [] };
+  }
+
   async requestCode(): Promise<BondaCouponCodeHttpResponse> {
     throw new Error("not used");
   }

@@ -47,6 +47,7 @@ import {
   PostgresBondaCouponPolicyQuery,
 } from "../bonda/catalog-application.js";
 import { BondaHttpGateway } from "../bonda/http-gateway.js";
+import { FakeBondaGateway, localPreviewBondaCoupons } from "../bonda/fake-gateway.js";
 import { BondaCatalogCache } from "../bonda/catalog-cache.js";
 import {
   PostgresBondaAffiliateProvisioning,
@@ -131,11 +132,14 @@ export function createRewardsCustomerPortalApplication(
 export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   affiliateProvisioning: BondaAffiliateProvisioningApplication;
   coupons: BondaCouponApplication;
+  warmCatalog(): Promise<void>;
 } {
   const clock = new SystemClock();
-  const gateway = new BondaHttpGateway(config);
+  const gateway = config.localPreviewEnabled
+    ? new FakeBondaGateway({ coupons: localPreviewBondaCoupons() })
+    : new BondaHttpGateway(config);
   const affiliateProvisioning = new BondaAffiliateProvisioningApplication(
-    config.affiliateProvisioningEnabled,
+    config.affiliateProvisioningEnabled || config.localPreviewEnabled === true,
     new PostgresBondaAffiliateProvisioning(database),
     gateway,
     clock,
@@ -146,18 +150,33 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
     config.catalogCacheTtlMs,
     config.catalogCacheMaxStaleMs,
   );
+  const policies = new PostgresBondaCouponPolicyQuery(database);
+  const rules = new PostgresRewardsV2RuleLookup(database);
   return {
     affiliateProvisioning,
     coupons: new BondaCouponApplication(
       gateway,
-      new PostgresBondaCouponPolicyQuery(database),
+      policies,
       new PostgresBondaCouponJourneyQuery(database),
       affiliateProvisioning,
       new PostgresBondaCouponRequests(database),
-      new PostgresRewardsV2RuleLookup(database),
+      rules,
       clock,
       undefined,
       catalog,
+      config.catalogAffiliateCode,
     ),
+    warmCatalog: async () => {
+      if (!config.catalogEnabled || !config.catalogAffiliateCode) return;
+      const now = clock.now();
+      const feature = await rules.findEffective("V2_BONDA_COUPONS", now);
+      if (!feature?.enabled || !feature.approvedForProduction) return;
+      const approvedPolicies = await policies.listEffective(now);
+      if (approvedPolicies.length === 0) return;
+      await catalog.read(
+        config.catalogAffiliateCode,
+        approvedPolicies.map((policy) => policy.bondaCouponId),
+      );
+    },
   };
 }

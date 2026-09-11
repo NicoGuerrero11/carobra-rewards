@@ -7,12 +7,14 @@ export interface BondaConfig {
   micrositeId?: string;
   couponApiKey?: string;
   affiliateToken?: string;
+  catalogAffiliateCode?: string;
   requestTimeoutMs: number;
   catalogCacheTtlMs: number;
   catalogCacheMaxStaleMs: number;
   catalogEnabled: boolean;
   affiliateProvisioningEnabled: boolean;
   couponRequestsEnabled: boolean;
+  localPreviewEnabled?: boolean;
 }
 
 export interface SiteBackendConfig {
@@ -143,16 +145,24 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
     "BONDA_COUPON_REQUESTS_ENABLED",
     environment.BONDA_COUPON_REQUESTS_ENABLED ?? "false",
   );
+  const localPreviewEnabled = parseBoolean(
+    "BONDA_LOCAL_PREVIEW_ENABLED",
+    environment.BONDA_LOCAL_PREVIEW_ENABLED ?? "false",
+  );
+  if (localPreviewEnabled && (environment.NODE_ENV ?? "development").trim().toLowerCase() === "production") {
+    throw new Error("BONDA_LOCAL_PREVIEW_ENABLED is forbidden in production");
+  }
   const micrositeId = optionalValue(environment.BONDA_MICROSITE_ID);
   const couponApiKey = optionalValue(environment.BONDA_COUPON_API_KEY);
   const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN);
+  const catalogAffiliateCode = optionalValue(environment.BONDA_CATALOG_AFFILIATE_CODE);
 
-  if ((catalogEnabled || couponRequestsEnabled) && (!micrositeId || !couponApiKey)) {
+  if (!localPreviewEnabled && (catalogEnabled || couponRequestsEnabled) && (!micrositeId || !couponApiKey)) {
     throw new Error(
       "Enabled Bonda coupon features require BONDA_MICROSITE_ID and BONDA_COUPON_API_KEY",
     );
   }
-  if (affiliateProvisioningEnabled && (!micrositeId || !affiliateToken)) {
+  if (!localPreviewEnabled && affiliateProvisioningEnabled && (!micrositeId || !affiliateToken)) {
     throw new Error(
       "Enabled Bonda affiliate provisioning requires BONDA_MICROSITE_ID and BONDA_AFFILIATE_TOKEN",
     );
@@ -173,19 +183,20 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
     ),
     catalogCacheTtlMs: parseInteger(
       "BONDA_CATALOG_CACHE_TTL_MS",
-      environment.BONDA_CATALOG_CACHE_TTL_MS ?? "60000",
+      environment.BONDA_CATALOG_CACHE_TTL_MS ?? "300000",
       1_000,
       300_000,
     ),
     catalogCacheMaxStaleMs: parseInteger(
       "BONDA_CATALOG_CACHE_MAX_STALE_MS",
-      environment.BONDA_CATALOG_CACHE_MAX_STALE_MS ?? "300000",
+      environment.BONDA_CATALOG_CACHE_MAX_STALE_MS ?? "1800000",
       1_000,
       3_600_000,
     ),
     catalogEnabled,
     affiliateProvisioningEnabled,
     couponRequestsEnabled,
+    localPreviewEnabled,
   };
   if (config.catalogCacheMaxStaleMs < config.catalogCacheTtlMs) {
     throw new Error("BONDA_CATALOG_CACHE_MAX_STALE_MS must be greater than or equal to BONDA_CATALOG_CACHE_TTL_MS");
@@ -193,6 +204,7 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   if (micrositeId) config.micrositeId = micrositeId;
   if (couponApiKey) config.couponApiKey = couponApiKey;
   if (affiliateToken) config.affiliateToken = affiliateToken;
+  if (catalogAffiliateCode) config.catalogAffiliateCode = catalogAffiliateCode;
   return config;
 }
 

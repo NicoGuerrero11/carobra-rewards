@@ -28,6 +28,14 @@ const server = createSiteBackendServer(
 );
 if (database) {
   server.on("close", () => void database.end());
+  void database.query("SELECT 1")
+    .then(async () => bonda?.warmCatalog())
+    .catch((error: unknown) => {
+      console.warn(JSON.stringify({
+        event: "site_backend_warmup_failed",
+        error_name: error instanceof Error ? error.name : "unknown",
+      }));
+    });
 }
 
 server.listen(config.port, config.host, () => {

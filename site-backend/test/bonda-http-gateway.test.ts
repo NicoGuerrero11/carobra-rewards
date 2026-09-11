@@ -63,6 +63,23 @@ test("creates affiliates with Rewards ID only and disables Bonda email", async (
   assert.deepEqual(result, { state: "ACTIVE", externalMemberId: "3051465" });
 });
 
+test("loads and normalizes optional coupon branches", async () => {
+  const gateway = new BondaHttpGateway(config, async (input) => {
+    assert.match(String(input), /\/api\/cupones\/10792\/sucursales\?/);
+    return jsonResponse(JSON.stringify({ results: [{ id: 1, nombre: "Centro", direccion: "Reforma 100", ciudad: "CDMX" }] }));
+  });
+
+  assert.deepEqual(await gateway.listCouponBranches("RWD-TEST", "10792"), [{
+    id: "1",
+    name: "Centro",
+    address: "Reforma 100",
+    city: "CDMX",
+    state: null,
+    latitude: null,
+    longitude: null,
+  }]);
+});
+
 test("treats documented HTTP-200 business errors as stable failures", async () => {
   const gateway = new BondaHttpGateway(config, async () => (
     jsonResponse(fixtureText("code-limit.json"))

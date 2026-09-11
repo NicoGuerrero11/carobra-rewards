@@ -25,6 +25,41 @@ test("reuses a fresh Bonda catalog and preserves its refresh time", async () => 
   assert.equal(second.refreshedAt.toISOString(), "2026-09-10T12:00:00.000Z");
 });
 
+test("loads only approved coupon identifiers and reuses the bounded result", async () => {
+  const clock = new MutableClock("2026-09-10T12:00:00.000Z");
+  const requested: string[] = [];
+  const cache = new BondaCatalogCache({
+    listCoupons: async () => { throw new Error("full catalog must not be loaded"); },
+    getCoupon: async (_affiliateCode, couponId) => {
+      requested.push(couponId);
+      return fakeBondaCoupon({ id: couponId });
+    },
+  }, clock, 300_000, 1_800_000);
+
+  const first = await cache.read("affiliate-1", ["9510", "4749", "9510"]);
+  const second = await cache.read("affiliate-1", ["4749", "9510"]);
+
+  assert.deepEqual(requested.sort(), ["4749", "9510"]);
+  assert.deepEqual(first.items.map((item) => item.id).sort(), ["4749", "9510"]);
+  assert.equal(second, first);
+});
+
+test("caches branch lists independently from the catalog", async () => {
+  const clock = new MutableClock("2026-09-10T12:00:00.000Z");
+  let calls = 0;
+  const cache = new BondaCatalogCache({
+    listCoupons: async () => [],
+    listCouponBranches: async () => {
+      calls += 1;
+      return [{ id: "branch-1", name: "Centro", address: "Reforma 100", city: "CDMX", state: null, latitude: 19.43, longitude: -99.16 }];
+    },
+  }, clock, 300_000, 1_800_000);
+
+  assert.equal((await cache.readBranches("affiliate-1", "9510")).length, 1);
+  assert.equal((await cache.readBranches("affiliate-1", "9510")).length, 1);
+  assert.equal(calls, 1);
+});
+
 test("serves a bounded stale catalog only for retryable partner failures", async () => {
   const clock = new MutableClock("2026-09-10T12:00:00.000Z");
   let unavailable = false;

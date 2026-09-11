@@ -1,5 +1,5 @@
 import type { BondaConfig } from "../../config.js";
-import type { BondaCouponDetail, BondaReceivedCoupon } from "./contracts.js";
+import type { BondaCouponBranch, BondaCouponDetail, BondaReceivedCoupon } from "./contracts.js";
 import {
   BondaGatewayError,
   type BondaAffiliateResult,
@@ -10,6 +10,7 @@ import {
   asRecord,
   htmlToSafeText,
   normalizeCoupon,
+  normalizeCouponBranch,
   normalizeReceivedCoupon,
   optionalString,
 } from "./normalization.js";
@@ -101,6 +102,32 @@ export class BondaHttpGateway implements BondaGateway {
       return normalizeCoupon(root, this.config.allowedImageHosts);
     } catch (error) {
       if (error instanceof BondaGatewayError && error.code === "COUPON_UNAVAILABLE") return null;
+      throw error;
+    }
+  }
+
+  async listCouponBranches(
+    affiliateCode: string,
+    couponId: string,
+  ): Promise<readonly BondaCouponBranch[]> {
+    const { micrositeId, key } = this.requireCouponConfiguration("catalog");
+    const query = couponQuery(key, micrositeId, affiliateCode);
+    try {
+      const payload = await this.requestJson(
+        "GET",
+        `/api/cupones/${encodeURIComponent(requireIdentifier(couponId))}/sucursales?${query.toString()}`,
+      );
+      if (Array.isArray(payload)) return payload.map(normalizeCouponBranch);
+      const root = asRecord(payload);
+      throwIfPartnerError(root);
+      const items = Array.isArray(root.results)
+        ? root.results
+        : Array.isArray(root.data)
+          ? root.data
+          : Array.isArray(root.sucursales) ? root.sucursales : [];
+      return items.map(normalizeCouponBranch);
+    } catch (error) {
+      if (error instanceof BondaGatewayError && error.code === "COUPON_UNAVAILABLE") return [];
       throw error;
     }
   }

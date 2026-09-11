@@ -42,13 +42,23 @@ import {
 } from "./rewards/bonda/catalog-application.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
-const CUSTOMER_CONTEXT_CACHE_TTL_MS = 30_000;
+// A customer commonly spends more than 30 seconds scanning the catalog before
+// opening a benefit. Keep the already validated, read-only context for the
+// length of that browsing session so every navigation does not repeat both
+// upstream identity requests. Explicit logout and customer mutations still
+// invalidate the entry immediately.
+const CUSTOMER_CONTEXT_CACHE_TTL_MS = 5 * 60_000;
 const CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES = 500;
 
 interface CustomerContextPayload {
   customer: CustomerProfile;
   validation: { status: string };
   portal: RewardsCustomerPortalHttpResponse | null;
+}
+
+interface CachedCustomerContext {
+  payload: CustomerContextPayload;
+  evidence: RewardsIdentityEvidence;
 }
 
 export function createSiteBackendServer(
@@ -148,7 +158,7 @@ async function routeRequest(
     if (method === "GET" && path === "/api/v1/rewards/customer-context") {
       const cached = customerContextCache.get(cookie);
       if (cached) {
-        sendJson(response, 200, cached);
+        sendJson(response, 200, cached.payload);
         return;
       }
       const context = await client.getAuthenticatedCustomerContext(cookie);
@@ -162,7 +172,7 @@ async function routeRequest(
         validation: { status: context.data.validation.status },
         portal: customerPortal,
       };
-      customerContextCache.set(cookie, payload);
+      customerContextCache.set(cookie, { payload, evidence: context.data.evidence });
       return sendApiResult(response, {
         status: 200,
         data: payload,
@@ -280,9 +290,9 @@ async function routeRequest(
     }
     if (method === "GET" && path === "/api/v1/rewards/coupons") {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
       sendJson(response, 200, await coupons.getCatalog(
-        bondaIdentity(evidence.data),
+        bondaIdentity(evidence),
         integerQuery(requestUrl, "page", 1),
         integerQuery(requestUrl, "page_size", 20),
       ));
@@ -300,8 +310,8 @@ async function routeRequest(
     }
     if (method === "GET" && path === "/api/v1/rewards/coupons/history") {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
-      sendJson(response, 200, await coupons.getHistory(bondaIdentity(evidence.data)));
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getHistory(bondaIdentity(evidence)));
       return;
     }
     const codeRequestMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/code$/);
@@ -319,12 +329,22 @@ async function routeRequest(
       ));
       return;
     }
+    const couponBranchesMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/branches$/);
+    if (method === "GET" && couponBranchesMatch) {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getBranches(
+        bondaIdentity(evidence),
+        decodePathSegment(couponBranchesMatch[1]!),
+      ));
+      return;
+    }
     const couponDetailMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)$/);
     if (method === "GET" && couponDetailMatch) {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
       sendJson(response, 200, await coupons.getDetail(
-        bondaIdentity(evidence.data),
+        bondaIdentity(evidence),
         decodePathSegment(couponDetailMatch[1]!),
       ));
       return;
@@ -420,9 +440,9 @@ async function routeRequest(
 }
 
 class CustomerContextCache {
-  private readonly entries = new Map<string, { expiresAt: number; payload: CustomerContextPayload }>();
+  private readonly entries = new Map<string, { expiresAt: number; context: CachedCustomerContext }>();
 
-  get(cookie: string | undefined): CustomerContextPayload | undefined {
+  get(cookie: string | undefined): CachedCustomerContext | undefined {
     const key = contextCacheKey(cookie);
     if (!key) return undefined;
     const entry = this.entries.get(key);
@@ -431,14 +451,14 @@ class CustomerContextCache {
       this.entries.delete(key);
       return undefined;
     }
-    return entry.payload;
+    return entry.context;
   }
 
-  set(cookie: string | undefined, payload: CustomerContextPayload): void {
+  set(cookie: string | undefined, context: CachedCustomerContext): void {
     const key = contextCacheKey(cookie);
     if (!key) return;
     this.entries.delete(key);
-    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, payload });
+    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, context });
     while (this.entries.size > CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES) {
       const oldestKey = this.entries.keys().next().value as string | undefined;
       if (!oldestKey) break;
@@ -450,6 +470,16 @@ class CustomerContextCache {
     const key = contextCacheKey(cookie);
     if (key) this.entries.delete(key);
   }
+}
+
+async function readCachedRewardsEvidence(
+  client: RewardsApiClient,
+  cache: CustomerContextCache,
+  cookie: string | undefined,
+): Promise<RewardsIdentityEvidence> {
+  const cached = cache.get(cookie);
+  if (cached) return cached.evidence;
+  return (await client.getRewardsIdentityEvidence(cookie)).data;
 }
 
 function contextCacheKey(cookie: string | undefined): string | undefined {
@@ -475,9 +505,16 @@ async function loadCustomerPortalSafely(
       evidence.validation_status,
     );
   } catch (error: unknown) {
+    const databaseError = error && typeof error === "object"
+      ? error as { code?: unknown; constraint?: unknown }
+      : null;
     console.error(JSON.stringify({
       event: "rewards_customer_context_unavailable",
       error_name: error instanceof Error ? error.name : "UnknownError",
+      error_code: typeof databaseError?.code === "string" ? databaseError.code : undefined,
+      error_constraint: typeof databaseError?.constraint === "string"
+        ? databaseError.constraint
+        : undefined,
     }));
     return null;
   }
