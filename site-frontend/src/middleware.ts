@@ -132,6 +132,8 @@ async function fetchValidationStatus(cookieHeader: string | null) {
 export const onRequest = defineMiddleware(async (context, next) => {
   const requestStartedAt = performance.now();
   const pathname = context.url.pathname;
+  const isCustomerEntryPath = customerEntryPaths.has(pathname)
+    || /^\/cliente\/beneficios\/[^/]{1,200}$/.test(pathname);
 
   // The admin workspace remains outside the authenticated customer MVP.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
@@ -140,11 +142,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (pathname === "/verificar-email") {
     return context.redirect("/login");
   }
-  if (pathname.startsWith("/cliente/") && !customerEntryPaths.has(pathname)) {
+  if (pathname.startsWith("/cliente/") && !isCustomerEntryPath) {
     return context.redirect("/cliente");
   }
 
-  const isProtected = customerEntryPaths.has(pathname);
+  const isProtected = isCustomerEntryPath;
   const isAuthPage = authPages.has(pathname);
   if (!isProtected && !isAuthPage) {
     return next();

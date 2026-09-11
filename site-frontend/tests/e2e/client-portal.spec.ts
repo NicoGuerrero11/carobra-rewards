@@ -8,11 +8,19 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
   const isMobile = await page.getByRole("navigation", { name: /Navegación móvil/ }).isVisible();
   await expect(page.getByRole("link", { name: /Beneficios/ }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /Ganar puntos/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Cursos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Productos/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Actividad/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Gift Cards/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /^Ver notificaciones/ })).toBeVisible();
+  const helpLink = page.getByRole("link", { name: "Ayuda", exact: true });
+  const notificationsLink = page.getByRole("link", { name: /^Ver notificaciones/ });
+  await expect(helpLink).toHaveAttribute("title", "Ayuda");
+  await expect(notificationsLink).toHaveAttribute("title", "Notificaciones");
+  await helpLink.hover();
+  await expect.poll(() => helpLink.evaluate((element) => getComputedStyle(element, "::after").opacity)).toBe("1");
+  await notificationsLink.hover();
+  await expect.poll(() => notificationsLink.evaluate((element) => getComputedStyle(element, "::after").opacity)).toBe("1");
   await expect(page.getByRole("link", { name: /^Ver notificaciones/ })).not.toHaveAttribute("data-astro-prefetch", "hover");
   await expect(page.getByText("Avisos", { exact: true })).toHaveCount(0);
   const activeNavigation = page.getByRole("navigation", { name: isMobile ? /Navegación móvil/ : /Navegación cliente/ });
@@ -24,15 +32,12 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   expect(rendered?.headers()["server-timing"]).toMatch(/auth-context;dur=\d+\.\d, page-render;dur=\d+\.\d, total;dur=\d+\.\d/);
 
   await page.goto("/cliente/beneficios");
-  await expect(page.getByRole("heading", { name: "Beneficios", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tu nivel abre nuevas experiencias." })).toBeVisible();
-  await expect(page.getByText("Nivel Invitado", { exact: true })).toBeVisible();
   await expect(page.getByText("Tus descuentos comienzan en Bronce")).toBeVisible();
+  await expect(page.getByText("Tu nivel abre nuevas experiencias.")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /canjear|redimir/i })).toHaveCount(0);
 
   await page.goto("/cliente/cursos");
-  await expect(page.getByRole("heading", { name: "Una biblioteca hecha para tu camino" })).toBeVisible();
-  await expect(page.getByText("Aún no tienes cursos asignados")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
 
   await page.goto("/cliente/gift-cards");
   await expect(page.getByRole("heading", { name: "Esta categoría aún no está habilitada" })).toBeVisible();
@@ -52,8 +57,7 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
 
   await page.goto("/cliente/cursos");
-  await expect(page.getByRole("heading", { name: "Fundamentos para tu retiro" })).toBeVisible();
-  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "40");
+  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
 
   await page.goto("/cliente/notificaciones");
   await expect(page.getByRole("heading", { name: "Notificaciones" })).toBeVisible();
@@ -63,29 +67,54 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.getByRole("heading", { name: "Elige qué actualizaciones recibir" })).toBeVisible();
 
   await page.goto("/cliente/beneficios");
-  await expect(page.getByText("Nivel Bronce", { exact: true })).toBeVisible();
-  await expect(page.getByText("150 pts")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "5 beneficios para ti" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cinépolis" })).toBeVisible();
-  await expect(page.locator(".coupon-card__visual img")).toHaveAttribute("src", /cuponstar-ar\.s3\.amazonaws\.com/);
-  await expect(page.getByText("Tu saldo no cambia al usar estos beneficios.")).toBeVisible();
-  await expect(page.getByText("Gift Cards · Próximamente")).toBeVisible();
-  await page.getByRole("button", { name: "Ver beneficio" }).first().click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Cinépolis" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "2 beneficios para ti" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cinépolis" })).toHaveCount(0);
+  await expect(page.locator(".coupon-card__visual > img").first()).toHaveAttribute("src", /cuponstar-ar\.s3\.amazonaws\.com/);
+  await expect(page.locator(".coupon-card__logo img")).toHaveAttribute("src", /cuponstar-ar\.s3\.amazonaws\.com/);
+  await expect(page.locator(".coupon-card__discount").first()).toHaveText("2x1");
+  await expect(page.locator(".coupon-card__visual")).toHaveCount(2);
+  await expect(page.locator(".coupon-card__link").first()).toHaveAttribute("aria-label", /Cinépolis: 2x1/);
+  await expect(page.getByText("Tu nivel abre nuevas experiencias.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Beneficios", exact: true })).toHaveCount(0);
+  const hasCrowdedCardContent = await page.locator(".coupon-card").evaluateAll((cards) => cards.some((card) => {
+    const visual = card.querySelector(".coupon-card__visual")?.getBoundingClientRect();
+    const logo = card.querySelector(".coupon-card__logo")?.getBoundingClientRect();
+    const discount = card.querySelector(".coupon-card__discount")?.getBoundingClientRect();
+    if (!visual || !logo || !discount) return true;
+    const logoOverlapsDiscount = logo.bottom > discount.top && logo.top < discount.bottom;
+    const imageOfferGap = discount.top - visual.bottom;
+    return logoOverlapsDiscount || imageOfferGap < 30;
+  }));
+  expect(hasCrowdedCardContent).toBe(false);
+  await expect(page.getByRole("heading", { name: "Otras experiencias" })).toHaveCount(0);
+  await expect(page.getByText(/Desde Bronce/)).toHaveCount(0);
+  await page.getByRole("link", { name: "Ver beneficio" }).first().click();
+  await expect(page).toHaveURL(/\/cliente\/beneficios\/cinepolis$/);
+  await expect(page.getByRole("heading", { name: "Cinépolis", exact: true })).toBeVisible();
+  await expect(page.locator(".coupon-detail__visual img")).toHaveAttribute("src", /variant=original/);
+  const detailTitleSize = await page.locator("#coupon-title").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(detailTitleSize).toBeLessThanOrEqual(48);
+  const detailDescriptionSize = await page.locator(".coupon-detail__copy .description").evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+  expect(detailDescriptionSize).toBeLessThanOrEqual(15);
+  await expect(page.getByRole("heading", { name: "Cómo usarlo" })).toBeVisible();
+  await page.getByText("Sucursales disponibles").click();
+  await expect(page.getByRole("dialog", { name: "Sucursales habilitadas" })).toBeVisible();
+  await expect(page.getByText("Cinépolis Universidad")).toBeVisible();
+  const branchDialog = page.getByRole("dialog", { name: "Sucursales habilitadas" });
+  const dialogBox = await branchDialog.boundingBox();
+  expect(dialogBox?.width).toBeLessThanOrEqual(752);
+  expect(dialogBox?.height).toBeLessThanOrEqual(460);
+  await expect(branchDialog.locator("#branches-map")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-  await page.getByRole("button", { name: "Ver beneficio" }).first().click();
+  await expect(branchDialog).toBeHidden();
   await page.getByRole("button", { name: "Quiero este beneficio" }).click();
-  await expect(page.getByText("Esta acción no consume puntos.")).toBeVisible();
+  await expect(page.getByText(/no descuenta puntos/i)).toBeVisible();
   await page.getByRole("button", { name: "Confirmar solicitud" }).click();
   await expect(page.getByText("CAROBRA-CINEPOLIS")).toBeVisible();
 
   await page.goto("/cliente/ganar-puntos");
-  await expect(page.getByRole("heading", { name: "Ganar puntos", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cada acción confirmada cuenta." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cómo puedes ganar puntos" })).toBeVisible();
-  await expect(page.getByText("+20 pts", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/cliente\/cursos$/);
+  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
 
   await page.goto("/cliente/productos");
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
@@ -118,10 +147,10 @@ test("portal navigation remains usable without horizontal overflow on mobile", a
   const mobileNav = page.getByRole("navigation", { name: /Navegación móvil/ });
   await expect(mobileNav.getByText("Inicio", { exact: true })).toBeVisible();
   await expect(mobileNav.getByRole("link", { name: /Beneficios/ })).toBeVisible();
-  await expect(mobileNav.getByRole("link", { name: /Ganar puntos/ })).toBeVisible();
+  await expect(mobileNav.getByRole("link", { name: /Cursos/ })).toBeVisible();
   await expect(mobileNav.getByRole("link", { name: /Productos/ })).toBeVisible();
   await expect(mobileNav.getByRole("link", { name: /Actividad/ })).toBeVisible();
-  await expect(mobileNav.getByRole("link", { name: /Cursos|Gift Cards/ })).toHaveCount(0);
+  await expect(mobileNav.getByRole("link", { name: /Ganar puntos|Gift Cards/ })).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: /Navegación móvil/ }).getByRole("link", { name: "Servicios" })).toHaveCount(0);
 
   const hasHorizontalOverflow = await page.evaluate(

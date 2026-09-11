@@ -33,3 +33,16 @@ test("protected middleware loads one authenticated customer context and exposes 
   assert.match(middleware, /total;dur=/);
   assert.doesNotMatch(middleware, /server-timing[^\n]*(?:customer|session|SISCA|sql)/i);
 });
+
+test("customer navigation exposes courses and labeled utility actions", async () => {
+  const shell = await readFile(new URL("../../src/layouts/ClientShellLayout.astro", import.meta.url), "utf8");
+  const courses = await readFile(new URL("../../src/pages/cliente/cursos.astro", import.meta.url), "utf8");
+  const benefits = await readFile(new URL("../../src/pages/cliente/beneficios.astro", import.meta.url), "utf8");
+
+  assert.match(shell, /label: "Cursos", href: "\/cliente\/cursos"/);
+  assert.doesNotMatch(shell, /label: "Ganar puntos"/);
+  assert.match(shell, /data-tooltip="Ayuda"/);
+  assert.match(shell, /data-tooltip="Notificaciones"/);
+  assert.match(courses, /<h1 id="courses-coming-soon-title">Próximamente<\/h1>/);
+  assert.doesNotMatch(benefits, /Otras experiencias|other-benefits-title/);
+});

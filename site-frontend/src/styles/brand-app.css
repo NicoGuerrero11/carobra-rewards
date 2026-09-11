@@ -280,7 +280,7 @@ body.carobra-app .client-shell__mobile-link.is-active .client-shell__nav-icon {
   color: #fff;
 }
 
-body.carobra-app .client-shell__notification-link,
+body.carobra-app .client-shell__utility-link,
 body.carobra-app .client-shell__user-toggle,
 body.carobra-app .client-shell__menu-toggle {
   border-color: var(--carobra-border);
@@ -288,9 +288,9 @@ body.carobra-app .client-shell__menu-toggle {
   color: var(--carobra-blue);
 }
 
-body.carobra-app .client-shell__notification-link:hover,
-body.carobra-app .client-shell__notification-link:focus-visible,
-body.carobra-app .client-shell__notification-link.is-active,
+body.carobra-app .client-shell__utility-link:hover,
+body.carobra-app .client-shell__utility-link:focus-visible,
+body.carobra-app .client-shell__utility-link.is-active,
 body.carobra-app .client-shell__user-toggle:hover,
 body.carobra-app .client-shell__menu-toggle:hover {
   border-color: var(--carobra-cyan);
@@ -1432,7 +1432,7 @@ body.carobra-app :where(.portal-welcome, .benefits-page__welcome, .rewards-home_
     padding-right: 0.15rem;
   }
 
-  body.carobra-app .client-shell__notification-link {
+  body.carobra-app .client-shell__utility-link {
     width: 2.25rem;
     height: 2.25rem;
   }

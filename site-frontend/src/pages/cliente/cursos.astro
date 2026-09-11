@@ -1,56 +1,21 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
-import { getSiteBackendBaseUrl } from "../../lib/api";
-import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
-
-const cookie = Astro.request.headers.get("cookie") ?? "";
-const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
-let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
-if (!portalLoadedWithContext) {
-  try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
-    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-  } catch {}
-}
-const courses = portal?.learning.items ?? [];
 ---
 
-<ClientShellLayout title="Cursos | Carobra" description="Cursos y contenidos para clientes Carobra." currentPath="/cliente/cursos" sectionLabel="Cursos">
-  <main class="portal-page">
-    <header class="portal-welcome">
-      <div><p class="portal-eyebrow">Aprende a tu ritmo</p><h1>Cursos</h1><p>Contenidos asignados para comprender tus decisiones y avanzar en tu relación con Carobra.</p></div>
-      <span>{courses.length} {courses.length === 1 ? "curso asignado" : "cursos asignados"}</span>
-    </header>
-    <section class="learning-hero" aria-labelledby="learning-title">
-      <div><p class="portal-eyebrow">Tu aprendizaje</p><h2 id="learning-title">Una biblioteca hecha para tu camino</h2><p>Aquí encontrarás únicamente contenidos aprobados y asignados a tu cuenta, con avance guardado y una acción clara para continuar.</p></div>
-      <div class="learning-hero__visual" aria-hidden="true"><span>▶</span><small>Contenido Carobra</small></div>
+<ClientShellLayout title="Cursos | Carobra" description="Próximamente, cursos y contenidos para clientes Carobra." currentPath="/cliente/cursos" sectionLabel="Cursos">
+  <main class="courses-coming-soon">
+    <section aria-labelledby="courses-coming-soon-title">
+      <p>Cursos</p>
+      <h1 id="courses-coming-soon-title">Próximamente</h1>
     </section>
-    {courses.length ? (
-      <section class="portal-section" aria-labelledby="learning-library-title">
-        <div class="portal-section-heading"><div><p class="portal-eyebrow">Tu biblioteca</p><h2 id="learning-library-title">Continúa donde te quedaste</h2></div><p>Tu progreso se guarda en tu cuenta.</p></div>
-        <div class="learning-grid">{courses.map((course) => (
-          <article data-course-id={course.id} data-progress={course.progress}>
-            <span>{course.progress}%</span>
-            <div><small>{course.category}</small><h3>{course.title}</h3><p>{course.description}</p><progress max="100" value={course.progress}>{course.progress}%</progress></div>
-            {course.status === "COMPLETED" ? <small>Completado</small> : <button class="course-progress" type="button">{course.progress ? "Continuar" : "Comenzar"}</button>}
-          </article>
-        ))}</div>
-      </section>
-    ) : (
-      <section class="portal-card portal-empty-state"><span aria-hidden="true">+</span><div><p class="portal-eyebrow">Al día</p><h2>Aún no tienes cursos asignados</h2><p>Cuando exista contenido aprobado para tu perfil, aparecerá aquí con su duración, avance y próxima acción.</p></div></section>
-    )}
   </main>
+
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
-    document.querySelectorAll<HTMLButtonElement>(".course-progress").forEach((button) => button.addEventListener("click", async () => {
-      const card = button.closest<HTMLElement>("[data-course-id]");
-      if (!card) return;
-      button.disabled = true;
-      const progress = Math.min(100, Number(card.dataset.progress ?? "0") + 10);
-      const response = await fetch("/api/v1/rewards/portal/learning-progress", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ assignment_id: card.dataset.courseId, progress }) });
-      if (response.ok) window.location.reload(); else button.disabled = false;
-    }));
   </script>
+
+  <style>
+    .courses-coming-soon{width:min(74rem,calc(100% - 2.2rem));min-height:calc(100vh - 4.6rem);display:grid;place-items:center;margin:0 auto;padding:3rem 0}.courses-coming-soon section{text-align:center}.courses-coming-soon p{margin:0 0 .8rem;color:#176f9e;font-size:.78rem;font-weight:900;letter-spacing:.16em;text-transform:uppercase}.courses-coming-soon h1{margin:0;color:#041c2c;font-size:clamp(4rem,12vw,9rem);line-height:.9;letter-spacing:-.065em}@media(max-width:760px){.courses-coming-soon{width:min(100% - 1.1rem,74rem);min-height:calc(100vh - 9rem)}.courses-coming-soon h1{font-size:clamp(3.3rem,17vw,5.5rem)}}
+  </style>
 </ClientShellLayout>

@@ -3,7 +3,7 @@ import BaseLayout from "./BaseLayout.astro";
 import ClientNavIcon from "../components/ClientNavIcon.astro";
 
 interface NavItem {
-  id: "home" | "benefits" | "earn" | "products" | "activity" | "help";
+  id: "home" | "benefits" | "courses" | "products" | "activity";
   label: string;
   href: string;
   activePaths: string[];
@@ -26,14 +26,13 @@ const {
 
 const navItems: NavItem[] = [
   { id: "home", label: "Inicio", href: "/cliente/recompensas", activePaths: ["/cliente/recompensas"], icon: "home" },
-  { id: "benefits", label: "Beneficios", href: "/cliente/beneficios", activePaths: ["/cliente/beneficios", "/cliente/gift-cards", "/cliente/cursos"], icon: "benefits" },
-  { id: "earn", label: "Ganar puntos", href: "/cliente/ganar-puntos", activePaths: ["/cliente/ganar-puntos"], icon: "earn" },
+  { id: "benefits", label: "Beneficios", href: "/cliente/beneficios", activePaths: ["/cliente/beneficios", "/cliente/gift-cards"], icon: "benefits" },
+  { id: "courses", label: "Cursos", href: "/cliente/cursos", activePaths: ["/cliente/cursos"], icon: "courses" },
   { id: "products", label: "Productos", href: "/cliente/productos", activePaths: ["/cliente/productos"], icon: "products" },
   { id: "activity", label: "Actividad", href: "/cliente/activities", activePaths: ["/cliente/activities"], icon: "activity" },
-  { id: "help", label: "Ayuda", href: "/cliente/ayuda", activePaths: ["/cliente/ayuda"], icon: "help" },
 ];
 
-const mobileNavItems = navItems.filter((item) => item.id !== "help");
+const mobileNavItems = navItems;
 const unreadCount = Astro.locals.rewardsPortal?.notifications.unread_count ?? 0;
 
 function isActive(item: NavItem) {
@@ -77,10 +76,21 @@ function isActive(item: NavItem) {
 
         <div class="client-shell__right">
           <a
-            class:list={["client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
+            class:list={["client-shell__utility-link", currentPath === "/cliente/ayuda" && "is-active"]}
+            href="/cliente/ayuda"
+            aria-label="Ayuda"
+            aria-current={currentPath === "/cliente/ayuda" ? "page" : undefined}
+            data-tooltip="Ayuda"
+            title="Ayuda"
+          >
+            <ClientNavIcon name="help" />
+          </a>
+          <a
+            class:list={["client-shell__utility-link", "client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
             href="/cliente/notificaciones"
             aria-label={unreadCount > 0 ? `Ver notificaciones, ${unreadCount} sin leer` : "Ver notificaciones"}
             aria-current={currentPath === "/cliente/notificaciones" ? "page" : undefined}
+            data-tooltip="Notificaciones"
             title="Notificaciones"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -102,7 +112,6 @@ function isActive(item: NavItem) {
 
             <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
               <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
-              <a class="client-shell__user-menu-link" href="/cliente/ayuda">Ayuda y soporte</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
           </div>

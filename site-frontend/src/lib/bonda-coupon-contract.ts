@@ -19,6 +19,9 @@ export interface BondaCouponSummary {
   shortDescription: string;
   expirationAt: string | null;
   imageUrl: string | null;
+  heroImageUrl: string | null;
+  logoImageUrl: string | null;
+  bannerImageUrl: string | null;
   category: string | null;
   channels: CouponChannel[];
   minimumLevel: RewardsV2Level;
@@ -29,6 +32,18 @@ export interface BondaCouponDetail extends BondaCouponSummary {
   description: string;
   usageInstructions: string;
   legalTerms: string;
+  brandDescription: string;
+  branches: BondaCouponBranch[];
+}
+
+export interface BondaCouponBranch {
+  id: string;
+  name: string;
+  address: string;
+  city: string | null;
+  state: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface BondaCouponCatalog {
@@ -80,4 +95,16 @@ export function couponChannelLabel(channel: CouponChannel): string {
     PHONE: "Teléfono",
     WHATSAPP: "WhatsApp",
   }[channel];
+}
+
+export function carobraCouponCategory(category: string | null): string {
+  const value = (category ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/cine|entretenimiento|espectaculo/.test(value)) return "Cine y entretenimiento";
+  if (/farmacia|salud|optica|cuidado|bienestar|laboratorio/.test(value)) return "Salud y bienestar";
+  if (/idioma|educacion|curso|capacitacion/.test(value)) return "Educación";
+  if (/deport|fitness|gimnasio|yoga/.test(value)) return "Deporte y bienestar";
+  if (/restaurant|gastronom|comida|bebida/.test(value)) return "Restaurantes";
+  if (/moda|indumentaria|calzado|accesorio|tienda/.test(value)) return "Compras";
+  if (/viaje|hotel|turismo|aerolinea/.test(value)) return "Viajes";
+  return "Otros beneficios";
 }

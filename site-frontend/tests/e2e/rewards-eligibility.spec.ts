@@ -96,7 +96,6 @@ async function assertCustomerSectionsAreReachable(page: Page) {
   for (const path of [
     "/cliente/beneficios",
     "/cliente/ayuda",
-    "/cliente/ganar-puntos",
     "/cliente/productos",
     "/cliente/activities",
     "/cliente/gift-cards",

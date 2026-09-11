@@ -83,7 +83,7 @@ a {
 
 .client-shell__right { gap: 0.5rem; }
 
-.client-shell__notification-link {
+.client-shell__utility-link {
   position: relative;
   width: 2.45rem;
   height: 2.45rem;
@@ -96,21 +96,48 @@ a {
   transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
 }
 
-.client-shell__notification-link:hover,
-.client-shell__notification-link:focus-visible,
-.client-shell__notification-link.is-active {
+.client-shell__utility-link:hover,
+.client-shell__utility-link:focus-visible,
+.client-shell__utility-link.is-active {
   color: #6754a6;
   border-color: #c9bdec;
   background: #f1edff;
   transform: translateY(-1px);
 }
 
-.client-shell__notification-link:focus-visible {
+.client-shell__utility-link:focus-visible {
   outline: 3px solid rgba(58,145,182,.25);
   outline-offset: 2px;
 }
 
-.client-shell__notification-link svg { width: 1.2rem; height: 1.2rem; }
+.client-shell__utility-link svg { width: 1.2rem; height: 1.2rem; }
+
+.client-shell__utility-link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  z-index: 40;
+  padding: 0.38rem 0.52rem;
+  border-radius: 0.42rem;
+  color: #fff;
+  background: #041c2c;
+  box-shadow: 0 6px 14px rgba(4, 28, 44, 0.18);
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -0.2rem);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.client-shell__utility-link:hover::after,
+.client-shell__utility-link:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 
 .client-shell__left {
   gap: 0.6rem;

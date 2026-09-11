@@ -70,7 +70,7 @@ const proxy: APIRoute = async ({ params, request }) => {
 
 function isAllowedPath(path: string): boolean {
   if (allowedPaths.has(path)) return true;
-  return /^rewards\/coupons(?:\/affiliate-status|\/history|\/[^/]{1,200}(?:\/code)?)?$/.test(path);
+  return /^rewards\/coupons(?:\/affiliate-status|\/history|\/[^/]{1,200}(?:\/(?:code|branches))?)?$/.test(path);
 }
 
 export const GET = proxy;

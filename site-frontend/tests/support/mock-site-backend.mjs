@@ -47,10 +47,7 @@ const attentionProfile = {
 
 const bronzeCoupons = [
   coupon("cinepolis", "Cinépolis", "2x1", "Entretenimiento", "Beneficio en entradas participantes.", "https://cuponstar-ar.s3.amazonaws.com/public/files/uploads/assets/65b0172b3f7b3.gif"),
-  coupon("toks", "Toks", "15%", "Restaurantes", "Descuento en consumo participante."),
   coupon("benavides", "Farmacias Benavides", "10%", "Salud", "Ahorra en productos participantes."),
-  coupon("smart-fit", "Smart Fit", "PROMO", "Bienestar", "Condiciones preferenciales en planes seleccionados."),
-  coupon("chopo", "Laboratorio Chopo", "20%", "Salud", "Descuento en estudios seleccionados."),
 ];
 
 const validation = {
@@ -229,6 +226,16 @@ const server = createServer(async (request, response) => {
     });
   }
 
+  const branchesMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/branches$/);
+  if (method === "GET" && branchesMatch) {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const item = bronzeCoupons.find((candidate) => candidate.id === branchesMatch[1]);
+    return json(response, 200, { items: item?.id === "cinepolis"
+      ? [{ id: "branch-1", name: "Cinépolis Universidad", address: "Av. Universidad 1000", city: "Ciudad de México", state: "CDMX", latitude: 19.368, longitude: -99.166 }]
+      : [] });
+  }
+
   const detailMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)$/);
   if (method === "GET" && detailMatch) {
     const authenticated = authenticatedProfile(request);
@@ -239,9 +246,13 @@ const server = createServer(async (request, response) => {
       affiliate_state: "ACTIVE",
       item: item ? {
         ...item,
-        description: item.shortDescription,
-        usageInstructions: "Solicita tu código y preséntalo antes de pagar.",
-        legalTerms: "Sujeto a disponibilidad y establecimientos participantes.",
+        description: item.id === "cinepolis"
+          ? "Disfruta descuentos exclusivos en entradas participantes y dulcería.\nImportante: presenta el código antes de finalizar tu compra.\nNo acumulable con otras promociones. Válido hasta 31/12/2027."
+          : item.shortDescription,
+        usageInstructions: "1- Solicita tu código.\n2- Elige tus entradas participantes.\n3- Presenta el código antes de pagar.",
+        legalTerms: "Sujeto a disponibilidad y establecimientos participantes. No acumulable con otras promociones.",
+        brandDescription: "Cinépolis crea experiencias de entretenimiento para toda la familia.",
+        branches: [{ id: "branch-1", name: "Cinépolis Universidad", address: "Av. Universidad 1000", city: "Ciudad de México", state: "CDMX", latitude: 19.368, longitude: -99.166 }],
       } : null,
     });
   }
@@ -456,10 +467,13 @@ function coupon(id, name, discount, category, shortDescription, imageUrl = null)
     shortDescription,
     expirationAt: "2027-12-31T23:59:59.000Z",
     imageUrl,
+    heroImageUrl: imageUrl ? `${imageUrl}?variant=original` : null,
+    logoImageUrl: imageUrl,
+    bannerImageUrl: null,
     category,
     channels: ["ONLINE", "ONSITE"],
     minimumLevel: "BRONZE",
-    displayOrder: ["cinepolis", "toks", "benavides", "smart-fit", "chopo"].indexOf(id) + 1,
+    displayOrder: ["cinepolis", "benavides"].indexOf(id) + 1,
   };
 }
 

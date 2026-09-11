@@ -44,7 +44,7 @@ const heroCopy = state === "INVITED"
 const invitedDiscoveryAction = state === "INVITED" && portal?.primary_action.type === "STATUS" && !portal.primary_action.href;
 const actionTitle = invitedDiscoveryAction ? "Contrata tu primer producto y activa tu camino Rewards" : portal?.primary_action.title;
 const actionDescription = invitedDiscoveryAction ? "Conoce las soluciones de Carobra y habla con un asesor. Las recompensas y el nivel se confirmarán según la regla vigente de tu cuenta." : portal?.primary_action.description;
-const actionHref = invitedDiscoveryAction ? "/cliente/productos" : portal?.primary_action.href ? portal.primary_action.href.startsWith("#") ? "/cliente/ganar-puntos" : portal.primary_action.href : null;
+const actionHref = invitedDiscoveryAction ? "/cliente/productos" : portal?.primary_action.href && !portal.primary_action.href.startsWith("#") && portal.primary_action.href !== "/cliente/ganar-puntos" ? portal.primary_action.href : null;
 const actionLabel = invitedDiscoveryAction ? "Ver productos" : portal?.primary_action.type === "SUPPORT" ? "Contactar soporte" : "Continuar";
 const recentActivity = portal?.timeline.slice(0, 3) ?? [];
 const assignedCourses = portal?.learning.items.length ?? 0;
@@ -102,7 +102,7 @@ const catalogBrands = ["Amazon", "Cinépolis", "Soriana", "Uber", "Starbucks"];
 
         <section class="rewards-home__decision-grid">
           <article class="rewards-home__panel rewards-home__panel--progress" aria-labelledby="home-progress-title">
-            <div class="rewards-home__panel-heading"><div><p class="rewards-home__eyebrow">Tu avance</p><h2 id="home-progress-title">{progressTitle}</h2></div><a href="/cliente/ganar-puntos">Ver detalle</a></div>
+            <div class="rewards-home__panel-heading"><div><p class="rewards-home__eyebrow">Tu avance</p><h2 id="home-progress-title">{progressTitle}</h2></div></div>
             {isMaximumLevel ? (
               <div class="rewards-home__message"><strong>Máximo reconocimiento actual</strong><p>Tu nivel refleja el nivel más alto definido hoy en Rewards.</p></div>
             ) : (
