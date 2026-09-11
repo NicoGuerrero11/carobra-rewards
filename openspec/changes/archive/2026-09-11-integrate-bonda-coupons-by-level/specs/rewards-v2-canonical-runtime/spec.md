@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: Free Bonda coupon availability must be independent from point redemption
-Rewards V2 SHALL expose free Bonda coupon availability through an independent feature state. Enabling coupons MUST NOT enable point-priced redemption, gift cards, point expiry, or the Bonda points API, and disabling point redemption MUST NOT by itself hide approved free coupons from an otherwise eligible Bronce-or-higher customer.
+### Requirement: Read-only Bonda coupon availability must be independent from point redemption
+Rewards V2 SHALL expose read-only free Bonda coupon availability through an independent feature state. Enabling catalog reads MUST NOT enable affiliate provisioning, coupon issuance, received history, point-priced redemption, gift cards, point expiry, or the Bonda points API. Disabling point redemption MUST NOT by itself hide approved free coupons from an otherwise eligible Bronce-or-higher customer.
 
 #### Scenario: Enable coupons while gift cards remain disabled
 - **WHEN** the Bonda coupon feature is approved and the point-redemption feature remains disabled
-- **THEN** eligible customers can view and request approved free coupons while gift cards and point redemption remain unavailable
+- **THEN** eligible customers can view approved free coupons while all Bonda writes, gift cards, and point redemption remain unavailable
 
 #### Scenario: Read coupon availability with a point balance
 - **WHEN** two customers at the same level have different point balances
