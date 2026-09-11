@@ -22,11 +22,15 @@ folders. Each folder SHALL have clear runtime and ownership responsibilities.
 - **THEN** they can update API, site backend, site frontend, and OpenSpec
   artifacts in the same repository
 
-### Requirement: API must remain the business source of truth
+### Requirement: API must remain the identity and SISCA validation authority
 The API SHALL own customer authentication rules, password hashing, session
 authority, customer registration, customer persistence, consent persistence,
-Rewards ID creation, SISCA validation creation, and Neon database transactions.
-The site backend MUST NOT duplicate these business rules.
+Rewards ID creation, SISCA validation creation, and the Neon transactions that
+support those concerns. It SHALL expose only safe authenticated identity and
+SISCA validation evidence required by the site backend. The API MUST NOT own
+V2 levels, profile activity, product-provider normalization beyond SISCA, or
+frontend test scenarios. The site backend MUST NOT duplicate API-owned identity
+or validation rules.
 
 #### Scenario: Registration business rules live in API
 - **WHEN** the site submits a customer registration request
@@ -38,12 +42,14 @@ The site backend MUST NOT duplicate these business rules.
 - **THEN** it calls the API instead of writing customer, consent, or SISCA
   validation records directly
 
-### Requirement: Site backend must act as a thin V2-only BFF
-The site backend SHALL provide web-facing routes for the site, call the business
-application, handle browser cookie ergonomics, and translate errors into stable
-site-facing errors. For Rewards, it SHALL expose only the V2 journey and portal
-contracts and MUST NOT offer V1 rewards account or eligibility routes as an
-alternative.
+### Requirement: Site backend must own V2 Rewards domain while brokering identity
+The site backend SHALL provide web-facing routes, call the API for identity and
+safe SISCA evidence, handle browser cookie ergonomics, translate errors into
+stable site-facing errors, and own the V2 Rewards domain APIs, configuration,
+test-mode controls, and associated database writes. It MUST NOT create an
+independent customer identity, session authority, or raw SISCA interpretation.
+For Rewards, it SHALL expose only the V2 journey and portal contracts and MUST
+NOT offer V1 rewards account or eligibility routes as an alternative.
 
 #### Scenario: Site requests rewards state
 - **WHEN** the frontend asks for the authenticated customer's rewards experience
@@ -63,6 +69,10 @@ alternative.
 - **WHEN** login succeeds through the site backend
 - **THEN** the resulting browser session corresponds to API-authorized
   authentication and does not create an independent business identity
+
+#### Scenario: Site backend evaluates a V2 journey
+- **WHEN** accepted product evidence or profile activity reaches the site backend
+- **THEN** it applies the V2 Rewards rules without writing authentication or raw SISCA records
 
 ### Requirement: Site frontend must start from the demo Rewards frontend
 The site frontend SHALL be initialized from the `frontend` application in
