@@ -56,7 +56,7 @@ class FixedRewardsIdGenerator:
 
     def generate(self) -> str:
         self.calls += 1
-        return f"RWD-fixed-{self.calls}"
+        return str(200_000_000 + self.calls)
 
 
 class SequenceRewardsIdGenerator:
@@ -312,16 +312,16 @@ async def test_registration_retries_a_duplicate_rewards_id(
 ) -> None:
     await _service(
         postgres_session_factory,
-        rewards_id_generator=SequenceRewardsIdGenerator(["RWD-collision"]),
+        rewards_id_generator=SequenceRewardsIdGenerator(["234567890"]),
     ).register(_command())
-    retrying_generator = SequenceRewardsIdGenerator(["RWD-collision", "RWD-recovered"])
+    retrying_generator = SequenceRewardsIdGenerator(["234567890", "234567891"])
 
     result = await _service(
         postgres_session_factory,
         rewards_id_generator=retrying_generator,
     ).register(_command(curp="ZXCV123456HMNLRS11", email="other@example.com"))
 
-    assert result.customer.rewards_id == "RWD-recovered"
+    assert result.customer.rewards_id == "234567891"
     assert retrying_generator.calls == 2
 
 
@@ -332,9 +332,9 @@ async def test_registration_surfaces_rewards_id_collision_exhaustion_without_par
 ) -> None:
     await _service(
         postgres_session_factory,
-        rewards_id_generator=SequenceRewardsIdGenerator(["RWD-collision"]),
+        rewards_id_generator=SequenceRewardsIdGenerator(["234567890"]),
     ).register(_command())
-    colliding_generator = SequenceRewardsIdGenerator(["RWD-collision"])
+    colliding_generator = SequenceRewardsIdGenerator(["234567890"])
 
     with pytest.raises(RewardsIdCollisionExhaustedError):
         await _service(

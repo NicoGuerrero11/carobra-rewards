@@ -42,7 +42,7 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.models i
     CustomerModel,
 )
 from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator import (
-    TokenHexRewardsIdGenerator,
+    NumericRewardsIdGenerator,
 )
 from carobra_rewards.modules.sisca_validation.application.models import ValidationExecutionResult
 from carobra_rewards.modules.sisca_validation.domain.models import SiscaValidation, ValidationStatus
@@ -84,7 +84,7 @@ class CustomerAuthService:
     ) -> None:
         self._session_factory = session_factory
         self._session_ttl = session_ttl
-        self._rewards_id_generator = rewards_id_generator or TokenHexRewardsIdGenerator()
+        self._rewards_id_generator = rewards_id_generator or NumericRewardsIdGenerator()
         self._validation_factory = validation_factory or _create_validation
         self._initial_validation_check = initial_validation_check
         self._clock = clock

@@ -31,7 +31,7 @@ NOW = datetime(2026, 7, 9, 23, 30, tzinfo=UTC)
 def _profile() -> CustomerProfile:
     return CustomerProfile(
         id=CUSTOMER_ID,
-        rewards_id="RWD-test",
+        rewards_id="567890123",
         curp="ABCD123456HMNLRS09",
         first_name="Ada",
         last_name="Lovelace",

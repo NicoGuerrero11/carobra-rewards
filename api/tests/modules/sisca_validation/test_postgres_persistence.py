@@ -64,7 +64,7 @@ class ControlledGateway(CountingGateway):
 
 class FixedRewardsIdGenerator:
     def __init__(self, registered_at: datetime) -> None:
-        self._rewards_id = f"RWD-{registered_at.timestamp()}"
+        self._rewards_id = str(100_000_000 + int(registered_at.timestamp()) % 900_000_000)
 
     def generate(self) -> str:
         return self._rewards_id
