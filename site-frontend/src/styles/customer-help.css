@@ -1,0 +1,88 @@
+.customer-help {
+  width: min(74rem, calc(100% - 2.2rem));
+  margin: auto;
+  padding: 1.7rem 0 3.5rem;
+  color: var(--carobra-ink);
+}
+.customer-help * { box-sizing: border-box; }
+.customer-help .help-heading { margin-bottom: 1.4rem; }
+.customer-help .help-eyebrow { margin: 0 0 .3rem; color: var(--carobra-blue); font-size: .65rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.customer-help h1 { margin: .25rem 0 .5rem; font-size: clamp(1.8rem, 3vw, 2.3rem); font-weight: 750; line-height: 1.25; letter-spacing: -.035em; }
+.customer-help h2 { margin: 0; font-size: 1.1rem; font-weight: 650; line-height: 1.4; letter-spacing: -.02em; }
+.customer-help p { margin: .5rem 0 0; font-size: .82rem; line-height: 1.7; color: var(--carobra-ink-muted); }
+.customer-help .help-heading > p:last-child { font-size: .85rem; }
+.customer-help .help-topics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1.4rem; }
+.customer-help .help-topics a { position: relative; display: grid; align-content: start; gap: .8rem; min-width: 0; padding: 1rem; background: var(--carobra-surface); border: 1px solid var(--carobra-border); border-radius: var(--carobra-radius-md); color: var(--carobra-ink); transition: border-color 150ms ease, background-color 150ms ease; }
+.customer-help .help-topics a:hover { border-color: var(--carobra-blue); background: var(--carobra-surface-blue); }
+.customer-help .help-topics strong { display: block; font-size: .79rem; font-weight: 700; line-height: 1.45; text-wrap: initial; }
+.customer-help .help-topics small { display: block; margin-top: .3rem; color: var(--carobra-ink-muted); font-size: .68rem; line-height: 1.6; }
+.customer-help .help-topic-arrow { position: absolute; top: 1rem; right: 1rem; color: var(--carobra-blue); font-size: .9rem; }
+.customer-help .help-icon { display: grid; place-items: center; flex: 0 0 2.25rem; width: 2.25rem; height: 2.25rem; border-radius: .7rem; background: var(--carobra-cyan-soft); color: var(--carobra-blue); }
+.customer-help .help-icon svg { width: 1.15rem; height: 1.15rem; }
+.customer-help .help-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(17rem, .43fr); gap: 1.25rem; align-items: start; }
+.customer-help .help-faqs, .customer-help .help-sidebar { display: grid; gap: 1rem; min-width: 0; }
+.customer-help .help-panel { min-width: 0; padding: 1.35rem; border: 1px solid var(--carobra-border); border-radius: var(--carobra-radius-lg); background: var(--carobra-surface); box-shadow: var(--carobra-shadow-sm); }
+.customer-help .help-panel-heading { display: flex; align-items: center; gap: .8rem; margin-bottom: .6rem; padding-bottom: 1rem; border-bottom: 1px solid var(--carobra-border); }
+.customer-help .help-panel-heading p { margin-top: .2rem; font-size: .74rem; }
+.customer-help .help-topic, .customer-help .help-question, .customer-help #soporte { scroll-margin-top: 7.5rem; }
+.customer-help .help-question { border-bottom: 1px solid var(--carobra-border); }
+.customer-help .help-question:last-child { border-bottom: 0; }
+.customer-help .help-question summary { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 3.4rem; padding: .85rem .2rem; border-radius: .25rem; color: var(--carobra-ink); font-size: .83rem; font-weight: 650; line-height: 1.6; list-style: none; cursor: pointer; }
+.customer-help .help-question summary::-webkit-details-marker { display: none; }
+.customer-help .help-question summary svg { width: 1rem; height: 1rem; flex: 0 0 1rem; color: var(--carobra-blue); }
+.customer-help .help-question summary:hover { color: var(--carobra-blue); }
+.customer-help .help-question[open] > summary { color: var(--carobra-blue); }
+.customer-help .help-question[open] > summary svg { transform: rotate(180deg); }
+.customer-help .help-question:target { background: var(--carobra-surface-blue); border-radius: var(--carobra-radius-sm); padding-inline: .75rem; }
+.customer-help .help-answer { padding: 0 .2rem .8rem; }
+.customer-help .help-answer > p:first-child { margin-top: 0; }
+.customer-help .help-answer p + p { margin-top: .6rem; }
+.customer-help .help-answer strong, .customer-help .help-context > p strong { color: var(--carobra-blue); font-weight: 700; text-wrap: initial; }
+.customer-help .help-answer ul { list-style: disc; padding-left: 1.2rem; margin: .6rem 0; color: var(--carobra-ink-muted); font-size: .82rem; line-height: 1.7; }
+.customer-help .help-answer li + li { margin-top: .3rem; }
+.customer-help .help-answer-links { display: flex; flex-wrap: wrap; gap: 0 1.2rem; }
+.customer-help .help-answer a, .customer-help .help-text-link { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; margin-top: .25rem; color: var(--carobra-blue); font-size: .78rem; line-height: 1.6; font-weight: 700; }
+.customer-help .help-answer a:hover, .customer-help .help-text-link:hover { text-decoration: underline; text-underline-offset: .2em; }
+.customer-help .help-troubleshooting { background: var(--carobra-surface-blue); }
+.customer-help .help-troubleshooting nav { display: grid; margin-top: .8rem; }
+.customer-help .help-troubleshooting a { display: flex; justify-content: space-between; align-items: center; gap: .75rem; min-height: 2.75rem; padding-block: .7rem; border-bottom: 1px solid var(--carobra-border); color: var(--carobra-blue); font-size: .77rem; font-weight: 650; line-height: 1.6; }
+.customer-help .help-troubleshooting a:last-child { border-bottom: 0; padding-bottom: 0; }
+.customer-help .help-troubleshooting a:hover { text-decoration: underline; text-underline-offset: .2em; }
+.customer-help .help-context h2 { margin-bottom: .4rem; }
+.customer-help .help-context summary { font-size: .79rem; }
+.customer-help .help-contact > .help-icon { margin-bottom: .75rem; }
+.customer-help .help-contact-example { margin-top: 1rem; padding: .85rem; border: 1px dashed var(--carobra-border-strong); border-radius: var(--carobra-radius-sm); background: var(--carobra-surface-blue); }
+.customer-help .help-contact-example > span { display: block; margin-bottom: .35rem; color: var(--carobra-blue); font-size: .64rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.customer-help .help-contact-example > strong { display: block; color: var(--carobra-ink); font-size: .85rem; font-weight: 650; overflow-wrap: anywhere; }
+.customer-help .help-contact-example p { font-size: .72rem; line-height: 1.65; }
+.customer-help .help-safety { margin-top: 1rem; font-size: .72rem; }
+.customer-help :is(a, summary, [tabindex]):focus-visible { outline: 3px solid var(--carobra-blue); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .customer-help .help-topics a { transition: none; }
+}
+@media (max-width: 980px) {
+  .customer-help .help-topics { gap: .5rem; }
+  .customer-help .help-topics a { padding: .85rem; }
+  .customer-help .help-topics small { display: none; }
+  .customer-help .help-columns { grid-template-columns: minmax(0, 1fr) minmax(15rem, .5fr); gap: 1rem; }
+}
+@media (max-width: 760px) {
+  .customer-help .help-topics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .customer-help .help-topics a { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .7rem; }
+  .customer-help .help-topics a:last-child { grid-column: 1 / -1; }
+  .customer-help .help-topic-arrow { display: none; }
+  .customer-help .help-columns { grid-template-columns: 1fr; }
+  .customer-help .help-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .customer-help .help-topic, .customer-help .help-question, .customer-help #soporte { scroll-margin-top: 6.5rem; }
+}
+@media (max-width: 560px) {
+  .customer-help { width: calc(100% - 1.2rem); padding-top: 1.1rem; }
+  .customer-help h1 { font-size: 1.7rem; }
+  .customer-help h2 { font-size: 1.05rem; }
+  .customer-help .help-heading { margin-bottom: 1rem; }
+  .customer-help .help-topics strong { font-size: .72rem; }
+  .customer-help .help-topics a { padding: .8rem .6rem; gap: .5rem; }
+  .customer-help .help-topics .help-icon { width: 1.8rem; height: 1.8rem; }
+  .customer-help .help-panel { padding: 1.1rem; }
+  .customer-help .help-sidebar { grid-template-columns: 1fr; }
+}

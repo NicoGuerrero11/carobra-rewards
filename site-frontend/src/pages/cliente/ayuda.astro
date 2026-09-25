@@ -1,48 +1,200 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import ClientNavIcon from "../../components/ClientNavIcon.astro";
+import HelpQuestion from "../../components/HelpQuestion.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import "../../styles/customer-help.css";
 
-const cookie = Astro.request.headers.get("cookie") ?? "";
-const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
 let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
-let unavailable = portalLoadedWithContext && !portal;
-
-if (!portalLoadedWithContext) {
+// A known unavailable projection must not trigger another account request.
+if (Astro.locals.rewardsPortal === undefined) {
   try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
+      headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
+      signal: AbortSignal.timeout(6000),
+    });
     if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
     if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-    else unavailable = true;
-  } catch {
-    unavailable = true;
-  }
+  } catch { /* General help remains available without the account projection. */ }
 }
-
+Astro.response.headers.set("Cache-Control", "private, no-store");
 const helpItems = portal?.help ?? [];
+const topics = [
+  { id: "cuenta", title: "Cuenta y niveles", description: "Tu perfil y tu categoría", icon: "home" },
+  { id: "beneficios", title: "Beneficios", description: "Cupones y descuentos", icon: "benefits" },
+  { id: "cursos", title: "Cursos y bienestar", description: "Contenido y avance", icon: "courses" },
+  { id: "puntos", title: "Puntos y actividad", description: "Saldo y movimientos", icon: "activity" },
+  { id: "productos", title: "Productos", description: "Opciones para ti", icon: "products" },
+] as const;
 ---
 
-<ClientShellLayout title="Ayuda | Carobra Rewards" description="Respuestas y soporte para tu experiencia Rewards." currentPath="/cliente/ayuda" sectionLabel="Ayuda">
-  <main class="portal-page help-page">
-    <header class="portal-welcome"><div><p class="portal-eyebrow">Estamos para ayudarte</p><h1>Ayuda</h1><p>Encuentra respuestas sobre tu cuenta, tus productos y el uso de Rewards.</p></div><a href="mailto:soporte@carobra.mx">Contactar soporte</a></header>
-
-    {unavailable && !portal ? (
-      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos cargar las respuestas</h2><p>Puedes escribirnos directamente y nuestro equipo te ayudará.</p><a class="portal-text-link" href="mailto:soporte@carobra.mx">Escribir a soporte</a></div></section>
-    ) : (
-      <div class="help-layout">
-        <section class="help-list" aria-labelledby="help-list-title">
-          <div class="portal-section-heading"><div><p class="portal-eyebrow">Preguntas frecuentes</p><h2 id="help-list-title">Información para tu cuenta</h2></div></div>
-          {helpItems.length ? helpItems.map((item) => <details><summary>{item.title}</summary><p>{item.body}</p></details>) : <div class="portal-card"><h3>Tu cuenta Rewards</h3><p>Los estados, puntos y productos que ves corresponden a la información confirmada para tu cuenta.</p></div>}
+<ClientShellLayout title="Ayuda | Carobra Rewards" description="Respuestas sobre tu cuenta, beneficios, cursos y puntos de Carobra Rewards." currentPath="/cliente/ayuda" sectionLabel="Ayuda">
+  <main class="customer-help">
+    <header class="help-heading">
+      <p class="help-eyebrow">Centro de ayuda</p>
+      <h1>¿En qué podemos ayudarte?</h1>
+      <p>Elige un tema y encuentra respuestas para aprovechar tu cuenta.</p>
+    </header>
+    <nav class="help-topics" aria-label="Temas de ayuda">
+      {topics.map(topic => <a href={`#${topic.id}`}>
+        <span class="help-icon"><ClientNavIcon name={topic.icon} /></span>
+        <span><strong>{topic.title}</strong><small>{topic.description}</small></span>
+        <span class="help-topic-arrow" aria-hidden="true">↗</span>
+      </a>)}
+    </nav>
+    <div class="help-columns">
+      <div class="help-faqs">
+        <section class="help-panel help-topic" id="cuenta" aria-labelledby="cuenta-title" tabindex="-1">
+          <header class="help-panel-heading"><span class="help-icon"><ClientNavIcon name="home" /></span><div><h2 id="cuenta-title">Cuenta y niveles</h2><p>Tu lugar en Carobra Rewards.</p></div></header>
+          <HelpQuestion id="cuenta-invitado" title="¿Por qué mi cuenta aparece como Invitado?">
+            <p>Al registrarte puedes consultar tu cuenta mientras Carobra <strong>confirma tu primer producto activo</strong>. Esa confirmación permite evaluar tu nivel y los beneficios disponibles.</p>
+            <p><strong>No necesitas registrarte otra vez.</strong> Revisa el estado que aparece en Inicio.</p>
+            <a href="/cliente/recompensas">Ver el estado de mi cuenta <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="cuenta-nivel" title="¿Dónde veo mi nivel y lo que tengo disponible?">
+            <p>En <strong>Inicio</strong> puedes consultar tu categoría y el avance que esté disponible para tu cuenta. Los niveles son Bronce, Plata, Oro, Platino y Titanio.</p>
+            <p>En Beneficios y Cursos encontrarás el contenido habilitado para ti. <strong>Tu saldo de puntos y tu nivel no son lo mismo.</strong></p>
+            <a href="/cliente/recompensas">Consultar mi nivel <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="cuenta-revision" title="¿Qué significa que un producto esté en validación o revisión?">
+            <p>Su información todavía necesita confirmarse. Consulta el estado en Inicio y tus productos registrados en Productos; <strong>tener un producto registrado no significa que ya esté activo</strong>.</p>
+            <p>Si un producto deja de estar activo, revisa el estado actualizado de tu cuenta para conocer los accesos disponibles. No hace falta crear una cuenta nueva.</p>
+            <a href="/cliente/productos">Revisar mis productos <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
         </section>
-        <aside class="portal-card portal-card--dark"><p class="portal-eyebrow">Atención personal</p><h2>¿Necesitas hablar con alguien?</h2><p>Un asesor puede ayudarte a revisar tu cuenta o explicarte las opciones disponibles.</p><a class="portal-text-link" href="mailto:soporte@carobra.mx">Contactar a Carobra</a></aside>
+        <section class="help-panel help-topic" id="beneficios" aria-labelledby="beneficios-title" tabindex="-1">
+          <header class="help-panel-heading"><span class="help-icon"><ClientNavIcon name="benefits" /></span><div><h2 id="beneficios-title">Beneficios</h2><p>Lo que necesitas antes de usar un descuento.</p></div></header>
+          <HelpQuestion id="beneficios-usar" title="¿Cómo uso un beneficio? ¿Consume puntos?">
+            <p>Los cupones y descuentos de <strong>Beneficios no consumen puntos</strong>. Abre la tarjeta que te interesa y revisa su descripción, instrucciones y condiciones.</p>
+            <p>Si la opción para obtenerlo está habilitada, sigue los pasos que indica esa página. <strong>Cada beneficio tiene su propia forma de uso.</strong></p>
+            <a href="/cliente/beneficios">Explorar beneficios <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="beneficios-condiciones" title="¿Dónde consulto sucursales, vigencia y restricciones?">
+            <p>Dentro de cada beneficio encontrarás su <strong>vigencia, cómo usarlo y términos y condiciones</strong>. Cuando tenga sucursales asociadas, abre <strong>Sucursales disponibles</strong> para consultar la lista y el mapa.</p>
+            <p>Comprueba la sucursal y el canal indicado antes de usarlo: que una marca tenga un descuento no significa que aplique en todas sus tiendas o productos.</p>
+            <a href="/cliente/beneficios">Consultar el catálogo <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="catalogo-no-carga" title="¿Qué hago si no carga el catálogo o no puedo obtener un código?">
+            <p><strong>Lee el mensaje de la página:</strong> puede indicar que falta confirmar tu producto, que el acceso está en preparación o que existe una interrupción temporal.</p>
+            <p>Si aparece un error de carga, comprueba tu conexión y vuelve a intentarlo. Si el código figura como no disponible, consulta las indicaciones del beneficio; <strong>poder ver su información no garantiza que la emisión esté habilitada</strong>.</p>
+            <a href="/cliente/beneficios">Volver a Beneficios <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="beneficio-no-aceptado" title="¿Qué reviso si no me aceptan un descuento?">
+            <p>Comprueba estos datos en la página del beneficio:</p>
+            <ul><li><strong>Vigencia</strong> del beneficio y del código, si corresponde.</li><li><strong>Sucursal y canal</strong> donde puede utilizarse.</li><li><strong>Productos incluidos y restricciones</strong>, como la combinación con otras promociones.</li></ul>
+            <p>Si todo coincide, sigue las indicaciones de contacto que incluya ese beneficio. Conserva el nombre, la fecha y una descripción de lo ocurrido, <strong>sin compartir contraseñas ni datos de pago</strong>.</p>
+            <a href="/cliente/beneficios">Revisar el beneficio <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+        </section>
+        <section class="help-panel help-topic" id="cursos" aria-labelledby="cursos-title" tabindex="-1">
+          <header class="help-panel-heading"><span class="help-icon"><ClientNavIcon name="courses" /></span><div><h2 id="cursos-title">Cursos y bienestar</h2><p>Aprende a tu ritmo y lleva tu avance.</p></div></header>
+          <HelpQuestion id="cursos-acceso" title="¿Qué diferencia hay entre Cursos y Bienestar?">
+            <p>Los <strong>Cursos se habilitan por nivel</strong>: cada nueva categoría suma contenidos y conserva los de las anteriores.</p>
+            <p>El catálogo de <strong>Bienestar está disponible completo desde Bronce</strong>, con una cuenta activa. Incluye videos y lecturas para cuidarte a tu ritmo. Puedes entrar a ambos espacios desde Cursos.</p>
+            <div class="help-answer-links"><a href="/cliente/cursos?tipo=cursos">Ver cursos <span aria-hidden="true">→</span></a><a href="/cliente/cursos?tipo=bienestar">Ver bienestar <span aria-hidden="true">→</span></a></div>
+          </HelpQuestion>
+          <HelpQuestion id="cursos-continuar" title="¿Puedo continuar un curso después?">
+            <p>Sí. El <strong>avance guardado está asociado a tu cuenta</strong>. Vuelve a entrar con la misma cuenta y abre el curso para consultar los videos completados y elegir el capítulo que quieres continuar.</p>
+            <p>Si necesitas retomar una parte del video, puedes avanzar el reproductor hasta ese punto. Revisa el estado de cada capítulo antes de salir.</p>
+            <a href="/cliente/cursos?tipo=cursos">Ir a mis cursos <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="cursos-completar" title="¿Cómo marco un video como completado o reviso si se guardó?">
+            <p>Debajo de la descripción del video encontrarás <strong>Marcar como completado</strong>. Si ya lo viste y aún no aparece completado, puedes usar ese botón.</p>
+            <p>Espera a que aparezca <strong>Completado</strong>. Si ves un error al guardar, comprueba tu conexión y vuelve a intentarlo. El curso se considera completado cuando <strong>todos sus videos</strong> están completados.</p>
+            <p>Este registro sirve para llevar tu avance; por sí solo <strong>no acredita puntos ni emite certificados</strong>.</p>
+            <a href="/cliente/cursos">Consultar mi contenido <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="video-no-carga" title="¿Qué hago si un video no reproduce?">
+            <p>Primero pulsa <strong>reproducir</strong> y comprueba tu conexión. Si continúa sin cargar, vuelve a abrir el capítulo o recarga la página.</p>
+            <p>Si te ocurre solo en un video, anota el nombre del curso y el capítulo. Si ocurre con varios, puedes comprobarlo en otro navegador actualizado. <strong>No necesitas volver a registrarte.</strong></p>
+            <a href="/cliente/cursos">Volver a Cursos y bienestar <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+        </section>
+        <section class="help-panel help-topic" id="puntos" aria-labelledby="puntos-title" tabindex="-1">
+          <header class="help-panel-heading"><span class="help-icon"><ClientNavIcon name="activity" /></span><div><h2 id="puntos-title">Puntos y actividad</h2><p>Encuentra lo que cambió en tu cuenta.</p></div></header>
+          <HelpQuestion id="puntos-consultar" title="¿Dónde veo mi saldo, movimientos y notificaciones?">
+            <p>En <strong>Actividad</strong> puedes consultar el saldo y los movimientos registrados, además de la línea de tiempo de tu cuenta.</p>
+            <p><strong>Notificaciones</strong> reúne los avisos de cambios. Puedes marcarlos individualmente o usar <strong>Marcar todas como leídas</strong>. Leer un aviso no modifica tu saldo ni elimina el movimiento.</p>
+            <div class="help-answer-links"><a href="/cliente/activities">Consultar movimientos <span aria-hidden="true">→</span></a><a href="/cliente/notificaciones">Ver notificaciones <span aria-hidden="true">→</span></a></div>
+          </HelpQuestion>
+          <HelpQuestion id="puntos-faltantes" title="¿Qué hago si no aparece un movimiento que esperaba?">
+            <p>Revisa <strong>Actividad</strong> y el estado de tu producto en <strong>Productos</strong>. Solicitar información o registrar una acción no equivale, por sí solo, a una acreditación confirmada.</p>
+            <p>Si necesitas una revisión, anota el nombre del producto o movimiento y la fecha. <strong>No repitas el registro ni una operación para intentar generar puntos.</strong></p>
+            <a href="/cliente/activities">Revisar mis movimientos <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+        </section>
+        <section class="help-panel help-topic" id="productos" aria-labelledby="productos-title" tabindex="-1">
+          <header class="help-panel-heading"><span class="help-icon"><ClientNavIcon name="products" /></span><div><h2 id="productos-title">Productos</h2><p>Descubre opciones para tus próximos planes.</p></div></header>
+          <HelpQuestion id="productos-informacion" title="¿Dónde conozco otros productos y solicito información?">
+            <p>En <strong>Productos</strong> puedes explorar las opciones de Carobra, sus principales beneficios y el acceso para solicitar información sobre la que te interese.</p>
+            <p><strong>Consultar una opción no implica contratarla.</strong> Esta sección es distinta del soporte para incidencias de tu cuenta Rewards.</p>
+            <a href="/cliente/productos">Descubrir productos <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+          <HelpQuestion id="productos-puntos" title="¿Los puntos de una oferta ya están en mi saldo?">
+            <p>No. Los puntos que ves en una oferta son <strong>información del producto, no una acreditación en tu cuenta</strong>. Abrir una tarjeta o solicitar información no suma puntos por sí solo.</p>
+            <p>Los movimientos confirmados y tu saldo se consultan en <strong>Actividad</strong>.</p>
+            <a href="/cliente/activities">Consultar mi saldo <span aria-hidden="true">→</span></a>
+          </HelpQuestion>
+        </section>
       </div>
-    )}
+      <aside class="help-sidebar" aria-label="Orientación y contacto">
+        <section class="help-panel help-troubleshooting" aria-labelledby="troubleshooting-title">
+          <p class="help-eyebrow">Soluciones rápidas</p><h2 id="troubleshooting-title">¿Algo no funciona?</h2>
+          <nav aria-label="Problemas frecuentes">
+            <a href="#catalogo-no-carga">No carga el catálogo <span aria-hidden="true">→</span></a>
+            <a href="#video-no-carga">Un video no reproduce <span aria-hidden="true">→</span></a>
+            <a href="#cursos-completar">No aparece mi avance <span aria-hidden="true">→</span></a>
+            <a href="#beneficio-no-aceptado">No puedo usar un beneficio <span aria-hidden="true">→</span></a>
+          </nav>
+        </section>
+        <section class="help-panel help-context" aria-labelledby="context-title">
+          <p class="help-eyebrow">Según tu cuenta</p><h2 id="context-title">Orientación para ti</h2>
+          {!portal ? <p role="status">No pudimos consultar el estado de tu cuenta. <strong>Las preguntas generales siguen disponibles.</strong></p>
+            : helpItems.length ? helpItems.map((item, index) => <HelpQuestion id={`orientacion-${index}`} title={item.title}><p>{item.body}</p></HelpQuestion>)
+              : <p>Puedes consultar tus datos personales y preferencias en Mi cuenta.</p>}
+          <a class="help-text-link" href="/cliente/perfil">Ver mi cuenta <span aria-hidden="true">→</span></a>
+        </section>
+        <section class="help-panel help-contact" id="soporte" aria-labelledby="support-title">
+          <span class="help-icon"><ClientNavIcon name="help" /></span>
+          <h2 id="support-title">Soporte Rewards</h2>
+          <p>Para dudas sobre tu cuenta, acceso o funcionamiento de la plataforma.</p>
+          <div class="help-contact-example">
+            <span>Correo de ejemplo</span>
+            <strong>soporte@carobra.com</strong>
+            <p>Este correo aún no es un canal de atención habilitado. El contacto oficial se confirmará próximamente.</p>
+          </div>
+          <p class="help-safety">Nunca compartas tu contraseña, códigos de acceso ni datos de pago al pedir ayuda.</p>
+        </section>
+        <section class="help-panel help-product-contact" aria-labelledby="product-contact-title">
+          <p class="help-eyebrow">Información comercial</p><h2 id="product-contact-title">¿Te interesa otro producto?</h2>
+          <p>Explora las opciones de Carobra y elige la que va con tus planes.</p>
+          <a class="help-text-link" href="/cliente/productos">Conocer productos <span aria-hidden="true">→</span></a>
+        </section>
+      </aside>
+    </div>
   </main>
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+
+    // Native anchors and accordions work without JS; deep links also open the answer.
+    const revealHelpTarget = () => {
+      let id: string;
+      try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+      const target = document.getElementById(id);
+      if (!target?.closest(".customer-help")) return;
+      if (target instanceof HTMLDetailsElement) target.open = true;
+      const focusTarget = target instanceof HTMLDetailsElement ? target.querySelector("summary") : target;
+      focusTarget?.focus({ preventScroll: true });
+      target.scrollIntoView({ block: "start" });
+    };
+    window.addEventListener("hashchange", revealHelpTarget);
+    document.querySelectorAll<HTMLAnchorElement>('.customer-help a[href^="#"]').forEach(link => {
+      link.addEventListener("click", () => {
+        if (window.location.hash === link.hash) revealHelpTarget();
+      });
+    });
+    revealHelpTarget();
   </script>
-  <style>
-    .help-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(17rem,.65fr);align-items:start;gap:1rem}.help-list{padding:clamp(1.4rem,4vw,2.2rem);border:1px solid #cbd7df;border-radius:1.15rem;background:#fff;box-shadow:0 8px 18px rgba(4,28,44,.07)}.help-list details{border-bottom:1px solid #dce5eb}.help-list details:last-child{border-bottom:0}.help-list summary{padding:1rem 2rem 1rem 0;color:#041c2c;font-weight:750;cursor:pointer}.help-list details p{margin:0;padding:0 0 1rem;color:#536878;line-height:1.65}.help-list>.portal-card{margin-top:1rem}.portal-welcome>a{color:#004b87;font-weight:750}@media(max-width:720px){.help-layout{grid-template-columns:1fr}}
-  </style>
 </ClientShellLayout>

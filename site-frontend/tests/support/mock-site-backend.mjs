@@ -34,6 +34,15 @@ function homePortal(request,candidate) {
     portal.journey.progress={target_level:'SILVER',rule_available:true,remaining_active_products:1,remaining_registration_months:2,remaining_qualifying_activities:0};
     portal.journey.modules.expiry_policy_approved=true;
   }
+  if (homeCookie(request, 'help-fixture') === 'state') {
+    const body = candidate === eligibleProfile ? 'Tu nivel considera productos activos, permanencia y actividades aprobadas; gastar puntos no lo reduce.'
+      : candidate === inactiveProfile ? 'Tus movimientos permanecen protegidos. Tu nivel volverá a calcularse cuando exista un producto activo confirmado.'
+      : candidate === attentionProfile ? 'Carobra necesita revisar información de tu producto. No repitas tu registro.'
+      : 'Carobra está confirmando tu primer producto. Puedes consultar tu cuenta mientras terminamos.';
+    portal.help = [{ id: 'state', title: 'Sobre el estado de tu cuenta', body }];
+  }
+  if (homeCookie(request, 'help-fixture') === 'empty') portal.help = [];
+  if (homeCookie(request, 'help-fixture') === 'markup') portal.help = [{ id: 'untrusted', title: '<img src=x onerror=alert(1)>', body: '<script>alert(1)</script>' }];
   return notificationPortal(request, candidate, portal);
 }
 function homeProgress(request,id) {
