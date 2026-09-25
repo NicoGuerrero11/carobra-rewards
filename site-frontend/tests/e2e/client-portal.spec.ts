@@ -117,16 +117,16 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.getByRole("heading", { name: "Cursos y bienestar" })).toBeVisible();
 
   await page.goto("/cliente/productos");
-  await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Da el siguiente paso." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cuenta de retiro" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Nuestras soluciones" })).toBeVisible();
   for (const product of ["Skandia", "Quálitas", "Modalidad 40"]) {
-    const card = page.locator(".product-offer__card").filter({ hasText: product });
+    const card = page.getByRole("article", { name: product, exact: true });
     await expect(card.getByRole("heading", { name: product })).toBeVisible();
-    await expect(card.getByRole("link", { name: /Me interesa/ })).toHaveAttribute("href", /mailto:soporte@carobra\.mx\?subject=Quiero%20informaci/);
+    await expect(card.getByRole("link", { name: /Quiero.*contactar por correo/ })).toHaveAttribute("href", `mailto:soporte@carobra.mx?subject=${encodeURIComponent(`Quiero información sobre ${product}`)}`);
   }
   await expect(page.getByRole("button", { name: /contratar|solicitar/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Hablar con un asesor" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Contactar a un asesor por correo" })).toBeVisible();
 
   await page.goto("/cliente/activities");
   await expect(page.getByRole("heading", { name: "Actividad", exact: true })).toBeVisible();

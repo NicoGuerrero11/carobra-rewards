@@ -188,7 +188,7 @@ const server = createServer(async (request, response) => {
       ? json(response, 200, {
           customer: authenticated,
           validation: { status: validationFor(authenticated).status },
-          portal: portalFor(authenticated),
+          portal: request.headers.cookie?.includes('products-failure=true') ? null : portalFor(authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
@@ -325,6 +325,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (method === "GET" && path === "/api/v1/rewards/portal") {
+    if (request.headers.cookie?.includes('products-failure=true')) return siteError(response, 503, 'portal_unavailable', 'Unavailable');
     const authenticated = authenticatedProfile(request);
     return authenticated
       ? json(response, 200, portalFor(authenticated))
