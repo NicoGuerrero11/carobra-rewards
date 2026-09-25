@@ -343,7 +343,7 @@ const server = createServer(async (request, response) => {
     if (request.headers.cookie?.includes('products-failure=true')) return siteError(response, 503, 'portal_unavailable', 'Unavailable');
     const authenticated = authenticatedProfile(request);
     return authenticated
-      ? json(response, 200, portalFor(authenticated))
+      ? json(response, 200, activityPortal(request, authenticated))
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
@@ -502,6 +502,34 @@ function portalFor(candidate) {
     documents: { requests: [] },
     help: [{ id: "levels", title: "¿Cómo se calcula mi nivel?", body: "Tu nivel considera productos activos, permanencia y actividades aprobadas; gastar puntos no lo reduce." }],
   };
+}
+
+// Presentation-only fixtures for Activity. All data stays in this isolated mock.
+function activityPortal(request, candidate) {
+  const portal = portalFor(candidate);
+  const mode = homeCookie(request, 'activity-fixture');
+  if (mode === 'empty') {
+    portal.timeline = [];
+    portal.movement_details.movements = [];
+  }
+  if (mode === 'review') {
+    const entry = portal.timeline[0];
+    portal.timeline.unshift(...[3, 2, 1, 0].map((day) => ({
+      ...entry, id: `review:${day}`, occurred_at: `2026-07-${18 + day}T12:00:00.000Z`,
+    })));
+  }
+  if (mode === 'mixed') {
+    portal.journey.points.available = '950';
+    portal.movement_details.movements = [
+      { code: 'REFUND', entry_type: 'REFUND', points_delta: '100', occurred_at: '2026-07-16T12:00:00.000Z' },
+      { code: 'CONSUMPTION', entry_type: 'CONSUMPTION', points_delta: '-50', occurred_at: '2026-07-15T12:00:00.000Z' },
+      { code: 'ADJUSTMENT', entry_type: 'ADJUSTMENT', points_delta: '0', occurred_at: '2026-07-14T12:00:00.000Z' },
+    ];
+    portal.timeline[0].title = 'Confirmación del producto asociado a tu cuenta de Carobra Rewards';
+    portal.timeline[0].description = 'La confirmación conserva su fecha y detalle original, incluso cuando el contenido ocupa varias líneas en una pantalla pequeña.';
+  }
+  if (homeCookie(request, 'activity-expiry') === 'approved') portal.journey.modules.expiry_policy_approved = true;
+  return portal;
 }
 
 function invitedPrimaryAction(validationStatus) {
