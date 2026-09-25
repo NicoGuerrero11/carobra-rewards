@@ -4,12 +4,21 @@ test("pending customer enters the real invited Rewards experience", async ({ pag
   await login(page, "ada@example.com");
 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
-  await expect(page.getByRole("heading", { name: "Invitado" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Invitado", exact: true })).toBeVisible();
   await expect(page.getByText("Saldo disponible")).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
-  await expect(page.getByText(/canje aún no está disponible/i)).toBeVisible();
+  await expect(page.getByText(/saldo se conserva mientras se habilitan opciones/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contrata tu primer producto y activa tu camino Rewards" })).toBeVisible();
+  await expect(page.getByText(/1 de 3 pasos hacia Bronce/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lo disponible hoy" })).toBeVisible();
+
+  await assertCustomerSectionsAreReachable(page);
+  await page.goto("/cliente/productos");
   await expect(page.getByText("Aún no hay productos confirmados")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Beneficios" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Nuestras soluciones" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Skandia" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quálitas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Modalidad 40" })).toBeVisible();
 });
 
 test("eligible customer sees the production Rewards summary at exactly 320 pixels", async ({ page }) => {
@@ -21,12 +30,12 @@ test("eligible customer sees the production Rewards summary at exactly 320 pixel
   await expect(page.getByRole("heading", { name: "Bronce" })).toBeVisible();
   await expect(page.getByText("Saldo disponible")).toBeVisible();
   await expect(page.getByText("150 pts").first()).toBeVisible();
-  await expect(page.getByText("Primer producto validado")).toBeVisible();
-  await expect(page.getByText("Bienvenida a Carobra Rewards")).toBeVisible();
+  await expect(page.getByText("Producto confirmado").first()).toBeVisible();
+  await expect(page.getByText("Registro completado")).toBeVisible();
   await expect(page.getByText("Plan personal de retiro")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Tu espacio para redimir" })).toBeVisible();
-  await expect(page.getByText("Catálogo en preparación")).toBeVisible();
-  await expect(page.getByText("Recompensas destacadas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lo disponible hoy" })).toBeVisible();
+  await expect(page.getByText("Categoría en preparación")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Últimos movimientos de tu cuenta" })).toBeVisible();
   await expect(page.getByRole("button", { name: /canjear/i })).toHaveCount(0);
 
   const hasHorizontalOverflow = await page.evaluate(
@@ -52,23 +61,26 @@ test("pending referral functionality is absent from the real Rewards summary", a
   await expect(page.getByText("Referido 1")).toHaveCount(0);
 });
 
-test("inactive customer sees a protected inactive state without Rewards data", async ({ page }) => {
+test("rejected customer remains invited and can browse every customer section", async ({ page }) => {
   await login(page, "inactive@example.com");
 
-  await expect(page).toHaveURL(/\/cliente\/validacion$/);
-  await expect(page.getByRole("heading", { name: "Cuenta inactiva" })).toBeVisible();
-  await expect(page.getByText("Saldo disponible")).toHaveCount(0);
-  await expect(page.getByText("2,000 pts")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/cliente\/recompensas$/);
+  await expect(page.getByRole("heading", { name: "Invitado", exact: true })).toBeVisible();
+  await expect(page.getByText("Miembro Invitado", { exact: true })).toBeVisible();
+  await expect(page.getByText(/saldo se conserva mientras se habilitan opciones/i)).toBeVisible();
+
+  await assertCustomerSectionsAreReachable(page);
 });
 
-test("attention-required customer receives a safe support state", async ({ page }) => {
+test("attention-required customer remains invited with a safe support state", async ({ page }) => {
   await login(page, "attention@example.com");
 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", {
-    name: "En revisión",
+    name: "Invitado",
+    exact: true,
   })).toBeVisible();
-  await expect(page.getByText(/Nuestro equipo está revisando la validación/)).toBeVisible();
+  await expect(page.getByText("Miembro Invitado", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Contactar soporte" })).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
 });
@@ -78,4 +90,21 @@ async function login(page: Page, email: string) {
   await page.locator("#email").fill(email);
   await page.locator("#password").fill("correct-horse-7");
   await page.locator("#submit-button").click();
+}
+
+async function assertCustomerSectionsAreReachable(page: Page) {
+  for (const path of [
+    "/cliente/beneficios",
+    "/cliente/ayuda",
+    "/cliente/productos",
+    "/cliente/activities",
+    "/cliente/gift-cards",
+    "/cliente/cursos",
+    "/cliente/notificaciones",
+    "/cliente/perfil",
+    "/cliente/validacion",
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`${path.replaceAll("/", "\\/")}$`));
+  }
 }

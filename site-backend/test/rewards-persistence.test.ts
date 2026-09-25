@@ -21,6 +21,8 @@ import { rewardsCustomerPortal } from "../src/database/migrations/020-rewards-cu
 import { rewardsV2Canonical } from "../src/database/migrations/021-rewards-v2-canonical.js";
 import { bondaCoupons } from "../src/database/migrations/022-bonda-coupons.js";
 import { bondaCouponCandidates } from "../src/database/migrations/023-bonda-coupon-candidates.js";
+import { bondaApprovedCoupons } from "../src/database/migrations/024-bonda-approved-coupons.js";
+import { bondaPresentationCatalogReconciliation } from "../src/database/migrations/025-bonda-presentation-catalog-reconciliation.js";
 
 test("ledger foundation migration declares required tables and business constraints", () => {
   for (const table of [
@@ -355,4 +357,23 @@ test("approved-presentation Bonda candidates are disabled and exclude gift cards
   assert.doesNotMatch(bondaCouponCandidates.up, /Despegar|GIFT_CARD|INVITED/i);
   assert.match(bondaCouponCandidates.up, /FREE_ENTITLEMENT', false, NULL/);
   assert.match(bondaCouponCandidates.up, /partner_item_reference/);
+});
+
+test("catalog-owner approved Bonda IDs preserve levels and separate Devlyn offers", () => {
+  for (const id of ["9510", "12490", "5850", "5849", "4749", "8344", "11919", "14220", "14806"]) {
+    assert.match(bondaApprovedCoupons.up, new RegExp(`'${id}'`));
+  }
+  assert.equal((bondaApprovedCoupons.up.match(/BONDA_DEVLYN_/g) ?? []).length, 3);
+  assert.equal((bondaApprovedCoupons.up.match(/FREE_ENTITLEMENT', true, NULL/g) ?? []).length, 9);
+  assert.doesNotMatch(bondaApprovedCoupons.up, /TOKS|SMART_FIT|CHOPO|TITANIUM|GIFT_CARD/);
+});
+
+test("latest Bonda reconciliation adds Chopo offers and Harry's without changing missing candidates", () => {
+  for (const id of ["11208", "9471", "14799"]) {
+    assert.match(bondaPresentationCatalogReconciliation.up, new RegExp(`'${id}'`));
+  }
+  assert.equal((bondaPresentationCatalogReconciliation.up.match(/BONDA_CHOPO_/g) ?? []).length, 2);
+  assert.match(bondaPresentationCatalogReconciliation.up, /BONDA_HARRYS_POLANCO_14799/);
+  assert.match(bondaPresentationCatalogReconciliation.up, /displayOrder/);
+  assert.doesNotMatch(bondaPresentationCatalogReconciliation.up, /TOKS|SMART_FIT|CHILIS|GIFT_CARD/);
 });

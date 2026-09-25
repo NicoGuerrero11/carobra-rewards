@@ -3,33 +3,179 @@ import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let portal: RewardsCustomerPortal | null = null;
-try {
-  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
-  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-} catch {}
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+if (!portalLoadedWithContext) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  } catch {}
+}
 const notifications = portal?.notifications.items ?? [];
 const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
 ---
 <ClientShellLayout title="Notificaciones | Carobra" description="Avisos de tu cuenta Carobra Rewards." currentPath="/cliente/notificaciones" sectionLabel="Notificaciones">
-  <main class="portal-page">
-    <header class="portal-welcome"><div><p class="portal-eyebrow">Centro de avisos</p><h1>Notificaciones</h1><p>Cambios importantes, actividades y movimientos de tu cuenta.</p></div><span>{portal?.notifications.unread_count ?? 0} sin leer</span></header>
-    <section class="portal-section" aria-labelledby="notifications-title">
-      <div class="portal-section-heading"><div><p class="portal-eyebrow">Tu cuenta</p><h2 id="notifications-title">Actividad reciente</h2></div><p>Los avisos describen lo que cambió y cuándo ocurrió.</p></div>
+  <main class="customer-notifications">
+    <header class="notifications-heading">
+      <div><p class="notifications-eyebrow">Centro de avisos</p><h1>Notificaciones</h1><p>Cambios importantes, actividades y movimientos de tu cuenta.</p></div>
+      <div class="notifications-actions">
+        <span id="notifications-unread-count" data-count={portal?.notifications.unread_count ?? 0}>{portal?.notifications.unread_count ?? 0} sin leer</span>
+        <button id="mark-all-read" class="btn-primary" type="button" disabled={!notifications.some((notice) => !notice.read)}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 12 4 4 9-9m-4 8 2 2 8-9" /></svg>
+          <span>Marcar todas como leídas</span>
+        </button>
+      </div>
+    </header>
+    <p id="notifications-feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+    <section class="notifications-panel" aria-labelledby="notifications-title">
+      <header class="notifications-panel-heading">
+        <span class="notifications-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 10.2a5.2 5.2 0 0 1 10.4 0c0 5.8 2.3 6.3 2.3 6.3H4.5s2.3-.5 2.3-6.3ZM10 20h4" /></svg></span>
+        <div><h2 id="notifications-title">Actividad reciente</h2><p>Los avisos describen lo que cambió y cuándo ocurrió.</p></div>
+      </header>
       {notifications.length ? <ul class="notification-list">{notifications.map((notice) => (
-        <li class:list={[!notice.read && "is-unread"]} data-notification-id={notice.id}><span aria-hidden="true"></span><div><strong>{notice.title}</strong><p>{notice.message}</p><small>{date(notice.occurred_at)}</small></div>{!notice.read && <button class="mark-read" type="button">Marcar como leída</button>}</li>
-      ))}</ul> : <div class="rewards-empty"><strong>No tienes avisos por ahora</strong><p>Cuando exista una actualización relevante aparecerá aquí.</p></div>}
+        <li class:list={[!notice.read && "is-unread"]} data-notification-id={notice.id}>
+          <span class="notification-dot" aria-hidden="true"></span>
+          <div class="notification-copy">
+            <h3>{notice.title}</h3><p>{notice.message}</p>
+            <div class="notification-meta"><time datetime={notice.occurred_at}>{date(notice.occurred_at)}</time><span data-read-state>{notice.read ? "Leída" : "Sin leer"}</span></div>
+          </div>
+          {!notice.read && <button class="mark-read" type="button">Marcar como leída</button>}
+        </li>
+      ))}</ul> : <div class="notifications-empty"><h3>No tienes avisos por ahora</h3><p>Cuando exista una actualización relevante aparecerá aquí.</p></div>}
     </section>
   </main>
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
-    document.querySelectorAll<HTMLButtonElement>(".mark-read").forEach((button) => button.addEventListener("click", async () => {
+    const bulkButton = requireElement<HTMLButtonElement>("#mark-all-read");
+    const bulkLabel = requireElement<HTMLSpanElement>("#mark-all-read span");
+    const countLabel = requireElement<HTMLSpanElement>("#notifications-unread-count");
+    const feedback = requireElement<HTMLParagraphElement>("#notifications-feedback");
+    let unreadCount = Number(countLabel.dataset.count ?? 0);
+    let busy = false;
+    const pendingItems = () => Array.from(document.querySelectorAll<HTMLElement>("[data-notification-id].is-unread"));
+
+    function updateCounters() {
+      countLabel.textContent = `${unreadCount} sin leer`;
+      countLabel.dataset.count = String(unreadCount);
+      const bell = document.querySelector<HTMLAnchorElement>(".client-shell__notification-link");
+      const badge = bell?.querySelector<HTMLElement>(".client-shell__notification-count");
+      bell?.setAttribute("aria-label", unreadCount ? `Ver notificaciones, ${unreadCount} sin leer` : "Ver notificaciones");
+      if (unreadCount === 0) badge?.remove();
+      else if (badge) badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+    }
+
+    async function markRead(items: HTMLElement[], all: boolean) {
+      if (busy || !items.length) return;
+      busy = true;
+      bulkButton.disabled = true;
+      bulkButton.setAttribute("aria-busy", "true");
+      bulkLabel.textContent = "Marcando…";
+      document.querySelectorAll<HTMLButtonElement>(".mark-read").forEach(button => { button.disabled = true; });
+      feedback.dataset.state = "pending";
+      feedback.textContent = "Guardando cambios…";
+      const focusedBefore = document.activeElement;
+      let failures = 0;
+      let sessionExpired = false;
+
+      const save = async (item: HTMLElement) => {
+        try {
+          const response = await fetch("/api/v1/rewards/portal/notifications/read", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ notification_id: item.dataset.notificationId }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!response.ok) {
+            sessionExpired ||= response.status === 401;
+            failures++;
+            return;
+          }
+          item.classList.remove("is-unread");
+          const stateLabel = item.querySelector<HTMLElement>("[data-read-state]");
+          if (stateLabel) stateLabel.textContent = "Leída";
+          item.querySelector(".mark-read")?.remove();
+          unreadCount = Math.max(0, unreadCount - 1);
+          updateCounters();
+        } catch {
+          failures++;
+        }
+      };
+      // The current inbox is bounded; limit concurrent writes and retain failed items for retry.
+      for (let start = 0; start < items.length; start += 3) {
+        await Promise.all(items.slice(start, start + 3).map(save));
+      }
+
+      busy = false;
+      bulkButton.disabled = !pendingItems().length;
+      bulkButton.removeAttribute("aria-busy");
+      bulkLabel.textContent = "Marcar todas como leídas";
+      document.querySelectorAll<HTMLButtonElement>(".mark-read").forEach(button => { button.disabled = false; });
+      feedback.dataset.state = failures ? "error" : "success";
+      feedback.textContent = failures
+        ? sessionExpired ? "Tu sesión venció. Vuelve a iniciar sesión para marcar los avisos pendientes."
+          : "No pudimos marcar todos los avisos. Los pendientes siguen sin leer; vuelve a intentarlo."
+        : all ? "Todas tus notificaciones están leídas." : "Notificación marcada como leída.";
+      if (focusedBefore && !focusedBefore.isConnected) {
+        (document.querySelector<HTMLButtonElement>(".mark-read") ?? feedback).focus({ preventScroll: true });
+      }
+    }
+
+    bulkButton.addEventListener("click", () => { void markRead(pendingItems(), true); });
+    document.querySelectorAll<HTMLButtonElement>(".mark-read").forEach((button) => button.addEventListener("click", () => {
       const item = button.closest<HTMLElement>("[data-notification-id]");
-      if (!item) return;
-      const response = await fetch("/api/v1/rewards/portal/notifications/read", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ notification_id: item.dataset.notificationId }) });
-      if (response.ok) { button.remove(); item.classList.remove("is-unread"); }
+      if (item) void markRead([item], false);
     }));
   </script>
+  <style>
+    .customer-notifications { width: min(74rem, calc(100% - 2.2rem)); margin: auto; padding: 1.7rem 0 3.5rem; color: var(--carobra-ink); }
+    .customer-notifications * { box-sizing: border-box; }
+    .notifications-heading { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.4rem; }
+    .notifications-heading > div:first-child { min-width: 0; }
+    .notifications-eyebrow { margin: 0; color: var(--carobra-blue); font-size: .65rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .notifications-heading h1 { margin: .25rem 0 .45rem; font-size: clamp(1.8rem, 3vw, 2.3rem); font-weight: 750; line-height: 1.2; letter-spacing: -.035em; }
+    .notifications-heading > div > p:last-child { margin: 0; color: var(--carobra-ink-muted); font-size: .85rem; line-height: 1.65; }
+    .notifications-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .65rem; flex-shrink: 0; }
+    #notifications-unread-count { color: var(--carobra-blue); background: var(--carobra-cyan-soft); border-radius: 999px; padding: .45rem .75rem; font-size: .75rem; font-weight: 700; }
+    #mark-all-read { display: inline-flex; justify-content: center; align-items: center; gap: .5rem; min-height: 2.75rem; max-width: 100%; padding: .7rem 1rem; font-size: .8rem; line-height: 1.4; cursor: pointer; }
+    #mark-all-read svg { flex: 0 0 1.15rem; width: 1.15rem; height: 1.15rem; }
+    .notifications-panel { padding: 1.5rem; border: 1px solid var(--carobra-border); border-radius: var(--carobra-radius-lg); background: var(--carobra-surface); box-shadow: var(--carobra-shadow-sm); }
+    .notifications-panel-heading { display: flex; align-items: center; gap: .8rem; padding-bottom: 1.3rem; border-bottom: 1px solid var(--carobra-border); }
+    .notifications-panel-icon { display: grid; place-items: center; flex: 0 0 2.5rem; height: 2.5rem; border-radius: .75rem; background: var(--carobra-cyan-soft); color: var(--carobra-blue); }
+    .notifications-panel-icon svg { width: 1.2rem; height: 1.2rem; }
+    .notifications-panel h2 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: -.02em; line-height: 1.35; }
+    .notifications-panel-heading p { margin: .3rem 0 0; font-size: .74rem; line-height: 1.6; color: var(--carobra-ink-muted); }
+    .customer-notifications h3 { margin: 0; font-size: .85rem; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+    .customer-notifications .notification-list { display: grid; gap: .65rem; list-style: none; margin: 1.2rem 0 0; padding: 0; }
+    .customer-notifications .notification-list > li { display: grid; grid-template-columns: .5rem minmax(0, 1fr) auto; align-items: center; gap: .9rem; padding: 1rem; border: 1px solid var(--carobra-border); border-left: 3px solid var(--carobra-border); border-radius: var(--carobra-radius-md); background: var(--carobra-surface); box-shadow: none; }
+    .customer-notifications .notification-list > li.is-unread { border-left-color: var(--carobra-blue); background: var(--carobra-surface-blue); }
+    .customer-notifications .notification-dot { align-self: start; width: .5rem; height: .5rem; margin-top: .4rem; border-radius: 50%; background: var(--carobra-border-strong); }
+    .customer-notifications .is-unread .notification-dot { background: var(--carobra-blue); }
+    .notification-copy { min-width: 0; }
+    .customer-notifications .notification-copy p { margin: .25rem 0 .5rem; font-size: .81rem; line-height: 1.65; color: var(--carobra-ink-muted); overflow-wrap: anywhere; }
+    .notification-meta { display: flex; flex-wrap: wrap; gap: .5rem .8rem; align-items: center; color: var(--carobra-ink-muted); font-size: .71rem; line-height: 1.6; }
+    [data-read-state] { padding: .15rem .45rem; border-radius: .35rem; background: var(--carobra-canvas); font-size: .65rem; font-weight: 650; }
+    .is-unread [data-read-state] { color: var(--carobra-blue); background: var(--carobra-cyan-soft); }
+    .customer-notifications .mark-read { min-height: 2.75rem; padding: .6rem .8rem; border: 1px solid var(--carobra-border-strong); border-radius: var(--carobra-radius-sm); color: var(--carobra-blue); background: var(--carobra-surface); box-shadow: none; font-size: .75rem; line-height: 1.4; font-weight: 650; cursor: pointer; transform: none; }
+    .customer-notifications .mark-read:hover { border-color: var(--carobra-blue); color: var(--carobra-blue-hover); background: var(--carobra-cyan-soft); box-shadow: none; transform: none; }
+    .notifications-empty { margin-top: 1.2rem; padding: 1rem; border-radius: var(--carobra-radius-md); background: var(--carobra-surface-blue); }
+    .notifications-empty p { margin: .35rem 0 0; font-size: .8rem; line-height: 1.65; color: var(--carobra-ink-muted); }
+    #notifications-feedback { margin: 0 0 1rem; padding: .75rem 1rem; border-radius: var(--carobra-radius-sm); color: var(--carobra-ink-muted); background: var(--carobra-surface-blue); font-size: .82rem; line-height: 1.6; }
+    #notifications-feedback:empty { display: none; }
+    #notifications-feedback[data-state="success"] { color: var(--carobra-success); background: var(--carobra-success-soft); }
+    #notifications-feedback[data-state="error"] { color: var(--carobra-danger); background: var(--carobra-danger-soft); }
+    @media (max-width: 900px) {
+      .notifications-heading { align-items: flex-start; flex-direction: column; gap: 1rem; }
+      .notifications-actions { justify-content: flex-start; }
+    }
+    @media (max-width: 560px) {
+      .customer-notifications { width: calc(100% - 1.2rem); padding-top: 1.1rem; }
+      .notifications-heading { margin-bottom: 1rem; }
+      .notifications-panel { padding: 1rem; }
+      .notifications-panel h2 { font-size: 1.05rem; }
+      .customer-notifications .notification-list > li { grid-template-columns: .5rem minmax(0, 1fr); padding: .85rem; column-gap: .6rem; }
+      .customer-notifications .mark-read { grid-column: 2; justify-self: start; }
+    }
+  </style>
 </ClientShellLayout>

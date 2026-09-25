@@ -1,0 +1,315 @@
+body.carobra-public {
+  --public-navy: #041c2c;
+  --public-blue: #004b87;
+  --public-cyan: #00a3e0;
+  --public-gray: #a7a8aa;
+  font-family: "Montserrat Variable", "Montserrat", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+body.carobra-public .landing-nav {
+  gap: clamp(0.7rem, 1.5vw, 1.15rem);
+  font-size: clamp(0.7rem, 1vw, 0.8rem);
+  font-weight: 620;
+}
+
+body.carobra-public .landing-header__inner {
+  width: min(1220px, calc(100% - 2rem));
+}
+
+body.carobra-public .brand__logo {
+  width: clamp(9.5rem, 14vw, 13rem);
+}
+
+body.carobra-public .hero-media {
+  position: relative;
+  min-height: 23rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  padding: clamp(1.4rem, 4vw, 2.4rem);
+  border: 1px solid rgba(4, 28, 44, 0.2);
+  border-radius: 1.15rem;
+  background:
+    linear-gradient(122deg, transparent 0 62%, rgba(0, 163, 224, 0.2) 62% 69%, transparent 69%),
+    linear-gradient(125deg, var(--public-navy), var(--public-blue));
+  color: #fff;
+  box-shadow: 0 22px 48px rgba(4, 28, 44, 0.2);
+}
+
+body.carobra-public .hero-media > span,
+body.carobra-public .public-products__heading span,
+body.carobra-public .catalog-strip > div > span,
+body.carobra-public .public-about__copy > span {
+  color: var(--public-cyan);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.carobra-public .hero-media h2 {
+  max-width: 14ch;
+  margin: 0.45rem 0 0.7rem;
+  color: #fff;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 0.95;
+}
+
+body.carobra-public .hero-media p {
+  max-width: 48ch;
+  margin: 0;
+  color: #dcecf5;
+}
+
+body.carobra-public .hero-media a {
+  width: max-content;
+  margin-top: 1.2rem;
+  padding: 0.72rem 0.9rem;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--public-blue);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+body.carobra-public .hero-media small {
+  margin-top: 0.9rem;
+  color: #b9d5e3;
+  font-size: 0.68rem;
+}
+
+body.carobra-public .hero-media--video {
+  min-height: 0;
+  padding: 0;
+  background: var(--public-navy);
+}
+
+body.carobra-public .hero-media video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+body.carobra-public .public-products {
+  padding: 4.5rem 0;
+  border-bottom: 1px solid #d7e0e7;
+  background: #f8fafb;
+}
+
+body.carobra-public .public-products__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.8fr);
+  align-items: end;
+  gap: 2rem;
+  text-align: left;
+}
+
+body.carobra-public .public-products__heading h2 {
+  margin-top: 0.45rem;
+}
+
+body.carobra-public .public-products__heading p {
+  margin: 0;
+}
+
+body.carobra-public .public-products__controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+}
+
+body.carobra-public .public-products__controls button {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #b8c8d3;
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--public-blue);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+body.carobra-public .public-products__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(17rem, 31%);
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+  padding: 0.15rem 0 0.8rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-color: #9eb5c5 transparent;
+}
+
+body.carobra-public .public-product {
+  min-height: 20rem;
+  display: flex;
+  flex-direction: column;
+  scroll-snap-align: start;
+  padding: 1.4rem;
+  border: 1px solid #cbd7df;
+  border-top: 0.35rem solid var(--public-blue);
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(4, 28, 44, 0.07);
+}
+
+body.carobra-public .public-product.is-skandia { border-top-color: #5f438f; }
+body.carobra-public .public-product.is-qualitas { border-top-color: #19734a; }
+body.carobra-public .public-product.is-modalidad { border-top-color: #c46a24; }
+body.carobra-public .public-product.is-infinity { border-top-color: var(--public-cyan); }
+
+body.carobra-public .public-product > span {
+  color: #536878;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+body.carobra-public .public-product h3 {
+  margin: 1.2rem 0 0.6rem;
+  color: var(--public-navy);
+  font-size: 1.9rem;
+}
+
+body.carobra-public .public-product p {
+  margin: 0;
+  color: #536878;
+  line-height: 1.65;
+}
+
+body.carobra-public .public-product a {
+  margin-top: auto;
+  padding-top: 1.25rem;
+  color: var(--public-blue);
+  font-size: 0.78rem;
+  font-weight: 760;
+}
+
+body.carobra-public .catalog-strip {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 1rem 2rem;
+  margin-top: 1rem;
+  padding: 1.3rem;
+  border: 1px solid #cbd7df;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+body.carobra-public .catalog-strip h3 {
+  margin: 0.3rem 0 0;
+  color: var(--public-navy);
+}
+
+body.carobra-public .catalog-strip ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.carobra-public .catalog-strip li {
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.45rem;
+  background: #edf0f2;
+  color: #536878;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+body.carobra-public .catalog-strip > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #71808a;
+  font-size: 0.7rem;
+}
+
+body.carobra-public .public-about {
+  padding: 4.5rem 0;
+  background: #fff;
+}
+
+body.carobra-public .public-about__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.9fr);
+  align-items: center;
+  gap: clamp(2rem, 6vw, 5rem);
+}
+
+body.carobra-public .public-about__copy h2 {
+  max-width: 15ch;
+  margin: 0.5rem 0 1rem;
+  color: var(--public-navy);
+  font-size: clamp(2rem, 4vw, 3.8rem);
+  line-height: 0.98;
+}
+
+body.carobra-public .public-about__copy p {
+  color: #536878;
+  line-height: 1.7;
+}
+
+body.carobra-public .public-about__copy a {
+  display: inline-flex;
+  margin-top: 0.8rem;
+  color: var(--public-blue);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+body.carobra-public .public-about__facts {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+}
+
+body.carobra-public .public-about__facts > div {
+  padding: 1.1rem;
+  border-left: 0.3rem solid var(--public-cyan);
+  background: #f2f8fc;
+}
+
+body.carobra-public .public-about__facts dt {
+  color: #6e7e88;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+body.carobra-public .public-about__facts dd {
+  margin: 0.3rem 0 0;
+  color: var(--public-navy);
+  font-size: 1.2rem;
+  font-weight: 760;
+}
+
+@media (max-width: 980px) {
+  body.carobra-public .landing-nav { display: none; }
+  body.carobra-public .public-products__track { grid-auto-columns: minmax(17rem, 48%); }
+}
+
+@media (max-width: 720px) {
+  body.carobra-public .public-products__heading,
+  body.carobra-public .catalog-strip,
+  body.carobra-public .public-about__grid { grid-template-columns: 1fr; }
+  body.carobra-public .public-products__track { grid-auto-columns: minmax(16.5rem, 86%); }
+  body.carobra-public .catalog-strip ul { justify-content: flex-start; }
+  body.carobra-public .public-about { padding: 3.5rem 0; }
+}
+
+@media (max-width: 520px) {
+  body.carobra-public .brand__logo { width: 8.5rem; }
+  body.carobra-public .landing-header__actions .btn-primary { width: auto; }
+  body.carobra-public .hero-media { min-height: 21rem; }
+}

@@ -1,53 +1,95 @@
 ---
-import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
-import { getSiteBackendBaseUrl } from "../../lib/api";
-import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
-
-const cookie = Astro.request.headers.get("cookie") ?? "";
-let portal: RewardsCustomerPortal | null = null;
+import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
+import { getSiteBackendBaseUrl } from '../../lib/api';
+import { courseDuration, courseLevels, learningSpaces, learningSpace, learningCatalogUrl, type LearningSpace, type CoursesCatalog } from '../../lib/courses';
+const type = Astro.url.searchParams.get('tipo');
+if (type !== null && type !== 'cursos' && type !== 'bienestar') return Astro.redirect('/cliente/cursos');
+const space: LearningSpace | null = type;
+const retryUrl = space ? learningCatalogUrl(space) : '/cliente/cursos';
+let catalog: CoursesCatalog | null = null;
 try {
-  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
-  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
-  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-} catch {}
-const courses = portal?.learning.items ?? [];
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/courses`, {
+    headers: {cookie: Astro.request.headers.get('cookie') ?? ''}, signal: AbortSignal.timeout(12000),
+  });
+  if (response.status === 401) return Astro.redirect('/login');
+  if (response.ok) catalog = await response.json();
+} catch { /* Show a retryable unavailable state, not an empty catalog. */ }
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+const courses = (catalog?.courses ?? []).filter(course => space && learningSpace(course) === space).sort((a,b) => Number(b.accessible) - Number(a.accessible));
+const available = courses.filter(c => c.accessible).length;
+const categories = [...new Set(courses.map(c => c.category))];
 ---
-
-<ClientShellLayout title="Cursos | Carobra" description="Cursos y contenidos para clientes Carobra." currentPath="/cliente/cursos" sectionLabel="Cursos">
-  <main class="portal-page">
-    <header class="portal-welcome">
-      <div><p class="portal-eyebrow">Aprende a tu ritmo</p><h1>Cursos</h1><p>Contenidos asignados para comprender tus decisiones y avanzar en tu relación con Carobra.</p></div>
-      <span>{courses.length} {courses.length === 1 ? "curso asignado" : "cursos asignados"}</span>
-    </header>
-    <section class="learning-hero" aria-labelledby="learning-title">
-      <div><p class="portal-eyebrow">Tu aprendizaje</p><h2 id="learning-title">Una biblioteca hecha para tu camino</h2><p>Aquí encontrarás únicamente contenidos aprobados y asignados a tu cuenta, con avance guardado y una acción clara para continuar.</p></div>
-      <div class="learning-hero__visual" aria-hidden="true"><span>▶</span><small>Contenido Carobra</small></div>
-    </section>
-    {courses.length ? (
-      <section class="portal-section" aria-labelledby="learning-library-title">
-        <div class="portal-section-heading"><div><p class="portal-eyebrow">Tu biblioteca</p><h2 id="learning-library-title">Continúa donde te quedaste</h2></div><p>Tu progreso se guarda en tu cuenta.</p></div>
-        <div class="learning-grid">{courses.map((course) => (
-          <article data-course-id={course.id} data-progress={course.progress}>
-            <span>{course.progress}%</span>
-            <div><small>{course.category}</small><h3>{course.title}</h3><p>{course.description}</p><progress max="100" value={course.progress}>{course.progress}%</progress></div>
-            {course.status === "COMPLETED" ? <small>Completado</small> : <button class="course-progress" type="button">{course.progress ? "Continuar" : "Comenzar"}</button>}
-          </article>
-        ))}</div>
+<ClientShellLayout title="Cursos | Carobra Rewards" description="Tu ruta de aprendizaje, con cursos disponibles según tu nivel." currentPath="/cliente/cursos" sectionLabel="Cursos">
+  <main class="courses-page">
+    {!catalog ? <section class="courses-state" role="status"><h1>No pudimos cargar tus cursos</h1><p>Tu catálogo no ha cambiado. Intenta de nuevo en unos momentos.</p><a href={retryUrl}>Volver a intentar →</a></section>
+    : catalog.status === 'DISABLED' ? <section class="courses-state"><p>Cursos</p><h1>Próximamente</h1><p>Estamos preparando tu ruta de aprendizaje.</p></section>
+    : !space ? <>
+      <header class="learning-heading"><p class="eyebrow">Tu espacio de aprendizaje</p><h1>Cursos y bienestar</h1><p>Elige qué quieres explorar. Conservamos los contenidos disponibles para tu nivel.</p></header>
+      <section class="learning-spaces" aria-label="Explora cursos y bienestar">
+        {(Object.keys(learningSpaces) as LearningSpace[]).map(key => {
+          const item = learningSpaces[key];
+          return <article class="learning-space">
+            <img src={item.image} alt="" width="560" height="350" decoding="async" />
+            <div><h2>{item.title}</h2><p>{item.summary}</p><a href={learningCatalogUrl(key)}>{item.action}<span aria-hidden="true">→</span></a></div>
+          </article>;
+        })}
       </section>
-    ) : (
-      <section class="portal-card portal-empty-state"><span aria-hidden="true">+</span><div><p class="portal-eyebrow">Al día</p><h2>Aún no tienes cursos asignados</h2><p>Cuando exista contenido aprobado para tu perfil, aparecerá aquí con su duración, avance y próxima acción.</p></div></section>
-    )}
+    </> : <>
+      <a class="learning-back" href="/cliente/cursos">← Cursos y bienestar</a>
+      <header class="courses-heading">
+        <div><p class="eyebrow">Tu ruta de aprendizaje</p><h1>{space === 'bienestar' ? 'Bienestar para ti' : 'Cursos para seguir creciendo'}</h1><p>{space === 'bienestar' ? 'Videos y lecturas para cuidarte a tu ritmo. Todo este catálogo está disponible desde Bronce.' : 'Aprende a tu ritmo. Cada nuevo nivel suma contenidos y conserva los que ya tienes.'}</p></div>
+        <div class="courses-level"><span>{catalog.current_level ? `Nivel ${courseLevels[catalog.current_level] ?? ''}` : 'Invitado'}</span><strong>{available}</strong><span>{space === 'bienestar' ? 'contenidos disponibles' : 'cursos y series disponibles'}</span></div>
+      </header>
+      {available === 0 && <aside class="courses-notice">Explora el catálogo. Para acceder al contenido necesitas una cuenta activa y alcanzar el nivel indicado. <a href="/cliente/productos">Ver cómo avanzar →</a></aside>}
+      <section class="courses-catalog" aria-label={`Catálogo de ${learningSpaces[space].title.toLowerCase()}`}>
+        <div class="courses-filters">
+          <label><span id="course-category-label">Categoría</span><select id="course-category" aria-labelledby="course-category-label"><option value="">Todas las categorías</option>{categories.map(c => <option value={c}>{c}</option>)}</select></label>
+          <label><span id="course-access-label">Acceso</span><select id="course-access" aria-labelledby="course-access-label"><option value="available" selected={available > 0}>Disponibles para mí</option><option value="all" selected={available === 0}>{space === 'bienestar' ? 'Todo el catálogo' : 'Toda la ruta'}</option></select></label>
+        </div>
+        <p id="course-results" class="course-results" data-label={space === 'bienestar' ? 'contenidos de bienestar' : 'cursos y series'} aria-live="polite"></p>
+        <div class="course-grid">
+          {courses.map(course => <article class="course-card" data-course-card data-category={course.category} data-accessible={String(course.accessible)}>
+            <div class="course-cover">{course.image_url ? <img src={course.image_url} alt="" width="640" height="360" loading="lazy" decoding="async" /> : <span aria-hidden="true">{course.content_type === 'text' ? '≡' : '▶'}</span>}<span class="course-format">{course.content_type === 'text' ? 'Artículo' : course.chapter_count > 1 ? `${course.chapter_count} capítulos` : '1 video'}</span></div>
+            <div class="course-card-body"><p class="eyebrow">{course.category}</p><h2>{course.title}</h2><p class="course-summary">{course.summary}</p><p class="course-duration">{course.content_type === 'text' ? 'Lectura · A tu ritmo' : `${courseDuration(course.duration_seconds)} · A tu ritmo`}</p>
+              {course.accessible ? <a href={`/cliente/cursos/${course.id}`} class="course-action" aria-label={`${course.content_type === 'text' ? 'Leer artículo' : space === 'bienestar' ? 'Ver video' : 'Ver curso'}: ${course.title}`}>{course.content_type === 'text' ? 'Leer artículo' : space === 'bienestar' ? 'Ver video' : 'Ver curso'} <span aria-hidden="true">→</span></a> : <div class="course-lock"><span>Desde {courseLevels[course.minimum_level]}</span><a href="/cliente/productos" aria-label={`Cómo desbloquear ${course.title}`}>Cómo desbloquear →</a></div>}
+              {course.accessible && course.content_type !== 'text' && course.progress && <p class="course-progress-count">{course.progress.completed ? (space === 'bienestar' ? '✓ Video completado' : '✓ Curso completado') : `${course.progress.completed_chapters} de ${course.progress.total_chapters} videos completados`}</p>}
+            </div>
+          </article>)}
+        </div>
+        <p id="course-empty" hidden>No hay contenidos con esos filtros. Prueba otra categoría o cambia el acceso.</p>
+        <button id="course-more" class="course-more" type="button" hidden>{space === 'bienestar' ? 'Ver más contenidos' : 'Ver más cursos'}</button>
+        <p class="courses-footnote">Revisado el {new Date(`${catalog.reviewed_at}T12:00:00`).toLocaleDateString('es-MX', {day:'numeric',month:'long',year:'numeric'})}. La disponibilidad se comprueba al abrir cada contenido.</p>
+      </section>
+    </>}
   </main>
   <script>
-    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
-    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
-    document.querySelectorAll<HTMLButtonElement>(".course-progress").forEach((button) => button.addEventListener("click", async () => {
-      const card = button.closest<HTMLElement>("[data-course-id]");
-      if (!card) return;
-      button.disabled = true;
-      const progress = Math.min(100, Number(card.dataset.progress ?? "0") + 10);
-      const response = await fetch("/api/v1/rewards/portal/learning-progress", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ assignment_id: card.dataset.courseId, progress }) });
-      if (response.ok) window.location.reload(); else button.disabled = false;
-    }));
+    import { attachLogoutHandler, requireElement } from '../../lib/client-page-utils';
+    attachLogoutHandler(requireElement<HTMLButtonElement>('#logout'), '');
+    const category = document.querySelector<HTMLSelectElement>('#course-category');
+    const access = document.querySelector<HTMLSelectElement>('#course-access');
+    const more = document.querySelector<HTMLButtonElement>('#course-more');
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-course-card]')];
+    let limit = 24;
+    function filter(reset = true) {
+      if (reset) limit = 24;
+      const matches = cards.filter(card => (!category?.value || card.dataset.category === category.value)
+        && (access?.value !== 'available' || card.dataset.accessible === 'true'));
+      const visible = new Set(matches.slice(0, limit));
+      cards.forEach(card => card.hidden = !visible.has(card));
+      const result = document.querySelector<HTMLElement>('#course-results');
+      if (result) result.textContent = `${matches.length} ${result.dataset.label}${matches.length > limit ? ` · Mostrando ${limit}` : ''}`;
+      const empty = document.querySelector<HTMLElement>('#course-empty');
+      if (empty) empty.hidden = matches.length > 0;
+      if (more) more.hidden = matches.length <= limit;
+    }
+    category?.addEventListener('change', () => filter());
+    access?.addEventListener('change', () => filter());
+    more?.addEventListener('click', () => {limit += 24; filter(false);});
+    if (category && access) filter();
   </script>
+  <style>
+    .course-progress-count{font-size:.72rem;font-weight:700;color:#00518a;margin:.8rem 0 0}
+    .learning-heading{margin-bottom:1.8rem}.learning-heading h1{font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;line-height:1.2;margin:0 0 .7rem;letter-spacing:-.035em}.learning-heading>p:last-child{color:#46617a;font-size:.87rem;line-height:1.7;max-width:42rem}.learning-spaces{display:grid;gap:1.5rem}.learning-space{display:grid;grid-template-columns:minmax(0,22rem) 1fr;gap:2rem;align-items:center;padding:1.25rem;background:white;border:1px solid #d3e0e9;border-radius:20px;box-shadow:0 6px 24px #041c2c05}.learning-space>img{display:block;width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;border-radius:14px}.learning-space>div{padding:.5rem 1rem .5rem 0}.learning-space h2{font-size:1.55rem;font-weight:700;line-height:1.3;margin:0 0 .7rem;letter-spacing:-.025em}.learning-space p{font-size:.9rem;color:#46617a;line-height:1.75;margin:0 0 1.4rem}.learning-space a{display:inline-flex;align-items:center;gap:1.4rem;background:#00518a;color:white;padding:.85rem 1.2rem;border-radius:9px;font-size:.82rem;font-weight:700;min-height:44px}.learning-space a:hover{background:#041c2c}.learning-back{display:inline-block;color:#00518a;font-size:.8rem;font-weight:700;margin-bottom:1.3rem}@media(max-width:700px){.learning-space{grid-template-columns:1fr;gap:1.1rem;padding:1rem}.learning-space>img{aspect-ratio:16/9}.learning-space>div{padding:.25rem .2rem .5rem}.learning-space h2{font-size:1.35rem}.learning-space p{margin-bottom:1.1rem}}
+    .courses-page{width:min(74rem,calc(100% - 2.2rem));margin:0 auto;padding:2.5rem 0 4rem;color:#041c2c}.courses-heading{display:flex;align-items:center;justify-content:space-between;gap:2rem;margin-bottom:1.5rem}.eyebrow{font-size:.68rem!important;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#00518a!important;margin:0 0 .6rem!important}.courses-heading h1{font-size:clamp(1.8rem,3.4vw,2.6rem);line-height:1.15;letter-spacing:-.04em;font-weight:700;margin:0 0 .8rem}.courses-heading p{font-size:.87rem;line-height:1.7;color:#46617a;margin:0;max-width:42rem}.courses-level{padding:1rem 1.4rem;border-left:3px solid #00a8e1;display:grid;flex-shrink:0;gap:.2rem;color:#00518a;font-size:.74rem}.courses-level strong{font-size:1.8rem}.courses-catalog,.courses-state{background:white;border:1px solid #d3e0e9;border-radius:20px;padding:1.6rem;box-shadow:0 6px 24px #041c2c05}.courses-state h1{font-size:2rem}.courses-state p{line-height:1.7}.courses-state a,.courses-notice a{color:#00518a;font-weight:700}.courses-notice{background:#e9f8fc;padding:1rem 1.3rem;border-radius:12px;margin-bottom:1rem;font-size:.85rem;line-height:1.8}.courses-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.courses-filters label{display:grid;gap:.45rem;font-size:.72rem;font-weight:700;color:#36526a}.courses-filters select{width:100%;min-width:0;padding:.8rem;border:1px solid #bdcfdc;border-radius:9px;background:white;color:#041c2c;font:inherit;font-size:.8rem}.course-results{font-size:.8rem;color:#46617a;margin:1.2rem 0}.course-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.2rem}.course-card{border:1px solid #d3e0e9;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .2s}.course-card:hover{box-shadow:0 8px 22px #041c2c10}.course-cover{aspect-ratio:16/9;background:#e3f3fa;position:relative;display:grid;place-items:center;overflow:hidden}.course-cover img{width:100%;height:100%;object-fit:cover}.course-format{position:absolute;bottom:.6rem;right:.6rem;background:#041c2ce6;color:white;font-size:.66rem;font-weight:700;border-radius:5px;padding:.35rem .5rem}.course-card-body{padding:1.15rem;display:flex;flex-direction:column;flex:1}.course-card h2{font-size:1rem;font-weight:700;line-height:1.45;margin:0 0 .65rem;letter-spacing:-.02em}.course-summary{font-size:.77rem;color:#46617a;line-height:1.65;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;margin:0 0 .8rem}.course-duration{font-size:.7rem;color:#46617a;margin:auto 0 .85rem;padding-top:.5rem}.course-action{display:flex;justify-content:space-between;border-top:1px solid #e0eaf0;padding-top:.85rem;color:#00518a;font-size:.8rem;font-weight:800}.course-lock{border-top:1px solid #e0eaf0;padding-top:.8rem;display:grid;gap:.5rem;font-size:.72rem;color:#46617a}.course-lock a{color:#00518a;font-weight:700}.course-more{display:block;margin:1.7rem auto .5rem;padding:.8rem 1.5rem;background:#00518a;border:0;border-radius:9px;color:white;font-size:.8rem;font-weight:700;cursor:pointer}.courses-footnote{font-size:.65rem;color:#587084;line-height:1.7;margin:1.5rem 0 0}[hidden]{display:none!important}select:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid #00a8e1;outline-offset:3px}@media(max-width:950px){.course-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.courses-heading{align-items:flex-start}.courses-level{max-width:10rem;flex-shrink:1}.courses-filters{grid-template-columns:1fr 1fr}}@media(max-width:580px){.courses-page{width:calc(100% - 1.2rem);padding-top:1.5rem}.courses-heading{display:block}.courses-level{display:flex;align-items:center;flex-wrap:wrap;max-width:none;gap:.6rem;margin-top:1rem;padding:.5rem 1rem}.courses-level strong{font-size:1.2rem}.courses-catalog{padding:1rem}.course-grid{grid-template-columns:1fr}.courses-filters{grid-template-columns:1fr}.courses-heading h1{font-size:1.8rem}}
+  </style>
 </ClientShellLayout>

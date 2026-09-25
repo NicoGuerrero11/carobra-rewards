@@ -1,0 +1,69 @@
+---
+interface Props {
+  text: string;
+  class?: string;
+}
+
+interface Fragment {
+  text: string;
+  highlighted: boolean;
+}
+
+interface TextBlock {
+  kind: "paragraph" | "bullet" | "step";
+  marker: string | null;
+  fragments: Fragment[];
+}
+
+const { text, class: className } = Astro.props as Props;
+
+const emphasisPattern = /(https?:\/\/[^\s]+|www\.[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|(?:hasta\s+)?\d+(?:[.,]\d+)?\s*%|Importante:?|Información de contacto:?|Página Web:?|Teléfono:?|WhatsApp|Mail:?|No (?:es )?acumulable con otras promociones\.?|No válido con otras promociones\.?|Válido hasta\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/giu;
+
+function emphasize(value: string): Fragment[] {
+  const fragments: Fragment[] = [];
+  let cursor = 0;
+  for (const match of value.matchAll(emphasisPattern)) {
+    const index = match.index ?? 0;
+    if (index > cursor) fragments.push({ text: value.slice(cursor, index), highlighted: false });
+    fragments.push({ text: match[0], highlighted: true });
+    cursor = index + match[0].length;
+  }
+  if (cursor < value.length) fragments.push({ text: value.slice(cursor), highlighted: false });
+  return fragments.length > 0 ? fragments : [{ text: value, highlighted: false }];
+}
+
+const blocks: TextBlock[] = text
+  .replace(/\r\n?/g, "\n")
+  .split(/\n+/)
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .map((line) => {
+    const step = line.match(/^(\d+)\s*[-.)]\s*(.+)$/);
+    if (step) return { kind: "step", marker: step[1]!, fragments: emphasize(step[2]!) };
+    const bullet = line.match(/^[-•]\s*(.+)$/);
+    if (bullet) return { kind: "bullet", marker: "•", fragments: emphasize(bullet[1]!) };
+    return { kind: "paragraph", marker: null, fragments: emphasize(line) };
+  });
+---
+
+<div class:list={["benefit-rich-text", className]}>
+  {blocks.map((block) => (
+    <p class:list={["benefit-rich-text__block", `benefit-rich-text__block--${block.kind}`]}>
+      {block.marker && <span class="benefit-rich-text__marker" aria-hidden="true">{block.marker}</span>}
+      <span>
+        {block.fragments.map((fragment) => fragment.highlighted
+          ? <strong class="benefit-rich-text__highlight">{fragment.text}</strong>
+          : fragment.text)}
+      </span>
+    </p>
+  ))}
+</div>
+
+<style>
+  .benefit-rich-text{display:grid;gap:.72rem;color:#526c80;font-size:.9rem;line-height:1.62}
+  .benefit-rich-text__block{margin:0}
+  .benefit-rich-text__block--bullet,.benefit-rich-text__block--step{display:grid;grid-template-columns:1.55rem minmax(0,1fr);gap:.45rem;align-items:start}
+  .benefit-rich-text__marker{width:1.45rem;min-height:1.45rem;display:grid;place-items:center;border-radius:.38rem;color:#004b87;background:#dff5fd;font-size:.68rem;font-weight:900;line-height:1.2}
+  .benefit-rich-text__block--bullet .benefit-rich-text__marker{background:transparent;font-size:1rem}
+  .benefit-rich-text__highlight{color:#004b87;font-weight:900}
+</style>

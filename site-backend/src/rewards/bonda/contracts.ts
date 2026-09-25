@@ -35,6 +35,9 @@ export interface BondaCouponSummary {
   shortDescription: string;
   expirationAt: string | null;
   imageUrl: string | null;
+  heroImageUrl: string | null;
+  logoImageUrl: string | null;
+  bannerImageUrl: string | null;
   category: string | null;
   channels: readonly BondaCouponChannel[];
   minimumLevel: RewardsLevel;
@@ -45,6 +48,18 @@ export interface BondaCouponDetail extends BondaCouponSummary {
   description: string;
   usageInstructions: string;
   legalTerms: string;
+  brandDescription: string;
+  branches: readonly BondaCouponBranch[];
+}
+
+export interface BondaCouponBranch {
+  id: string;
+  name: string;
+  address: string;
+  city: string | null;
+  state: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface BondaCouponCatalogHttpResponse {
@@ -63,6 +78,10 @@ export interface BondaCouponDetailHttpResponse {
   access_state: BondaCouponAccessState;
   affiliate_state: BondaAffiliateIntegrationState;
   item: BondaCouponDetail | null;
+}
+
+export interface BondaCouponBranchesHttpResponse {
+  items: readonly BondaCouponBranch[];
 }
 
 export type BondaCouponCodeStatus =
@@ -107,8 +126,22 @@ export function assertBondaCouponDetailContract(
 ): BondaCouponDetailHttpResponse {
   if (value.item) {
     assertCoupon(value.item);
-    for (const text of [value.item.description, value.item.usageInstructions, value.item.legalTerms]) {
+    for (const text of [value.item.description, value.item.usageInstructions, value.item.legalTerms, value.item.brandDescription]) {
       assertSafeText(text);
+    }
+    for (const branch of value.item.branches) {
+      for (const text of [branch.id, branch.name, branch.address, branch.city ?? "", branch.state ?? ""]) {
+        assertSafeText(text);
+      }
+      if ((branch.latitude === null) !== (branch.longitude === null)) {
+        throw new Error("Branch coordinates must be provided as a pair");
+      }
+      if (branch.latitude !== null && (!Number.isFinite(branch.latitude) || Math.abs(branch.latitude) > 90)) {
+        throw new Error("Branch latitude is invalid");
+      }
+      if (branch.longitude !== null && (!Number.isFinite(branch.longitude) || Math.abs(branch.longitude) > 180)) {
+        throw new Error("Branch longitude is invalid");
+      }
     }
   }
   return value;
@@ -122,8 +155,10 @@ function assertCoupon(item: BondaCouponSummary): void {
   assertSafeText(item.name);
   assertSafeText(item.shortDescription);
   if (item.discount) assertSafeText(item.discount);
-  if (item.imageUrl && new URL(item.imageUrl).protocol !== "https:") {
-    throw new Error("Coupon images must use HTTPS");
+  for (const imageUrl of [item.imageUrl, item.heroImageUrl, item.logoImageUrl, item.bannerImageUrl]) {
+    if (imageUrl && new URL(imageUrl).protocol !== "https:") {
+      throw new Error("Coupon images must use HTTPS");
+    }
   }
 }
 

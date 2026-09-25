@@ -103,7 +103,7 @@ async def _seed_existing_customer(
     nss: str,
 ) -> Customer:
     customer = Customer.create(
-        rewards_id="RWD-existing",
+        rewards_id="123456789",
         curp=curp,
         nss=nss,
         name="Existing Customer",
@@ -191,7 +191,7 @@ async def test_customer_repository_persists_split_name_without_nss(
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     customer = Customer.create(
-        rewards_id="RWD-1",
+        rewards_id="123456790",
         curp="ABCD123456HMNLRS09",
         nss="0012345678901234",
         name="First Customer",
@@ -222,7 +222,7 @@ async def test_service_replays_duplicate_request_as_idempotent_duplicate(
 ) -> None:
     service = ProcessSimulatedCustomerIntake(
         SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory),
-        FixedRewardsIdGenerator("RWD-fixed"),
+        FixedRewardsIdGenerator("123456791"),
         mvp_start_date=date(2026, 7, 1),
     )
     command = _command(external_request_id="external-fixed")
@@ -247,7 +247,7 @@ async def test_service_reuses_existing_customer_for_duplicate_identity_by_nss(
     )
     service = ProcessSimulatedCustomerIntake(
         SqlAlchemyCustomerIntakeUnitOfWork(postgres_session_factory),
-        FixedRewardsIdGenerator("RWD-unused"),
+        FixedRewardsIdGenerator("123456792"),
         mvp_start_date=date(2026, 7, 1),
     )
 

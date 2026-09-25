@@ -1,12 +1,13 @@
-"""Infrastructure adapter for provisional Rewards ID generation."""
-
-from __future__ import annotations
+"""Infrastructure adapter for canonical Rewards ID generation."""
 
 import secrets
 
+MIN_REWARDS_ID = 100_000_000
+REWARDS_ID_SPACE = 900_000_000
 
-class TokenHexRewardsIdGenerator:
-    """Generate provisional opaque Rewards IDs."""
+
+class NumericRewardsIdGenerator:
+    """Generate opaque nine-digit Rewards IDs without customer-derived data."""
 
     def generate(self) -> str:
-        return f"RWD-{secrets.token_hex(16)}"
+        return str(MIN_REWARDS_ID + secrets.randbelow(REWARDS_ID_SPACE))

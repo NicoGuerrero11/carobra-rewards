@@ -1,163 +1,145 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import CouponCard from "../../components/CouponCard.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
-import type { BondaCouponCatalog, BondaCouponHistory } from "../../lib/bonda-coupon-contract";
-import { couponChannelLabel } from "../../lib/bonda-coupon-contract";
-import type { RewardsJourneySummary } from "../../lib/rewards-v2-contract";
-import { levelLabel } from "../../lib/rewards-v2-contract";
+import {
+  carobraCouponCategory,
+  couponChannelLabel,
+  type BondaCouponCatalog,
+  type BondaCouponHistory,
+} from "../../lib/bonda-coupon-contract";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 
-const user = Astro.locals.user;
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let journey: RewardsJourneySummary | null = null;
-let catalog: BondaCouponCatalog = {
-  current_level: null,
-  access_state: "PARTNER_UNAVAILABLE",
-  affiliate_state: "DISABLED",
-  items: [],
-  refreshed_at: null,
-  page: 1,
-  page_size: 50,
-  total: 0,
-  next_page: null,
-};
+const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let portalUnavailable = portalLoadedWithContext && !portal;
+let catalog: BondaCouponCatalog = emptyCatalog("PARTNER_UNAVAILABLE");
 let history: BondaCouponHistory = { items: [] };
 
-try {
-  const [journeyResponse, catalogResponse] = await Promise.all([
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/journey`, { headers: { cookie } }),
-    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons?page_size=50`, { headers: { cookie } }),
-  ]);
-  if (journeyResponse.status === 401 || catalogResponse.status === 401) {
-    return Astro.redirect("/login?error=unauthenticated");
+if (!portalLoadedWithContext) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+    else portalUnavailable = true;
+  } catch {
+    portalUnavailable = true;
   }
-  if (journeyResponse.ok) journey = (await journeyResponse.json()) as RewardsJourneySummary;
-  if (catalogResponse.ok) catalog = (await catalogResponse.json()) as BondaCouponCatalog;
-  if (catalog.access_state === "AVAILABLE") {
-    const historyResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons/history`, { headers: { cookie } });
-    if (historyResponse.ok) history = (await historyResponse.json()) as BondaCouponHistory;
-  }
-} catch {
-  // The screen keeps a truthful degraded state when Carobra or Bonda is unavailable.
 }
 
-const currentLevel = catalog.current_level ?? journey?.journey.current_level ?? null;
-const categories = [...new Set(catalog.items.map((item) => item.category).filter(Boolean))] as string[];
+if (portal) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons?page_size=50`, { headers: { cookie } });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) catalog = await response.json() as BondaCouponCatalog;
+    if (catalog.access_state === "AVAILABLE" && catalog.affiliate_state === "ACTIVE" && catalog.items.length > 0) {
+      const historyResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons/history`, { headers: { cookie } });
+      if (historyResponse.ok) history = await historyResponse.json() as BondaCouponHistory;
+    }
+  } catch {
+    catalog = emptyCatalog("PARTNER_UNAVAILABLE", portal.journey.journey.current_level);
+  }
+}
+
+const catalogItems = catalog.items.map((item) => ({ ...item, displayCategory: carobraCouponCategory(item.category) }));
+const categories = [...new Set(catalogItems.map((item) => item.displayCategory))];
 const channels = [...new Set(catalog.items.flatMap((item) => item.channels))];
+const refreshedAt = catalog.refreshed_at
+  ? new Date(catalog.refreshed_at).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })
+  : null;
 const stateContent = {
-  FEATURE_DISABLED: ["Estamos preparando tus beneficios", "La conexión está lista, pero el catálogo todavía no ha sido aprobado para clientes."],
-  NO_LEVEL: ["Tus descuentos comienzan en Bronce", "Cuando tengas un nivel activo aparecerán aquí los cupones y descuentos que te correspondan."],
+  FEATURE_DISABLED: ["Estamos preparando el catálogo", "La integración está lista, pero los beneficios todavía no han sido aprobados para clientes."],
+  NO_LEVEL: ["Tus descuentos comienzan en Bronce", "Cuando tu primer producto esté confirmado y tengas un nivel activo, aparecerán aquí los beneficios que te correspondan."],
   ACCOUNT_UNAVAILABLE: ["Tus beneficios no están disponibles", "Revisa el estado de tu cuenta para volver a consultar el catálogo."],
-  AFFILIATE_PENDING: ["Estamos activando tus beneficios", "Tu cuenta Carobra funciona normalmente. Reintentaremos la activación con Bonda sin que tengas que registrarte otra vez."],
+  AFFILIATE_PENDING: ["Estamos activando tus beneficios", "Tu cuenta funciona normalmente. Volveremos a intentar la activación con Bonda sin que tengas que registrarte otra vez."],
   COUPON_UNAVAILABLE: ["Este beneficio cambió", "Ya no se encuentra disponible en el catálogo actual."],
-  PARTNER_UNAVAILABLE: ["No pudimos cargar los beneficios", "El servicio de beneficios no respondió. Intenta nuevamente en unos minutos."],
+  PARTNER_UNAVAILABLE: ["No pudimos cargar los beneficios", "Bonda no respondió en este momento. Intenta nuevamente en unos minutos."],
   AVAILABLE: ["Aún no hay beneficios publicados", "No mostraremos marcas ni condiciones hasta que el catálogo haya sido validado."],
 }[catalog.access_state];
+
+function emptyCatalog(
+  accessState: BondaCouponCatalog["access_state"],
+  currentLevel: BondaCouponCatalog["current_level"] = null,
+): BondaCouponCatalog {
+  return {
+    current_level: currentLevel,
+    access_state: accessState,
+    affiliate_state: "DISABLED",
+    items: [],
+    refreshed_at: null,
+    page: 1,
+    page_size: 50,
+    total: 0,
+    next_page: null,
+  };
+}
 ---
 
 <ClientShellLayout title="Beneficios | Carobra Rewards" description="Cupones y descuentos disponibles para tu nivel Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Beneficios">
   <main class="benefits-page">
-    <header class="benefits-header">
-      <div><p class="benefits-kicker">Carobra Rewards</p><h1>Beneficios para disfrutar hoy</h1><p>Cupones y descuentos gratuitos que se acumulan conforme avanzas de nivel.</p></div>
-      <div class="level-chip"><span>Tu nivel</span><strong>{levelLabel(currentLevel)}</strong></div>
-    </header>
-
-    <section class="benefits-hero" aria-labelledby="benefits-hero-title">
-      <div><p class="benefits-kicker">Hola, {user?.firstName ?? "cliente"}</p><h2 id="benefits-hero-title">Tu nivel abre nuevas experiencias.</h2><p>Estos beneficios no consumen puntos. Si subes de nivel, conservas los anteriores y desbloqueas otros nuevos.</p></div>
-      <div class="hero-stat" aria-label={`${catalog.total} beneficios disponibles`}><strong>{catalog.total}</strong><span>{catalog.total === 1 ? "beneficio disponible" : "beneficios disponibles"}</span></div>
-      <span class="hero-shape hero-shape--one" aria-hidden="true"></span><span class="hero-shape hero-shape--two" aria-hidden="true"></span>
-    </section>
-
-    {catalog.items.length > 0 && (
-      <section class="benefits-catalog" aria-labelledby="catalog-title">
-        <div class="catalog-heading">
-          <div><p class="benefits-kicker">Seleccionados para ti</p><h2 id="catalog-title">Explora tus beneficios</h2></div>
-          <div class="catalog-filters" aria-label="Filtros de beneficios">
-            <label><span>Categoría</span><select id="category-filter"><option value="">Todas</option>{categories.map((category) => <option value={category}>{category}</option>)}</select></label>
-            <label><span>Cómo usarlo</span><select id="channel-filter"><option value="">Todos</option>{channels.map((channel) => <option value={channel}>{couponChannelLabel(channel)}</option>)}</select></label>
-          </div>
-        </div>
-        <div class="benefits-grid" id="benefits-grid">
-          {catalog.items.map((item) => (
-            <article class="benefit-card" data-category={item.category ?? ""} data-channels={item.channels.join(",")}>
-              <div class="benefit-card__visual">
-                {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" referrerpolicy="no-referrer" /> : <span aria-hidden="true">{item.name.slice(0, 1).toUpperCase()}</span>}
-                {item.discount && <strong>{item.discount}</strong>}
+    {portalUnavailable && !portal ? (
+      <section class="benefits-page__empty" role="status"><span aria-hidden="true">!</span><div><h1>No pudimos cargar tus beneficios</h1><p>Intenta de nuevo en unos minutos. No mostraremos opciones que no estén confirmadas para tu cuenta.</p></div></section>
+    ) : portal && (
+      <>
+        {catalog.items.length > 0 ? (
+          <section class="benefits-page__section benefits-catalog" aria-labelledby="catalog-title">
+            <div class="benefits-page__section-heading catalog-heading">
+              <div><p class="benefits-page__eyebrow">Disponible hoy</p><h1 id="catalog-title">{catalog.total === 1 ? "1 beneficio para ti" : `${catalog.total} beneficios para ti`}</h1></div>
+              <div class="catalog-filters" aria-label="Filtros de beneficios">
+                <label><span>Categoría</span><select id="category-filter"><option value="">Todos</option>{categories.map((category) => <option value={category}>{category}</option>)}</select></label>
+                <label><span>Cómo usarlo</span><select id="channel-filter"><option value="">Todos</option>{channels.map((channel) => <option value={channel}>{couponChannelLabel(channel)}</option>)}</select></label>
               </div>
-              <div class="benefit-card__body">
-                <div class="benefit-card__meta"><span>{item.category ?? "Beneficio"}</span><span>{levelLabel(item.minimumLevel)}</span></div>
-                <h3>{item.name}</h3><p>{item.shortDescription || "Consulta las condiciones y forma de uso."}</p>
-                <div class="benefit-card__channels">{item.channels.slice(0, 2).map((channel) => <span>{couponChannelLabel(channel)}</span>)}</div>
-                <button class="benefit-card__open" type="button" data-coupon-id={item.id}>Ver beneficio <span aria-hidden="true">→</span></button>
-              </div>
-            </article>
-          ))}
-        </div>
-        <p class="filter-empty" id="filter-empty" hidden>No encontramos beneficios con esos filtros.</p>
-      </section>
-    )}
+            </div>
+            {refreshedAt && <p class="catalog-freshness">Catálogo actualizado: <time datetime={catalog.refreshed_at ?? undefined}>{refreshedAt}</time></p>}
+            <div class="benefits-grid" id="benefits-grid">
+              {catalogItems.map(item => <CouponCard item={item} />)}
+            </div>
+            <p class="filter-empty" id="filter-empty" hidden>No encontramos beneficios con esos filtros.</p>
+          </section>
+        ) : (
+          <section class="benefits-page__section benefits-state" aria-live="polite">
+            <span aria-hidden="true">✦</span><div><p class="benefits-page__eyebrow">Estado del catálogo</p><h1>{stateContent[0]}</h1><p>{stateContent[1]}</p></div>
+            {catalog.access_state === "PARTNER_UNAVAILABLE" && <a href="/cliente/beneficios">Volver a intentar</a>}
+          </section>
+        )}
 
-    {catalog.items.length === 0 && (
-      <section class="benefits-state" aria-live="polite">
-        <span aria-hidden="true">✦</span><div><p class="benefits-kicker">Estado del catálogo</p><h2>{stateContent[0]}</h2><p>{stateContent[1]}</p></div>
-        {catalog.access_state === "PARTNER_UNAVAILABLE" && <a href="/cliente/beneficios">Volver a intentar</a>}
-      </section>
-    )}
-
-    <section class="benefits-footnotes">
-      <article><span aria-hidden="true">✓</span><div><h2>Sin costo en puntos</h2><p>Consultar y solicitar estos cupones no modifica tu saldo.</p></div></article>
-      <article><span aria-hidden="true">↑</span><div><h2>Beneficios acumulables</h2><p>Cada nivel conserva lo desbloqueado en los niveles anteriores.</p></div></article>
-      <a href="/cliente/gift-cards"><span aria-hidden="true">◇</span><div><h2>Gift Cards</h2><p>Se integrarán después y estarán separadas de estos descuentos.</p></div><small>Próximamente</small></a>
-    </section>
-
-    {history.items.length > 0 && (
-      <section class="coupon-history" aria-labelledby="history-title">
-        <div><p class="benefits-kicker">Tus solicitudes</p><h2 id="history-title">Cupones recientes</h2></div>
-        <ul>{history.items.map((item) => <li><div><strong>{item.name}</strong><span>{item.requestedAt ? new Date(item.requestedAt).toLocaleDateString("es-MX") : "Fecha no disponible"}</span></div><code>{item.code ?? "Consulta pendiente"}</code></li>)}</ul>
-      </section>
+        {history.items.length > 0 && (
+          <section class="benefits-page__section coupon-history" id="historial" aria-labelledby="history-title">
+            <div><p class="benefits-page__eyebrow">Tus solicitudes</p><h2 id="history-title">Cupones recientes</h2></div>
+            <ul>{history.items.map((item) => <li><div><strong>{item.name}</strong><span>{item.requestedAt ? new Date(item.requestedAt).toLocaleDateString("es-MX") : "Fecha no disponible"}</span></div><code>{item.code ?? "Verificación pendiente"}</code></li>)}</ul>
+          </section>
+        )}
+      </>
     )}
   </main>
 
-  <dialog class="benefit-dialog" id="benefit-dialog" aria-labelledby="dialog-title">
-    <button class="dialog-close" type="button" aria-label="Cerrar detalle">×</button><div class="dialog-loading" id="dialog-loading" role="status">Cargando beneficio…</div>
-    <div id="dialog-content" hidden>
-      <p class="benefits-kicker" id="dialog-category"></p><h2 id="dialog-title"></h2><strong class="dialog-discount" id="dialog-discount"></strong><p id="dialog-description"></p>
-      <dl><div><dt>Vigencia</dt><dd id="dialog-expiration"></dd></div><div><dt>Disponible en</dt><dd id="dialog-channels"></dd></div></dl>
-      <section><h3>Cómo usarlo</h3><p id="dialog-instructions"></p></section><details><summary>Términos y condiciones</summary><p id="dialog-legal"></p></details>
-      <div class="request-zone">
-        <button id="request-start" type="button">Quiero este beneficio</button>
-        <div id="request-confirmation" hidden><p>Solicitaremos un código a Bonda. Esta acción no consume puntos.</p><div><button id="request-confirm" type="button">Confirmar solicitud</button><button id="request-cancel" type="button">Cancelar</button></div></div>
-        <div id="request-result" role="status" aria-live="polite" hidden><p id="request-message"></p><div id="coupon-code-wrap" hidden><code id="coupon-code"></code><button id="copy-code" type="button">Copiar código</button></div></div>
-      </div>
-    </div>
-  </dialog>
-
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
-    import type { BondaCouponCodeResponse, BondaCouponDetailResponse } from "../../lib/bonda-coupon-contract";
+
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
     const categoryFilter = document.querySelector<HTMLSelectElement>("#category-filter");
     const channelFilter = document.querySelector<HTMLSelectElement>("#channel-filter");
-    const cards = [...document.querySelectorAll<HTMLElement>(".benefit-card")];
+    const cards = [...document.querySelectorAll<HTMLElement>(".coupon-card")];
     const filterEmpty = document.querySelector<HTMLElement>("#filter-empty");
-    const applyFilters = () => { let visible = 0; for (const card of cards) { const categoryMatches = !categoryFilter?.value || card.dataset.category === categoryFilter.value; const channelMatches = !channelFilter?.value || card.dataset.channels?.split(",").includes(channelFilter.value); card.hidden = !(categoryMatches && channelMatches); if (!card.hidden) visible += 1; } if (filterEmpty) filterEmpty.hidden = visible > 0; };
-    categoryFilter?.addEventListener("change", applyFilters); channelFilter?.addEventListener("change", applyFilters);
+    const applyFilters = () => {
+      let visible = 0;
+      for (const card of cards) {
+        const categoryMatches = !categoryFilter?.value || card.dataset.category === categoryFilter.value;
+        const channelMatches = !channelFilter?.value || card.dataset.channels?.split(",").includes(channelFilter.value);
+        card.hidden = !(categoryMatches && channelMatches);
+        if (!card.hidden) visible += 1;
+      }
+      if (filterEmpty) filterEmpty.hidden = visible > 0;
+    };
+    categoryFilter?.addEventListener("change", applyFilters);
+    channelFilter?.addEventListener("change", applyFilters);
 
-    const dialog = requireElement<HTMLDialogElement>("#benefit-dialog"); const loading = requireElement<HTMLElement>("#dialog-loading"); const content = requireElement<HTMLElement>("#dialog-content"); const requestStart = requireElement<HTMLButtonElement>("#request-start"); const confirmation = requireElement<HTMLElement>("#request-confirmation"); const requestResult = requireElement<HTMLElement>("#request-result"); const codeWrap = requireElement<HTMLElement>("#coupon-code-wrap"); const codeElement = requireElement<HTMLElement>("#coupon-code"); let selectedCouponId = "";
-    document.querySelectorAll<HTMLButtonElement>(".benefit-card__open").forEach((button) => button.addEventListener("click", async () => {
-      selectedCouponId = button.dataset.couponId ?? ""; loading.hidden = false; loading.textContent = "Cargando beneficio…"; content.hidden = true; confirmation.hidden = true; requestResult.hidden = true; requestStart.hidden = false; dialog.showModal();
-      try { const response = await fetch(`/api/v1/rewards/coupons/${encodeURIComponent(selectedCouponId)}`); if (!response.ok) throw new Error(); const result = await response.json() as BondaCouponDetailResponse; if (!result.item) throw new Error(); const item = result.item; setText("#dialog-category", item.category ?? "Beneficio"); setText("#dialog-title", item.name); setText("#dialog-discount", item.discount ?? "Beneficio exclusivo"); setText("#dialog-description", item.description || item.shortDescription); setText("#dialog-expiration", item.expirationAt ? new Date(item.expirationAt).toLocaleDateString("es-MX") : "Consulta los términos"); setText("#dialog-channels", item.channels.map(channelLabel).join(" · ") || "Consulta las condiciones"); setText("#dialog-instructions", item.usageInstructions || "Bonda mostrará las instrucciones al generar el beneficio."); setText("#dialog-legal", item.legalTerms || "Sin términos adicionales publicados."); loading.hidden = true; content.hidden = false; } catch { loading.textContent = "No pudimos cargar este beneficio. Intenta nuevamente."; }
-    }));
-    document.querySelector<HTMLButtonElement>(".dialog-close")?.addEventListener("click", () => dialog.close()); dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
-    requestStart.addEventListener("click", () => { requestStart.hidden = true; confirmation.hidden = false; }); requireElement<HTMLButtonElement>("#request-cancel").addEventListener("click", () => { confirmation.hidden = true; requestStart.hidden = false; });
-    requireElement<HTMLButtonElement>("#request-confirm").addEventListener("click", async (event) => { const button = event.currentTarget as HTMLButtonElement; button.disabled = true; requestResult.hidden = false; codeWrap.hidden = true; setText("#request-message", "Solicitando tu beneficio…"); try { const response = await fetch(`/api/v1/rewards/coupons/${encodeURIComponent(selectedCouponId)}/code`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request_id: crypto.randomUUID() }) }); const result = await response.json() as BondaCouponCodeResponse; setText("#request-message", result.instructions || statusMessage(result.status)); if (result.status === "ISSUED" && result.code) { codeElement.textContent = result.code; codeWrap.hidden = false; } } catch { setText("#request-message", "No pudimos solicitar el beneficio. Intenta más tarde."); } finally { button.disabled = false; confirmation.hidden = true; } });
-    requireElement<HTMLButtonElement>("#copy-code").addEventListener("click", async (event) => { await navigator.clipboard.writeText(codeElement.textContent ?? ""); (event.currentTarget as HTMLButtonElement).textContent = "Copiado"; });
-    function setText(selector: string, value: string) { requireElement<HTMLElement>(selector).textContent = value; }
-    function channelLabel(channel: string) { return ({ ONLINE: "En línea", ONSITE: "En sucursal", EMAIL: "Correo", PHONE: "Teléfono", WHATSAPP: "WhatsApp" } as Record<string, string>)[channel] ?? channel; }
-    function statusMessage(status: BondaCouponCodeResponse["status"]) { return ({ ISSUED: "Tu beneficio está listo.", LIMIT_REACHED: "Ya alcanzaste el límite temporal de este beneficio.", INVENTORY_UNAVAILABLE: "No hay códigos disponibles por ahora.", UNAVAILABLE: "El beneficio no está disponible en este momento.", VERIFICATION_REQUIRED: "Estamos verificando si tu código fue generado." })[status]; }
   </script>
 
   <style>
-    .benefits-page{width:min(1180px,calc(100% - 2rem));margin:0 auto;padding:2rem 0 5rem;color:#183c5d}.benefits-kicker{margin:0;color:#7258a5;font-size:.7rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.benefits-header{display:flex;align-items:end;justify-content:space-between;gap:2rem;margin-bottom:1.4rem}.benefits-header h1{max-width:760px;margin:.3rem 0 .45rem;color:#173c61;font-size:clamp(2.5rem,5.5vw,4.8rem);line-height:.94;letter-spacing:-.055em}.benefits-header>div>p:last-child{margin:0;color:#617b92}.level-chip{flex:0 0 auto;display:grid;gap:.12rem;padding:.75rem 1.1rem;border-radius:1.1rem;background:#eee9ff}.level-chip span{font-size:.67rem;font-weight:800;text-transform:uppercase}.level-chip strong{color:#694f9e;font-size:1.15rem}.benefits-hero{position:relative;isolation:isolate;display:grid;grid-template-columns:1fr auto;align-items:end;gap:2rem;min-height:21rem;padding:clamp(1.5rem,5vw,3.5rem);overflow:hidden;border-radius:2.2rem;color:#fff;background:linear-gradient(125deg,#6050a5,#397bad 52%,#38b7a8);box-shadow:0 26px 60px rgba(43,76,124,.2)}.benefits-hero>div,.hero-stat{position:relative;z-index:2}.benefits-hero .benefits-kicker{color:#dcd3ff}.benefits-hero h2{max-width:650px;margin:.55rem 0 .9rem;font-size:clamp(2.7rem,6vw,5.4rem);line-height:.88;letter-spacing:-.06em}.benefits-hero div>p:last-child{max-width:650px;margin:0;color:#e6f4f5;line-height:1.6}.hero-stat{width:12rem;padding:1.3rem;border:1px solid rgba(255,255,255,.24);border-radius:1.5rem;background:rgba(255,255,255,.12);backdrop-filter:blur(10px)}.hero-stat strong{display:block;font-size:4rem;line-height:.9}.hero-stat span{display:block;margin-top:.6rem;font-size:.77rem;font-weight:800}.hero-shape{position:absolute;z-index:1;border-radius:50%;opacity:.65}.hero-shape--one{width:11rem;height:11rem;right:9rem;top:-5rem;background:#ffd37e}.hero-shape--two{width:8rem;height:8rem;left:-3rem;bottom:-3rem;background:#ef8797}.benefits-catalog{margin-top:3.5rem}.catalog-heading{display:flex;align-items:end;justify-content:space-between;gap:2rem;margin-bottom:1.25rem}.catalog-heading h2,.coupon-history h2{margin:.25rem 0 0;font-size:2rem;letter-spacing:-.035em}.catalog-filters{display:flex;gap:.75rem}.catalog-filters label{display:grid;gap:.25rem;color:#59738a;font-size:.68rem;font-weight:800}.catalog-filters select{min-width:10rem;padding:.7rem 2rem .7rem .8rem;border:1px solid #cad8e2;border-radius:.8rem;color:#234c6e;background:#fff}.benefits-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.benefit-card{min-width:0;overflow:hidden;border:1px solid rgba(30,71,101,.1);border-radius:1.5rem;background:#fff;box-shadow:0 15px 35px rgba(25,66,96,.08)}.benefit-card[hidden]{display:none}.benefit-card__visual{position:relative;height:11rem;display:grid;place-items:center;background:linear-gradient(145deg,#edf8f6,#ece8ff)}.benefit-card__visual img{width:100%;height:100%;object-fit:cover}.benefit-card__visual>span{display:grid;place-items:center;width:5rem;height:5rem;border-radius:1.4rem;color:#6c55a2;background:#fff;font-size:2.4rem;font-weight:950;box-shadow:0 12px 30px rgba(75,62,119,.14)}.benefit-card__visual>strong{position:absolute;right:.8rem;bottom:.8rem;padding:.45rem .65rem;border-radius:.65rem;color:#fff;background:#eb7d78;font-size:.85rem}.benefit-card__body{padding:1.15rem}.benefit-card__meta,.benefit-card__channels{display:flex;flex-wrap:wrap;gap:.4rem}.benefit-card__meta span,.benefit-card__channels span{padding:.32rem .5rem;border-radius:999px;color:#527187;background:#edf5f7;font-size:.63rem;font-weight:850}.benefit-card__meta span:last-child{color:#6a4d9d;background:#eee8ff}.benefit-card h3{margin:.8rem 0 .45rem;font-size:1.45rem;letter-spacing:-.025em}.benefit-card p{min-height:3.9em;margin:0 0 .8rem;color:#657f93;font-size:.86rem;line-height:1.5}.benefit-card__open{width:100%;display:flex;justify-content:space-between;margin-top:1rem;padding:.8rem 0 0;border:0;border-top:1px solid #e5ecef;color:#235e7d;background:none;font-weight:900;cursor:pointer}.filter-empty{padding:2rem;border-radius:1rem;text-align:center;background:#f5f8fa}.benefits-state{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1.2rem;margin-top:1.2rem;padding:1.5rem;border:1px dashed #b8cad8;border-radius:1.5rem;background:#fff}.benefits-state>span{display:grid;place-items:center;width:3.5rem;height:3.5rem;border-radius:50%;color:#7057a3;background:#eee8ff;font-size:1.3rem}.benefits-state h2{margin:.25rem 0 .35rem}.benefits-state div>p:last-child{margin:0;color:#647d91}.benefits-state a{padding:.7rem .9rem;border-radius:.8rem;color:#fff;background:#2d6f91;text-decoration:none;font-weight:800}.benefits-footnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1rem}.benefits-footnotes article,.benefits-footnotes>a{display:grid;grid-template-columns:auto 1fr;gap:.8rem;align-items:start;padding:1.2rem;border-radius:1.3rem;background:#eef8f5;color:inherit;text-decoration:none}.benefits-footnotes>a{position:relative;background:#fff2e3}.benefits-footnotes>*>span{display:grid;place-items:center;width:2.2rem;height:2.2rem;border-radius:.7rem;color:#fff;background:#39a490;font-weight:900}.benefits-footnotes>a>span{background:#ef9776}.benefits-footnotes h2{margin:0 0 .3rem;font-size:1rem}.benefits-footnotes p{margin:0;color:#647d91;font-size:.78rem;line-height:1.45}.benefits-footnotes small{position:absolute;right:1rem;top:1rem;color:#9c5c46;font-weight:850}.coupon-history{margin-top:3rem}.coupon-history ul{display:grid;gap:.6rem;padding:0;list-style:none}.coupon-history li{display:flex;justify-content:space-between;gap:1rem;padding:1rem 1.2rem;border-radius:1rem;background:#fff}.coupon-history li div{display:grid;gap:.2rem}.coupon-history li span{color:#718698;font-size:.75rem}.coupon-history code{align-self:center;padding:.4rem .6rem;border-radius:.5rem;background:#edf5f7}.benefit-dialog{width:min(650px,calc(100% - 1rem));max-height:90vh;padding:2rem;border:0;border-radius:1.5rem;color:#193e60;box-shadow:0 30px 90px rgba(20,45,70,.35)}.benefit-dialog::backdrop{background:rgba(12,31,48,.62);backdrop-filter:blur(4px)}.dialog-close{position:absolute;right:1rem;top:1rem;width:2.3rem;height:2.3rem;border:0;border-radius:50%;font-size:1.4rem;cursor:pointer}.dialog-loading{padding:3rem;text-align:center}.benefit-dialog h2{margin:.3rem 2.5rem .5rem 0;font-size:2.3rem;letter-spacing:-.04em}.dialog-discount{display:inline-block;margin:.25rem 0 .8rem;padding:.4rem .6rem;border-radius:.6rem;color:#9a4e4c;background:#ffe4df}.benefit-dialog dl{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}.benefit-dialog dl div{padding:.8rem;border-radius:.8rem;background:#f2f7f8}.benefit-dialog dt{font-size:.67rem;font-weight:900;text-transform:uppercase}.benefit-dialog dd{margin:.25rem 0 0}.benefit-dialog section{margin:1rem 0;padding:1rem;border-left:3px solid #48aa9c;background:#eef8f5}.benefit-dialog section h3{margin:0 0 .4rem}.benefit-dialog section p,.benefit-dialog details p{white-space:pre-line}.benefit-dialog details{padding:1rem 0;border-top:1px solid #dbe5ea}.benefit-dialog summary{font-weight:850;cursor:pointer}.request-zone{margin-top:1rem}.request-zone>button,.request-zone div button{padding:.8rem 1rem;border:0;border-radius:.8rem;color:#fff;background:#6751a1;font-weight:850;cursor:pointer}.request-zone button:disabled{opacity:.6}.request-zone div button+button{color:#516b7e;background:#edf2f4}.request-zone>div{padding:1rem;border-radius:1rem;background:#f5f7fa}.request-zone>div div{display:flex;gap:.5rem}.request-zone code{font-size:1rem;font-weight:850}.filter-empty[hidden],#dialog-content[hidden],#dialog-loading[hidden],#request-confirmation[hidden],#request-result[hidden],#coupon-code-wrap[hidden],#request-start[hidden]{display:none}
-    @media(max-width:860px){.benefits-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.benefits-footnotes{grid-template-columns:1fr 1fr}.benefits-footnotes>a{grid-column:span 2}.catalog-heading{align-items:flex-start;flex-direction:column}}@media(max-width:600px){.benefits-page{width:min(100% - 1rem,1180px);padding-top:1rem}.benefits-header{align-items:flex-start;flex-direction:column}.benefits-hero{grid-template-columns:1fr;min-height:auto;padding:1.4rem;border-radius:1.5rem}.benefits-hero h2{font-size:3.1rem}.hero-stat{width:100%}.benefits-grid,.benefits-footnotes{grid-template-columns:1fr}.benefits-footnotes>a{grid-column:auto}.catalog-filters{width:100%;flex-direction:column}.catalog-filters label,.catalog-filters select{width:100%}.benefits-state{grid-template-columns:auto 1fr}.benefits-state a{grid-column:2;justify-self:start}.benefit-dialog{padding:1.3rem}.benefit-dialog dl{grid-template-columns:1fr}.coupon-history li{align-items:flex-start;flex-direction:column}}
+    .benefits-page{width:min(74rem,calc(100% - 2.2rem));margin:0 auto;padding:1.5rem 0 4rem;color:#173f68}.benefits-page__welcome{display:flex;justify-content:space-between;align-items:end;gap:1.5rem;margin-bottom:1.25rem}.benefits-page__welcome h1{margin:.2rem 0 .3rem;font-size:clamp(2.7rem,6vw,4.8rem);line-height:.92;letter-spacing:-.055em}.benefits-page__welcome div>p:last-child{margin:0;color:#627b91}.benefits-page__welcome>span,.benefits-page__tags span{padding:.48rem .72rem;border-radius:.55rem;font-size:.72rem;font-weight:850}.benefits-page__welcome>span{color:#004b87;background:#dff5fd}.benefits-page__eyebrow{margin:0;color:#004b87;font-size:.68rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.benefits-page__hero{display:grid;grid-template-columns:minmax(0,1fr) 18rem;align-items:end;gap:2rem;padding:clamp(1.5rem,5vw,3.4rem);border-radius:1.15rem;color:#041c2c;background:#fff;box-shadow:0 8px 18px rgba(4,28,44,.07)}.benefits-page__hero h2{max-width:42rem;margin:.4rem 0 .8rem;font-size:clamp(2.8rem,7vw,5.6rem);line-height:.87;letter-spacing:-.06em}.benefits-page__hero>div>p:not(.benefits-page__eyebrow){max-width:43rem;margin:0;color:#536878;line-height:1.65}.benefits-page__tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.2rem}.benefits-page__tags span{border:1px solid #cbd7df;background:#f2f8fc;color:#004b87}.benefits-page__wallet{padding:1.45rem;border-radius:.85rem;color:#153b60;background:#f2f8fc}.benefits-page__wallet>span{color:#b88416;font-size:1.6rem}.benefits-page__wallet p{margin:.9rem 0 .25rem;color:#7e7890;font-size:.68rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.benefits-page__wallet strong{display:block;margin-bottom:.5rem;font-size:3rem;line-height:1}.benefits-page__wallet strong small{font-size:.8rem}.benefits-page__wallet>small{display:block;color:#607990;line-height:1.4}.benefits-page__wallet a{display:inline-block;margin-top:1rem;color:#004b87;font-size:.78rem;font-weight:900}.benefits-page__section{margin-top:1rem;padding:clamp(1.4rem,4vw,2.2rem);border-radius:1.15rem;background:#fff;box-shadow:0 15px 34px rgba(39,52,91,.07)}.benefits-page__section-heading{display:flex;justify-content:space-between;align-items:end;gap:2rem}.benefits-page__section-heading h2,.coupon-history h2{margin:.3rem 0 0;font-size:clamp(1.4rem,3vw,2rem)}.benefits-page__section-heading>p{max-width:31rem;margin:0;color:#627b90;line-height:1.55}.catalog-heading{align-items:center}.catalog-filters{display:flex;gap:.65rem}.catalog-filters label{display:grid;gap:.25rem;color:#607990;font-size:.68rem;font-weight:850}.catalog-filters select{min-width:10rem;padding:.65rem 2rem .65rem .7rem;border:1px solid #cbd7df;border-radius:.55rem;color:#173f68;background:#fff}.catalog-freshness{margin:.7rem 0 0;color:#758898;font-size:.72rem}.benefits-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-top:1.3rem}.filter-empty{padding:1.5rem;text-align:center;background:#f2f8fc}.benefits-state{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem}.benefits-state>span{width:2.8rem;height:2.8rem;display:grid;place-items:center;border-radius:50%;color:#004b87;background:#dff5fd}.benefits-state h2{margin:.25rem 0}.benefits-state div>p:last-child{margin:0;color:#627b90}.benefits-state>a{padding:.7rem .9rem;border-radius:.55rem;color:#fff;background:#041c2c;font-size:.8rem;font-weight:850}.benefits-page__available-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:.8rem;margin-top:1.3rem}.benefit-card{min-height:14rem;display:flex;flex-direction:column;padding:1.25rem;border-radius:.85rem;background:#f2f8fc}.benefit-card>span{width:2.3rem;height:2.3rem;display:grid;place-items:center;border-radius:.55rem;font-size:.75rem;font-weight:900}.benefit-card>div{margin-top:1rem}.benefit-card small{color:#39809c;font-size:.68rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.benefit-card h3{margin:.3rem 0;color:#173f68;font-size:1.35rem}.benefit-card p{margin:0;color:#607990;font-size:.86rem;line-height:1.55}.benefit-card>strong{margin-top:auto;padding-top:1rem;color:#176f9e;font-size:.8rem;font-weight:900}.benefit-card--learning>span{color:#004b87;background:#dff5fd}.benefit-card--future>span{color:#91622b;background:#fff0d7}.benefit-card--future>strong{color:#8a735a}.coupon-history ul{display:grid;gap:.6rem;margin:1rem 0 0;padding:0;list-style:none}.coupon-history li{display:flex;justify-content:space-between;gap:1rem;padding:.9rem;border-radius:.7rem;background:#f2f8fc}.coupon-history li div{display:grid;gap:.2rem}.coupon-history li span{color:#718698;font-size:.75rem}.coupon-history code{align-self:center;padding:.4rem .6rem;border-radius:.45rem;background:#fff}.benefits-page__empty{display:flex;align-items:center;gap:1rem;padding:1.5rem;border-radius:1.3rem;background:#fff}.benefits-page__empty>span{width:2.5rem;height:2.5rem;display:grid;place-items:center;border-radius:50%;background:#fde7df;font-weight:900}.benefits-page__empty h2{margin:0}.benefits-page__empty p{margin:.3rem 0 0;color:#627b90}.filter-empty[hidden]{display:none}@media(max-width:1050px){.benefits-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:850px){.benefits-page__hero{grid-template-columns:1fr}.benefits-page__wallet{width:min(100%,22rem)}.catalog-heading{align-items:flex-start;flex-direction:column}}@media(max-width:700px){.benefits-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.benefits-page{width:min(100% - 1.1rem,74rem);padding-top:1rem}.benefits-page__welcome,.benefits-page__section-heading{align-items:flex-start;flex-direction:column}.benefits-page__hero{padding:1.35rem}.benefits-page__hero h2{font-size:3.2rem}.benefits-page__wallet{width:100%}.benefits-grid,.benefits-page__available-grid{grid-template-columns:1fr}.catalog-filters{width:100%;flex-direction:column}.catalog-filters label,.catalog-filters select{width:100%}.benefits-state{grid-template-columns:auto 1fr}.benefits-state>a{grid-column:2;justify-self:start}.coupon-history li{align-items:flex-start;flex-direction:column}}
+    .catalog-heading h1{margin:.3rem 0 0;font-size:clamp(1.65rem,3vw,2.25rem)}
+    .benefits-state h1,.benefits-page__empty h1{margin:.25rem 0;font-size:clamp(1.45rem,3vw,2rem)}
   </style>
 </ClientShellLayout>

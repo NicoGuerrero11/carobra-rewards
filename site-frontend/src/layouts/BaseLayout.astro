@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+import "../styles/brand-app.css";
+import "../styles/brand-public.css";
 
 interface Props {
   title?: string;
@@ -7,9 +9,12 @@ interface Props {
 }
 
 const {
-  title = "Carobra Rewards | Registro y validación AFORE",
-  description = "Registra tu cuenta de Carobra Rewards y consulta el estado de tu validación AFORE.",
+  title = "Carobra Rewards | Tu relación con Carobra te da más",
+  description = "Únete a Carobra Rewards, consulta tu nivel, suma puntos y descubre los beneficios disponibles para ti.",
 } = Astro.props as Props;
+
+const isApplicationSurface = Astro.url.pathname !== "/";
+const isPublicLanding = Astro.url.pathname === "/";
 ---
 
 <!doctype html>
@@ -19,9 +24,11 @@ const {
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>{title}</title>
   </head>
-  <body>
+  <body class:list={{ "carobra-app": isApplicationSurface, "carobra-public": isPublicLanding }}>
     <slot />
   </body>
 </html>

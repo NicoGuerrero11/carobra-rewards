@@ -16,6 +16,7 @@ site/
 *.egg-info/
 .tmp/
 .pnpm-store/
+node_modules
 
 # Local environment files
 .env
@@ -32,6 +33,8 @@ docs/*
 !docs/rewards-http-contracts.md
 !docs/rewards-operations-runbook.md
 !docs/rewards-scheduler-runbook.md
+!docs/bonda-courses-reconciliation.md
+!docs/course-video-progress.md
 
 # Generated partner deliverables
 deliverables/sisca-uat/Guia-preparacion-UAT-SISCA-Carobra-Rewards.docx

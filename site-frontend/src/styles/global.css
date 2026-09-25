@@ -83,7 +83,7 @@ a {
 
 .client-shell__right { gap: 0.5rem; }
 
-.client-shell__notification-link {
+.client-shell__utility-link {
   position: relative;
   width: 2.45rem;
   height: 2.45rem;
@@ -96,21 +96,48 @@ a {
   transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
 }
 
-.client-shell__notification-link:hover,
-.client-shell__notification-link:focus-visible,
-.client-shell__notification-link.is-active {
+.client-shell__utility-link:hover,
+.client-shell__utility-link:focus-visible,
+.client-shell__utility-link.is-active {
   color: #6754a6;
   border-color: #c9bdec;
   background: #f1edff;
   transform: translateY(-1px);
 }
 
-.client-shell__notification-link:focus-visible {
+.client-shell__utility-link:focus-visible {
   outline: 3px solid rgba(58,145,182,.25);
   outline-offset: 2px;
 }
 
-.client-shell__notification-link svg { width: 1.2rem; height: 1.2rem; }
+.client-shell__utility-link svg { width: 1.2rem; height: 1.2rem; }
+
+.client-shell__utility-link::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  z-index: 40;
+  padding: 0.38rem 0.52rem;
+  border-radius: 0.42rem;
+  color: #fff;
+  background: #041c2c;
+  box-shadow: 0 6px 14px rgba(4, 28, 44, 0.18);
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -0.2rem);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.client-shell__utility-link:hover::after,
+.client-shell__utility-link:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
 
 .client-shell__left {
   gap: 0.6rem;
@@ -143,6 +170,7 @@ a {
 .client-shell__nav-link {
   display: inline-flex;
   align-items: center;
+  gap: 0.38rem;
   border-radius: 999px;
   padding: 0.58rem 0.9rem;
   color: #3a526d;
@@ -151,6 +179,25 @@ a {
   letter-spacing: -0.01em;
   white-space: nowrap;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.client-shell__nav-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: currentColor;
+  background: rgba(64, 100, 131, 0.08);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.client-shell__nav-link.is-active .client-shell__nav-icon,
+.client-shell__mobile-link.is-active .client-shell__nav-icon {
+  background: rgba(255, 255, 255, 0.17);
 }
 
 .client-shell__nav-link:hover {
@@ -290,7 +337,9 @@ a {
 }
 
 .client-shell__mobile-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   border-radius: 0.72rem;
   padding: 0.64rem 0.72rem;
   color: #1e4169;

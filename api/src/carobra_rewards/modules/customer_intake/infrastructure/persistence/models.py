@@ -94,6 +94,10 @@ class AuthSessionModel(TimestampMixin, Base):
 class CustomerModel(TimestampMixin, Base):
     __tablename__ = "customers"
     __table_args__ = (
+        CheckConstraint(
+            "rewards_id ~ '^[1-9][0-9]{8}$'",
+            name="ck_customers_rewards_id_numeric",
+        ),
         UniqueConstraint("rewards_id", name="uq_customers_rewards_id"),
         UniqueConstraint("curp", name="uq_customers_curp"),
         UniqueConstraint("auth_user_id", name="uq_customers_auth_user_id"),

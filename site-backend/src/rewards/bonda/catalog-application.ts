@@ -9,6 +9,7 @@ import type { RewardsV2RuleLookupPort } from "../v2/configuration.js";
 import type {
   BondaAffiliateIntegrationState,
   BondaCouponCatalogHttpResponse,
+  BondaCouponBranchesHttpResponse,
   BondaCouponCodeHttpResponse,
   BondaCouponCodeStatus,
   BondaCouponDetail,
@@ -132,8 +133,9 @@ export class BondaCouponApplicationError extends Error {
 }
 
 export interface BondaCouponHttpApplication {
-  getCatalog(identity: BondaCouponCustomerIdentity, page?: number, pageSize?: number): Promise<BondaCouponCatalogHttpResponse>;
+  getCatalog(identity: BondaCouponCustomerIdentity, page?: number, pageSize?: number, previewOnly?: boolean): Promise<BondaCouponCatalogHttpResponse>;
   getDetail(identity: BondaCouponCustomerIdentity, couponId: string): Promise<BondaCouponDetailHttpResponse>;
+  getBranches(identity: BondaCouponCustomerIdentity, couponId: string): Promise<BondaCouponBranchesHttpResponse>;
   requestCode(identity: BondaCouponCustomerIdentity, couponId: string, requestId?: string): Promise<BondaCouponCodeHttpResponse>;
   getHistory(identity: BondaCouponCustomerIdentity): Promise<BondaReceivedCouponsHttpResponse>;
 }
@@ -149,15 +151,17 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     private readonly clock: Clock,
     private readonly generateRequestId: () => string = randomUUID,
     private readonly catalogReader?: BondaCatalogReader,
+    private readonly catalogAffiliateCode?: string,
   ) {}
 
   async getCatalog(
     identity: BondaCouponCustomerIdentity,
     page = 1,
     pageSize = 20,
+    previewOnly = false,
   ): Promise<BondaCouponCatalogHttpResponse> {
     validatePage(page, pageSize);
-    const context = await this.readContext(identity);
+    const context = await this.readContext(identity, previewOnly);
     if (context.accessState !== "AVAILABLE") {
       return assertBondaCouponCatalogContract({
         current_level: context.journey?.currentLevel ?? null,
@@ -172,9 +176,10 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
       });
     }
     try {
+      const catalogAffiliateCode = this.catalogIdentity(identity);
       const snapshot = this.catalogReader
-        ? await this.catalogReader.read(identity.rewardsId)
-        : { items: await this.gateway.listCoupons(identity.rewardsId), refreshedAt: this.clock.now() };
+        ? await this.catalogReader.read(catalogAffiliateCode, context.policies.map((policy) => policy.bondaCouponId))
+        : { items: await this.gateway.listCoupons(catalogAffiliateCode), refreshedAt: this.clock.now() };
       const items = applyPolicies(snapshot.items, context.policies, context.journey!.currentLevel!, this.clock.now());
       const offset = (page - 1) * pageSize;
       return assertBondaCouponCatalogContract({
@@ -212,12 +217,18 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     const policy = eligiblePolicy(context.policies, couponId, context.journey.currentLevel!);
     if (!policy) return detailUnavailable(context.affiliateState);
     try {
-      const live = await this.gateway.getCoupon(identity.rewardsId, couponId);
+      const catalogAffiliateCode = this.catalogIdentity(identity);
+      const snapshot = this.catalogReader
+        ? await this.catalogReader.read(catalogAffiliateCode, context.policies.map((candidate) => candidate.bondaCouponId))
+        : null;
+      const live = snapshot
+        ? snapshot.items.find((candidate) => candidate.id === couponId) ?? null
+        : await this.gateway.getCoupon(catalogAffiliateCode, couponId);
       if (!live || isExpired(live, this.clock.now())) return detailUnavailable(context.affiliateState);
       return assertBondaCouponDetailContract({
         access_state: "AVAILABLE",
         affiliate_state: context.affiliateState,
-        item: applyPolicy(live, policy),
+        item: applyPolicy({ ...live, branches: [] }, policy),
       });
     } catch (error) {
       if (error instanceof BondaGatewayError) {
@@ -231,12 +242,34 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     }
   }
 
+  async getBranches(
+    identity: BondaCouponCustomerIdentity,
+    couponId: string,
+  ): Promise<BondaCouponBranchesHttpResponse> {
+    const context = await this.requireAvailableContext(identity);
+    const policy = eligiblePolicy(context.policies, couponId, context.journey.currentLevel!);
+    if (!policy) throw accessError("coupon_unavailable", "El beneficio no está disponible.", 404);
+    try {
+      const affiliateCode = this.catalogIdentity(identity);
+      const items = this.catalogReader
+        ? await this.catalogReader.readBranches(affiliateCode, couponId)
+        : await this.gateway.listCouponBranches(affiliateCode, couponId);
+      return { items };
+    } catch (error) {
+      if (error instanceof BondaGatewayError) return { items: [] };
+      throw error;
+    }
+  }
+
   async requestCode(
     identity: BondaCouponCustomerIdentity,
     couponId: string,
     requestId = this.generateRequestId(),
   ): Promise<BondaCouponCodeHttpResponse> {
     const context = await this.requireAvailableContext(identity);
+    if (context.affiliateState !== "ACTIVE") {
+      throw accessError("affiliate_pending", "Estamos activando tus beneficios.", 409);
+    }
     const policy = eligiblePolicy(context.policies, couponId, context.journey.currentLevel!);
     if (!policy) throw accessError("coupon_unavailable", "El beneficio no está disponible.", 404);
     const started = await this.requests.begin({
@@ -249,7 +282,7 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     if (started.replayed) return replayResponse(started.request);
 
     try {
-      const live = await this.gateway.getCoupon(identity.rewardsId, couponId);
+      const live = await this.gateway.getCoupon(this.catalogIdentity(identity), couponId);
       if (!live || isExpired(live, this.clock.now())) {
         throw new BondaGatewayError("COUPON_UNAVAILABLE", "Coupon is unavailable", false);
       }
@@ -291,6 +324,9 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     identity: BondaCouponCustomerIdentity,
   ): Promise<BondaReceivedCouponsHttpResponse> {
     const context = await this.requireAvailableContext(identity);
+    if (context.affiliateState !== "ACTIVE") {
+      throw accessError("affiliate_pending", "Estamos activando tus beneficios.", 409);
+    }
     const items = await this.gateway.listReceivedCoupons(identity.rewardsId);
     await this.reconcileVerificationRequired(identity.customerId, items);
     const allowedIds = new Set(context.policies
@@ -341,7 +377,7 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     };
   }
 
-  private async readContext(identity: BondaCouponCustomerIdentity): Promise<{
+  private async readContext(identity: BondaCouponCustomerIdentity, previewOnly = false): Promise<{
     journey: BondaCouponJourney | null;
     policies: readonly BondaCouponPolicyRecord[];
     affiliateState: BondaAffiliateIntegrationState;
@@ -361,14 +397,23 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     if (journey.state === "INVITED" || !journey.currentLevel) {
       return { journey, policies: [], affiliateState: "DISABLED", accessState: "NO_LEVEL" };
     }
+    // Inicio is discovery only: never provision a customer affiliate on a home visit.
+    if (previewOnly) {
+      if (!this.catalogAffiliateCode) return { journey, policies: [], affiliateState: "DISABLED", accessState: "AFFILIATE_PENDING" };
+      return { journey, policies: await this.policies.listEffective(now), affiliateState: "DISABLED", accessState: "AVAILABLE" };
+    }
     const [affiliate, policies] = await Promise.all([
       this.affiliateProvisioning.ensureForBenefits(identity),
       this.policies.listEffective(now),
     ]);
-    if (affiliate.state !== "ACTIVE") {
+    if (affiliate.state !== "ACTIVE" && !this.catalogAffiliateCode) {
       return { journey, policies, affiliateState: affiliate.state, accessState: "AFFILIATE_PENDING" };
     }
-    return { journey, policies, affiliateState: "ACTIVE", accessState: "AVAILABLE" };
+    return { journey, policies, affiliateState: affiliate.state, accessState: "AVAILABLE" };
+  }
+
+  private catalogIdentity(identity: BondaCouponCustomerIdentity): string {
+    return this.catalogAffiliateCode ?? identity.rewardsId;
   }
 }
 

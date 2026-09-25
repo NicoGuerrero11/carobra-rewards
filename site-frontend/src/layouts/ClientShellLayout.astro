@@ -1,10 +1,13 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
+import ClientNavIcon from "../components/ClientNavIcon.astro";
 
 interface NavItem {
-  id: "rewards" | "prizes" | "courses" | "giftCards";
+  id: "home" | "benefits" | "courses" | "products" | "activity";
   label: string;
   href: string;
+  activePaths: string[];
+  icon: NavItem["id"];
 }
 
 interface Props {
@@ -22,14 +25,18 @@ const {
 } = Astro.props as Props;
 
 const navItems: NavItem[] = [
-  { id: "rewards", label: "Rewards", href: "/cliente/recompensas" },
-  { id: "prizes", label: "Recompensas", href: "/cliente/beneficios" },
-  { id: "courses", label: "Cursos", href: "/cliente/cursos" },
-  { id: "giftCards", label: "Gift Cards", href: "/cliente/gift-cards" },
+  { id: "home", label: "Inicio", href: "/cliente/recompensas", activePaths: ["/cliente/recompensas"], icon: "home" },
+  { id: "benefits", label: "Beneficios", href: "/cliente/beneficios", activePaths: ["/cliente/beneficios", "/cliente/gift-cards"], icon: "benefits" },
+  { id: "courses", label: "Cursos", href: "/cliente/cursos", activePaths: ["/cliente/cursos"], icon: "courses" },
+  { id: "products", label: "Productos", href: "/cliente/productos", activePaths: ["/cliente/productos"], icon: "products" },
+  { id: "activity", label: "Actividad", href: "/cliente/activities", activePaths: ["/cliente/activities"], icon: "activity" },
 ];
 
+const mobileNavItems = navItems;
+const unreadCount = Astro.locals.rewardsPortal?.notifications.unread_count ?? 0;
+
 function isActive(item: NavItem) {
-  return currentPath.startsWith(item.href);
+  return item.activePaths.some((path) => currentPath === path || currentPath.startsWith(`${path}/`));
 }
 ---
 
@@ -38,7 +45,7 @@ function isActive(item: NavItem) {
     <header class="client-shell__topnav">
       <div class="client-shell__topnav-inner">
         <div class="client-shell__left">
-          <a href="/cliente" class="client-shell__brand-link" aria-label="Carobra inicio cliente" data-astro-prefetch="hover">
+          <a href="/cliente/recompensas" class="client-shell__brand-link" aria-label="Carobra inicio cliente">
             <img
               src="/images/carobra-logo-horizontal-cropped.png"
               alt="Carobra Consultores Especializados"
@@ -49,26 +56,17 @@ function isActive(item: NavItem) {
           </a>
         </div>
 
-        <button
-          id="client-shell-menu-toggle"
-          class="client-shell__menu-toggle"
-          type="button"
-          aria-expanded="false"
-          aria-label="Abrir menú de navegación"
-        >
-          <span aria-hidden="true">☰</span>
-          <span>Menú</span>
-        </button>
-
         <nav class:list={["client-shell__nav", "client-shell__nav--center"]} aria-label={`Navegación cliente · ${sectionLabel}`}>
           {
             navItems.map((item) =>
               isActive(item) ? (
                 <span class:list={["client-shell__nav-link", "is-active"]} aria-current="page">
+                  <span class="client-shell__nav-icon"><ClientNavIcon name={item.icon} /></span>
                   <span>{item.label}</span>
                 </span>
               ) : (
-                <a href={item.href} class="client-shell__nav-link" data-astro-prefetch="hover">
+                <a href={item.href} class="client-shell__nav-link">
+                  <span class="client-shell__nav-icon"><ClientNavIcon name={item.icon} /></span>
                   <span>{item.label}</span>
                 </a>
               ),
@@ -78,17 +76,28 @@ function isActive(item: NavItem) {
 
         <div class="client-shell__right">
           <a
-            class:list={["client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
+            class:list={["client-shell__utility-link", currentPath === "/cliente/ayuda" && "is-active"]}
+            href="/cliente/ayuda"
+            aria-label="Ayuda"
+            aria-current={currentPath === "/cliente/ayuda" ? "page" : undefined}
+            data-tooltip="Ayuda"
+            title="Ayuda"
+          >
+            <ClientNavIcon name="help" />
+          </a>
+          <a
+            class:list={["client-shell__utility-link", "client-shell__notification-link", currentPath === "/cliente/notificaciones" && "is-active"]}
             href="/cliente/notificaciones"
-            data-astro-prefetch="hover"
-            aria-label="Ver notificaciones"
+            aria-label={unreadCount > 0 ? `Ver notificaciones, ${unreadCount} sin leer` : "Ver notificaciones"}
             aria-current={currentPath === "/cliente/notificaciones" ? "page" : undefined}
+            data-tooltip="Notificaciones"
             title="Notificaciones"
           >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M6.8 10.2a5.2 5.2 0 0 1 10.4 0c0 5.8 2.3 6.3 2.3 6.3H4.5s2.3-.5 2.3-6.3Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
               <path d="M10 19h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
             </svg>
+            {unreadCount > 0 && <span class="client-shell__notification-count" aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </a>
           <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
@@ -102,32 +111,31 @@ function isActive(item: NavItem) {
             </button>
 
             <div id="client-shell-user-menu" class="client-shell__user-menu" hidden>
-              <a class="client-shell__user-menu-link" href="/cliente/perfil" data-astro-prefetch="hover">Mi cuenta</a>
-              <a class="client-shell__user-menu-link" href="mailto:soporte@carobra.mx">Ayuda y soporte</a>
+              <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
           </div>
         </div>
       </div>
+    </header>
 
-      <div id="client-shell-mobile-menu" class="client-shell__mobile-menu" hidden>
-        <nav class="client-shell__mobile-nav" aria-label={`Navegación móvil cliente · ${sectionLabel}`}>
+    <nav class="client-shell__bottom-nav" aria-label={`Navegación móvil cliente · ${sectionLabel}`}>
           {
-            navItems.map((item) =>
+            mobileNavItems.map((item) =>
               isActive(item) ? (
-                <span class:list={["client-shell__mobile-link", "is-active"]} aria-current="page">
+                <span class:list={["client-shell__bottom-link", "is-active"]} aria-current="page">
+                  <span class="client-shell__nav-icon"><ClientNavIcon name={item.icon} /></span>
                   <span>{item.label}</span>
                 </span>
               ) : (
-                <a href={item.href} class="client-shell__mobile-link" data-astro-prefetch="hover">
+                <a href={item.href} class="client-shell__bottom-link">
+                  <span class="client-shell__nav-icon"><ClientNavIcon name={item.icon} /></span>
                   <span>{item.label}</span>
                 </a>
               ),
             )
           }
-        </nav>
-      </div>
-    </header>
+    </nav>
 
     <div class="client-shell__content">
       <slot />
@@ -135,12 +143,9 @@ function isActive(item: NavItem) {
   </div>
 
   <script>
-    const topNav = document.querySelector<HTMLElement>(".client-shell__topnav");
     const userMenuRoot = document.querySelector<HTMLElement>("#client-shell-user");
     const userMenuToggle = document.querySelector<HTMLButtonElement>("#client-shell-user-toggle");
     const userMenu = document.querySelector<HTMLElement>("#client-shell-user-menu");
-    const mobileMenuToggle = document.querySelector<HTMLButtonElement>("#client-shell-menu-toggle");
-    const mobileMenu = document.querySelector<HTMLElement>("#client-shell-mobile-menu");
 
     const closeUserMenu = () => {
       if (!userMenu || !userMenuToggle) {
@@ -149,15 +154,6 @@ function isActive(item: NavItem) {
 
       userMenu.hidden = true;
       userMenuToggle.setAttribute("aria-expanded", "false");
-    };
-
-    const closeMobileMenu = () => {
-      if (!mobileMenu || !mobileMenuToggle) {
-        return;
-      }
-
-      mobileMenu.hidden = true;
-      mobileMenuToggle.setAttribute("aria-expanded", "false");
     };
 
     if (userMenuRoot && userMenuToggle && userMenu) {
@@ -171,7 +167,6 @@ function isActive(item: NavItem) {
           return;
         }
 
-        closeMobileMenu();
         userMenu.hidden = false;
         userMenuToggle.setAttribute("aria-expanded", "true");
       });
@@ -190,48 +185,6 @@ function isActive(item: NavItem) {
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
           closeUserMenu();
-          closeMobileMenu();
-        }
-      });
-    }
-
-    if (mobileMenuToggle && mobileMenu) {
-      mobileMenuToggle.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const shouldOpen = mobileMenu.hidden;
-        if (!shouldOpen) {
-          closeMobileMenu();
-          return;
-        }
-
-        closeUserMenu();
-        mobileMenu.hidden = false;
-        mobileMenuToggle.setAttribute("aria-expanded", "true");
-      });
-
-      mobileMenu.addEventListener("click", (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
-          return;
-        }
-
-        if (target.closest("a")) {
-          closeMobileMenu();
-        }
-      });
-    }
-
-    if (topNav) {
-      document.addEventListener("click", (event) => {
-        const target = event.target;
-        if (!(target instanceof Node)) {
-          return;
-        }
-
-        if (!topNav.contains(target)) {
-          closeMobileMenu();
         }
       });
     }

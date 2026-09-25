@@ -1,4 +1,5 @@
 import type {
+  BondaCouponBranch,
   BondaCouponChannel,
   BondaCouponDetail,
   BondaReceivedCoupon,
@@ -53,11 +54,14 @@ export function normalizeCoupon(
   const channelRecord = asOptionalRecord(raw.usar_en);
   const imageRecord = asOptionalRecord(raw.foto_principal);
   const thumbnailRecord = asOptionalRecord(raw.foto_thumbnail);
-  const imageUrl = approvedHttpsUrl(
-    imageRecord?.["280x190"] ?? imageRecord?.original
-      ?? thumbnailRecord?.["90x90"] ?? thumbnailRecord?.original,
-    allowedImageHosts,
-  );
+  const bannerRecord = asOptionalRecord(raw.foto_apaisada);
+  const companyRecord = asOptionalRecord(raw.empresa);
+  const heroImageUrl = approvedHttpsUrl(imageRecord?.original, allowedImageHosts)
+    ?? approvedHttpsUrl(imageRecord?.["280x190"], allowedImageHosts);
+  const logoImageUrl = approvedHttpsUrl(thumbnailRecord?.original, allowedImageHosts)
+    ?? approvedHttpsUrl(thumbnailRecord?.["90x90"], allowedImageHosts);
+  const bannerImageUrl = approvedHttpsUrl(bannerRecord?.original, allowedImageHosts)
+    ?? approvedHttpsUrl(bannerRecord?.["240x80"], allowedImageHosts);
 
   return {
     id,
@@ -67,12 +71,53 @@ export function normalizeCoupon(
     description: htmlToSafeText(raw.descripcion_micrositio, MAX_TEXT_LENGTH),
     usageInstructions: htmlToSafeText(raw.usage_instructions, MAX_TEXT_LENGTH),
     legalTerms: htmlToSafeText(raw.legales, MAX_TEXT_LENGTH),
+    brandDescription: htmlToSafeText(companyRecord?.descripcion, MAX_TEXT_LENGTH),
+    branches: [],
     expirationAt: normalizePartnerDate(raw.fecha_vencimiento),
-    imageUrl,
+    imageUrl: heroImageUrl ?? logoImageUrl,
+    heroImageUrl,
+    logoImageUrl,
+    bannerImageUrl,
     category: firstCategory ? optionalSafeText(firstCategory.nombre, 120) : null,
     channels: normalizeChannels(channelRecord),
     minimumLevel: "BRONZE",
     displayOrder: 0,
+  };
+}
+
+export function normalizeCouponBranch(value: unknown): BondaCouponBranch {
+  const raw = asRecord(value);
+  const locality = asOptionalRecord(raw.localidad ?? raw.ciudad);
+  const province = asOptionalRecord(raw.provincia ?? raw.estado);
+  const coordinateSource = raw.coordenadas ?? raw.coordinates ?? raw.ubicacion ?? raw.location;
+  const coordinateRecord = asOptionalRecord(coordinateSource);
+  const coordinatePair = Array.isArray(coordinateSource) ? coordinateSource : [];
+  const latitude = optionalCoordinate(
+    raw.latitud ?? raw.latitude ?? raw.lat ?? raw.geo_lat
+      ?? coordinateRecord?.latitud ?? coordinateRecord?.latitude ?? coordinateRecord?.lat
+      ?? coordinatePair[1],
+    -90,
+    90,
+  );
+  const longitude = optionalCoordinate(
+    raw.longitud ?? raw.longitude ?? raw.lng ?? raw.lon ?? raw.geo_lng ?? raw.geo_lon
+      ?? coordinateRecord?.longitud ?? coordinateRecord?.longitude ?? coordinateRecord?.lng
+      ?? coordinateRecord?.lon ?? coordinatePair[0],
+    -180,
+    180,
+  );
+  const hasCoordinatePair = latitude !== null && longitude !== null;
+  const id = optionalString(raw.id ?? raw.sucursal_id)
+    ?? [raw.nombre, raw.direccion].map((part) => optionalString(part)).filter(Boolean).join(":");
+  if (!id) throw invalidResponse("Bonda branch identity is invalid");
+  return {
+    id,
+    name: optionalSafeText(raw.nombre ?? raw.name, 160) ?? "Sucursal",
+    address: optionalSafeText(raw.direccion ?? raw.address, 500) ?? "",
+    city: optionalSafeText(locality?.nombre ?? raw.localidad ?? raw.ciudad, 160),
+    state: optionalSafeText(province?.nombre ?? raw.provincia ?? raw.estado, 160),
+    latitude: hasCoordinatePair ? latitude : null,
+    longitude: hasCoordinatePair ? longitude : null,
   };
 }
 
@@ -113,6 +158,15 @@ function stringField(record: Record<string, unknown>, key: string): string {
 function optionalSafeText(value: unknown, maximum: number): string | null {
   const normalized = htmlToSafeText(value, maximum);
   return normalized || null;
+}
+
+function optionalCoordinate(value: unknown, minimum: number, maximum: number): number | null {
+  const numeric = typeof value === "number"
+    ? value
+    : typeof value === "string"
+      ? Number(value.trim().replace(",", "."))
+      : Number.NaN;
+  return Number.isFinite(numeric) && numeric >= minimum && numeric <= maximum ? numeric : null;
 }
 
 function normalizePartnerDate(value: unknown): string | null {

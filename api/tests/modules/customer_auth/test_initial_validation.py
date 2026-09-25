@@ -48,7 +48,7 @@ def _registration() -> RegistrationResult:
     return RegistrationResult(
         customer=CustomerProfile(
             id=CUSTOMER_ID,
-            rewards_id="RWD-test",
+            rewards_id="345678901",
             curp="ABCD123456HMNLRS09",
             first_name="Ada",
             last_name="Lovelace",

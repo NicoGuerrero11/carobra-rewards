@@ -1,132 +1,122 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import "../../styles/customer-activity.css";
 
-const user = Astro.locals.user;
-
-const clientUser = {
-  id: user?.id ?? "",
-  firstName: user?.firstName ?? "",
-  lastName: user?.lastName ?? "",
-  email: user?.email ?? "",
-};
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let portal: RewardsCustomerPortal | null = null;
+let unavailable = false;
+try {
+  const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+  if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+  else unavailable = true;
+} catch {
+  unavailable = true;
+}
+const timeline = portal?.timeline ?? [];
+const movements = portal?.movement_details.movements ?? [];
+const dateTime = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const points = (value: string) => new Intl.NumberFormat("es-MX").format(BigInt(value));
+const movementTitle = (code: string) => ({ V2_INVITED_REGISTRATION: "Bienvenida a Carobra Rewards", V2_INITIAL_PRODUCT_ACTIVE: "Primer producto validado", REGISTRATION_ACTIVATION: "Bienvenida a Carobra Rewards", ISSUANCE: "Puntos obtenidos", CONSUMPTION: "Canje de puntos", EXPIRATION: "Puntos vencidos", ADJUSTMENT: "Ajuste de puntos", REFUND: "Reembolso" })[code] ?? "Movimiento de puntos";
 ---
 
-<ClientShellLayout
-  title="Actividades | Carobra"
-  description="Historial de actividad del cliente en Carobra Rewards."
-  currentPath="/cliente/activities"
-  sectionLabel="Actividades"
->
-  <main
-    id="activities-root"
-    data-user={JSON.stringify(clientUser)}
-    class="client-page client-page--soft-separators client-activities-page"
-  >
-    <section class="client-card client-activities-hero client-section--roomy">
-      <h1 class="client-section-title">Historial de actividades</h1>
-      <p class="client-activities-hero__description">
-        Aquí puedes revisar en detalle los movimientos recientes de tu cuenta:
-        redenciones, actualizaciones de perfil y eventos operativos validados.
-      </p>
-    </section>
+<ClientShellLayout title="Actividad | Carobra Rewards" description="Historial y movimientos confirmados de tu cuenta Rewards." currentPath="/cliente/activities" sectionLabel="Actividad">
+  <main class="customer-activity">
+    <header class="customer-activity__welcome">
+      <p class="customer-activity__eyebrow">Tu cuenta Rewards</p>
+      <h1>Actividad</h1>
+      <p>Los cambios de tu cuenta y tus movimientos de puntos, en un solo lugar.</p>
+    </header>
 
-    <section class="client-card client-activities-timeline-wrap client-section--roomy">
-      <div class="client-activities-timeline-head">
-        <h2 class="text-2xl font-extrabold text-[#14355f]">Timeline</h2>
-        <a href="/cliente" class="client-section-link">Volver al dashboard</a>
-      </div>
-      <ul id="activities-list" class="client-activities-timeline"></ul>
-    </section>
-  </main>
+    {unavailable && !portal ? (
+      <section class="customer-activity__unavailable" role="status">
+        <span class="customer-activity__notice-icon" aria-hidden="true">!</span>
+        <div>
+          <h2>No pudimos cargar tu actividad</h2>
+          <p>Tu historial sigue protegido. Intenta de nuevo en unos minutos.</p>
+          <a href="/cliente/activities">Volver a intentar <span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+    ) : portal && (
+      <>
+        <dl class="customer-activity__summary" aria-label="Resumen de tu actividad">
+          <div class="customer-activity__balance">
+            <dt>Saldo disponible</dt>
+            <dd>{points(portal.journey.points.available)} <span>pts</span></dd>
+          </div>
+          <div>
+            <dt>Eventos de cuenta</dt>
+            <dd>{timeline.length} <span>en este historial</span></dd>
+          </div>
+          <div>
+            <dt>Movimientos de puntos</dt>
+            <dd>{movements.length} <span>en este historial</span></dd>
+          </div>
+        </dl>
 
-  <script>
-    import { getActivityHistory, loadClientDemoState } from "../../lib/client-demo-state";
-    import { attachLogoutHandler, requireElement, resolveAuthenticatedClientIdentity } from "../../lib/client-page-utils";
-
-    const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000";
-    const root = requireElement<HTMLElement>("#activities-root");
-    const logoutButton = requireElement<HTMLButtonElement>("#logout");
-    const activitiesList = requireElement<HTMLUListElement>("#activities-list");
-
-    let user = JSON.parse(root.getAttribute("data-user") ?? "{}");
-
-    const formatDateTime = new Intl.DateTimeFormat("es-MX", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    function getTypeLabel(type: string) {
-      if (type === "redencion") {
-        return "Redención";
-      }
-
-      if (type === "perfil") {
-        return "Perfil";
-      }
-
-      if (type === "notificacion") {
-        return "Notificación";
-      }
-
-      return "Actividad";
-    }
-
-    function getTypeClass(type: string) {
-      if (type === "redencion") {
-        return "is-redencion";
-      }
-
-      if (type === "perfil") {
-        return "is-perfil";
-      }
-
-      if (type === "notificacion") {
-        return "is-notificacion";
-      }
-
-      return "is-actividad";
-    }
-
-    function render() {
-      const state = loadClientDemoState(user);
-      const history = getActivityHistory(state);
-
-      activitiesList.innerHTML =
-        history.length === 0
-          ? `
-              <li class="client-activities-empty">
-                Aún no hay actividad registrada en esta sesión.
-              </li>
-            `
-          : history
-              .map(
-                (item) => `
-                  <li class="client-activities-item">
-                    <div class="client-activities-item__dot" aria-hidden="true"></div>
-                    <div class="client-activities-item__card">
-                      <div class="client-activities-item__head">
-                        <p class="client-activities-item__title">${item.title}</p>
-                        <div class="client-activities-item__badges">
-                          <span class="client-activities-badge ${getTypeClass(item.type)}">${getTypeLabel(item.type)}</span>
-                          <span class="client-activities-badge is-status">${item.status}</span>
-                        </div>
-                      </div>
-                      <p class="client-activities-item__description">${item.description}</p>
-                      <p class="client-activities-item__timestamp">${formatDateTime.format(new Date(item.createdAt))}</p>
+        <div class="customer-activity__columns">
+          <section class="customer-activity__panel" aria-labelledby="timeline-title">
+            <header class="customer-activity__panel-heading">
+              <span class="customer-activity__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6M12 8v5l3 2" /></svg>
+              </span>
+              <div><h2 id="timeline-title">Cambios en tu cuenta</h2><p>Del evento más reciente al más antiguo.</p></div>
+            </header>
+            {timeline.length ? (
+              <ol class="customer-activity__timeline">
+                {timeline.map((entry) => (
+                  <li>
+                    <span class="customer-activity__dot" aria-hidden="true"></span>
+                    <div>
+                      <h3>{entry.title}</h3>
+                      <p>{entry.description}</p>
+                      <time datetime={entry.occurred_at}>{dateTime(entry.occurred_at)}</time>
                     </div>
                   </li>
-                `,
-              )
-              .join("");
-    }
+                ))}
+              </ol>
+            ) : (
+              <div class="customer-activity__empty"><h3>Aún no hay eventos</h3><p>Las confirmaciones de cuenta aparecerán aquí cuando estén disponibles.</p></div>
+            )}
+          </section>
 
-    attachLogoutHandler(logoutButton, API_BASE_URL);
-
-    void (async () => {
-      user = await resolveAuthenticatedClientIdentity(API_BASE_URL, user);
-      render();
-    })();
+          <section class="customer-activity__panel" aria-labelledby="movements-title">
+            <header class="customer-activity__panel-heading">
+              <span class="customer-activity__icon customer-activity__icon--points" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /></svg>
+              </span>
+              <div><h2 id="movements-title">Movimientos de puntos</h2><p>Entradas y salidas registradas.</p></div>
+            </header>
+            {movements.length ? (
+              <ul class="customer-activity__movements">
+                {movements.map((movement) => {
+                  const delta = BigInt(movement.points_delta);
+                  return (
+                    <li>
+                      <div><h3>{movementTitle(movement.code)}</h3><time datetime={movement.occurred_at}>{dateTime(movement.occurred_at)}</time></div>
+                      <div class="customer-activity__amount" data-kind={delta < 0n ? "debit" : delta > 0n ? "credit" : "neutral"}>
+                        <strong>{delta >= 0n ? "+" : ""}{points(movement.points_delta)} <span>pts</span></strong>
+                        <small>{delta < 0n ? "Cargo" : delta > 0n ? "Abono" : "Sin cambio"}</small>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div class="customer-activity__empty"><h3>Sin movimientos</h3><p>Tus puntos aparecerán con fecha y motivo cuando exista actividad.</p></div>
+            )}
+            {portal.journey.modules.expiry_policy_approved && portal.journey.points.next_expiration_at && (
+              <p class="customer-activity__expiry">Próximo vencimiento: <time datetime={portal.journey.points.next_expiration_at}>{dateTime(portal.journey.points.next_expiration_at)}</time></p>
+            )}
+          </section>
+        </div>
+      </>
+    )}
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
   </script>
 </ClientShellLayout>

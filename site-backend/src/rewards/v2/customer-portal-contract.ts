@@ -135,12 +135,21 @@ function inspectCustomerValue(value: unknown, path: string): void {
   }
 }
 
-export function journeyStateHelp(state: RewardsJourneyState, level: RewardsLevel | null): CustomerHelpItem[] {
+export function journeyStateHelp(
+  state: RewardsJourneyState,
+  level: RewardsLevel | null,
+  validationStatus?: string,
+): CustomerHelpItem[] {
+  const invitedBody = validationStatus === "CANCELLED"
+    ? "Tu cuenta Rewards sigue disponible como Invitado hasta que podamos confirmar un producto activo."
+    : validationStatus === "REQUIRES_ATTENTION"
+      ? "Tu cuenta sigue como Invitado mientras Carobra revisa la información de tu producto."
+      : "Carobra está confirmando tu primer producto. Puedes consultar tu cuenta mientras terminamos.";
   const stateHelp: Record<RewardsJourneyState, CustomerHelpItem> = {
     INVITED: {
       id: "validation-pending",
       title: "¿Qué estamos validando?",
-      body: "Carobra está confirmando tu primer producto. Puedes consultar tu cuenta mientras terminamos.",
+      body: invitedBody,
     },
     ACTIVE: {
       id: "active-account",

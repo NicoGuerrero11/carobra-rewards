@@ -9,11 +9,30 @@ test("Bonda configuration is disabled and credential-optional by default", () =>
   assert.equal(bonda.catalogEnabled, false);
   assert.equal(bonda.affiliateProvisioningEnabled, false);
   assert.equal(bonda.couponRequestsEnabled, false);
-  assert.equal(bonda.catalogCacheTtlMs, 60_000);
-  assert.equal(bonda.catalogCacheMaxStaleMs, 300_000);
+  assert.equal(bonda.localPreviewEnabled, false);
+  assert.equal(bonda.catalogCacheTtlMs, 300_000);
+  assert.equal(bonda.catalogCacheMaxStaleMs, 1_800_000);
   assert.equal(bonda.micrositeId, undefined);
   assert.equal(bonda.couponApiKey, undefined);
   assert.equal(bonda.affiliateToken, undefined);
+  assert.equal(bonda.catalogAffiliateCode, undefined);
+});
+
+test("Bonda local preview is isolated from production and does not require live credentials", () => {
+  const preview = loadConfig({
+    NODE_ENV: "development",
+    BONDA_CATALOG_ENABLED: "true",
+    BONDA_LOCAL_PREVIEW_ENABLED: "true",
+  }).bonda;
+  assert.equal(preview?.localPreviewEnabled, true);
+
+  assert.throws(
+    () => loadConfig({
+      NODE_ENV: "production",
+      BONDA_LOCAL_PREVIEW_ENABLED: "true",
+    }),
+    /forbidden in production/,
+  );
 });
 
 test("Bonda catalog cache requires a bounded stale window", () => {
@@ -61,11 +80,13 @@ test("Bonda capabilities can be enabled independently", () => {
     BONDA_ALLOWED_IMAGE_HOSTS: "assets-test.example",
     BONDA_MICROSITE_ID: "microsite-test",
     BONDA_COUPON_API_KEY: "coupon-key-test",
+    BONDA_CATALOG_AFFILIATE_CODE: "990910001",
     BONDA_CATALOG_ENABLED: "true",
   }).bonda;
   assert.ok(bonda);
   assert.equal(bonda.catalogEnabled, true);
   assert.equal(bonda.couponRequestsEnabled, false);
   assert.equal(bonda.affiliateProvisioningEnabled, false);
+  assert.equal(bonda.catalogAffiliateCode, "990910001");
   assert.deepEqual(bonda.allowedHosts, ["bonda-test.example"]);
 });

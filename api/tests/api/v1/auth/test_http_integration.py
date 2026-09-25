@@ -20,7 +20,7 @@ class FixedRewardsIdGenerator:
 
     def generate(self) -> str:
         self._next += 1
-        return f"RWD-http-{self._next}"
+        return str(500_000_000 + self._next)
 
 
 def _payload(**overrides: object) -> dict[str, object]:

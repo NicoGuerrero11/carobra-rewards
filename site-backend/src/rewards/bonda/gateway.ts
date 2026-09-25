@@ -1,4 +1,4 @@
-import type { BondaCouponDetail, BondaReceivedCoupon } from "./contracts.js";
+import type { BondaCouponBranch, BondaCouponDetail, BondaReceivedCoupon } from "./contracts.js";
 
 export interface BondaAffiliateResult {
   state: "ACTIVE" | "ALREADY_EXISTS";
@@ -16,6 +16,7 @@ export interface BondaGateway {
   affiliateExists(rewardsId: string): Promise<boolean>;
   listCoupons(affiliateCode: string): Promise<readonly BondaCouponDetail[]>;
   getCoupon(affiliateCode: string, couponId: string): Promise<BondaCouponDetail | null>;
+  listCouponBranches(affiliateCode: string, couponId: string): Promise<readonly BondaCouponBranch[]>;
   requestCouponCode(
     affiliateCode: string,
     couponId: string,

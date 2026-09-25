@@ -2,18 +2,9 @@
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 
 const user = Astro.locals.user;
-const eligibility = Astro.locals.rewardsEligibility;
-const isInactive = eligibility?.reason === "customer_inactive"
-  || user?.customerStatus === "INACTIVE";
-const statusLabel = isInactive
-    ? "Cuenta inactiva"
-    : "Pendiente de validación";
-const validationTitle = isInactive
-    ? "Cuenta inactiva"
-    : "Tu producto está en validación";
-const validationMessage = isInactive
-    ? "Tu cuenta no está activa actualmente. Contacta a soporte para revisar el estado de tu servicio antes de acceder a Rewards."
-    : "Tu cuenta ya fue registrada. Carobra está confirmando tu primer producto y te avisará cuando exista una actualización.";
+const statusLabel = "Miembro invitado";
+const validationTitle = "Tu producto está pendiente de confirmación";
+const validationMessage = "Tu cuenta Rewards sigue disponible como Invitado. Puedes recorrer todas las secciones mientras Carobra confirma un producto activo; las acciones que requieren validación permanecerán deshabilitadas.";
 ---
 
 <ClientShellLayout
@@ -29,7 +20,7 @@ const validationMessage = isInactive
           <p class="client-home-hero__kicker">Cuenta Carobra Rewards</p>
           <h1>Hola, {user?.firstName ?? "cliente"}</h1>
           <p class="mt-3 max-w-2xl text-sm text-[#dcecff] sm:text-base">
-            Tu acceso a Rewards se habilitará cuando la validación de tu servicio AFORE quede completada.
+            Ya puedes consultar tu experiencia Rewards como Invitado mientras confirmamos tu primer producto.
           </p>
         </div>
         <article class="client-card min-w-0 p-5 sm:min-w-[18rem]" aria-label="Estado de cuenta">
@@ -53,9 +44,9 @@ const validationMessage = isInactive
       </article>
 
       <aside class="client-card p-6" aria-labelledby="pending-access-title">
-        <h2 id="pending-access-title" class="text-xl font-extrabold text-[#14355f]">Mientras validamos</h2>
+        <h2 id="pending-access-title" class="text-xl font-extrabold text-[#14355f]">Mientras confirmamos tu producto</h2>
         <p class="mt-3 text-sm leading-6 text-[#4f6f90]">
-          Tu saldo, formas de ganar, beneficios y redenciones permanecerán protegidos hasta que cumplas la elegibilidad.
+          Puedes consultar tu saldo, productos, beneficios y actividad. El canje y otras acciones que requieren un producto confirmado seguirán protegidos.
         </p>
         <a class="mt-5 inline-flex font-bold text-[#0c5f9e]" href="mailto:soporte@carobra.mx">Contactar soporte</a>
       </aside>

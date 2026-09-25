@@ -1,0 +1,78 @@
+---
+import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import { getSiteBackendBaseUrl } from "../../lib/api";
+import { productOffers } from "../../lib/product-offers";
+import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import type { RewardsV2ProductStatus } from "../../lib/rewards-v2-contract";
+import "../../styles/products-showcase.css";
+
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let unavailable = false;
+if (!portal) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
+      headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
+    });
+    if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
+    if (response.ok) portal = await response.json() as RewardsCustomerPortal;
+    else unavailable = true;
+  } catch { unavailable = true; }
+}
+const products = portal?.products ?? [];
+const activeProducts = products.filter((product) => product.status === "ACTIVE").length;
+const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(value));
+const statusLabel = (status: RewardsV2ProductStatus) => ({ ACTIVE: "Activo", PENDING: "En validación", SIGNED: "Firmado", REJECTED: "No aprobado", CANCELLED: "Cancelado", ENDED: "Finalizado" })[status];
+---
+
+<ClientShellLayout title="Productos | Carobra Rewards" description="Descubre soluciones para tus objetivos y consulta tus productos Carobra." currentPath="/cliente/productos" sectionLabel="Productos">
+  <main class="portal-page product-showcase">
+    <header class="showcase-intro">
+      <div><p class="showcase-kicker">Productos · Carobra</p><h1>Da el siguiente paso.</h1><p>Para tus planes, tu tranquilidad y tu futuro.</p></div>
+      <a class="showcase-account-link" href="#mis-productos">Mis productos <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <section aria-labelledby="solutions-title">
+      <h2 id="solutions-title" class="showcase-sr-only">Nuestras soluciones</h2>
+      <div class="showcase-grid">
+        {productOffers.map((offer) => (
+          <article id={`producto-${offer.id}`} style="scroll-margin-top:7rem" class:list={["showcase-card", `brand-${offer.id}`]} aria-labelledby={`offer-${offer.id}`}>
+            <div class="showcase-card__brand">
+              <div class="showcase-card__mark">
+                {offer.logo ? <img src={offer.logo} width={offer.logoWidth} height={offer.logoHeight} alt={offer.name} /> : <div class="showcase-service-mark"><span>Modalidad</span><strong>40<span aria-hidden="true">.</span></strong></div>}
+              </div>
+              <div class="showcase-card__themes" aria-hidden="true">{offer.themes.map(theme => <span>{theme}</span>)}</div>
+            </div>
+            <div class="showcase-card__body">
+              <h3 id={`offer-${offer.id}`} class="showcase-sr-only">{offer.name}</h3>
+              <p class="showcase-card__category">{offer.category}</p>
+              <p class="showcase-card__headline">{offer.headline}</p>
+              <p class="showcase-card__description">{offer.description}</p>
+              <div class="showcase-card__action">
+                <p class="showcase-card__reward"><span aria-hidden="true">✦</span><strong>+{offer.displayRewardPoints}</strong><span>puntos Rewards</span></p>
+                <a class="showcase-primary" href={offer.contactHref} aria-label={`${offer.contactLabel} (${offer.name}), contactar por correo`}>{offer.contactLabel} <span aria-hidden="true">→</span></a>
+                <span>Contacto por correo</span>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <section class="showcase-account" id="mis-productos" aria-labelledby="account-title">
+      <div class="showcase-section-heading"><h2 id="account-title">Mis productos</h2>{portal && <span>{activeProducts} {activeProducts === 1 ? "activo" : "activos"}</span>}</div>
+      {unavailable && !portal ? <p class="showcase-account__empty" role="status">No pudimos cargar tus productos. Puedes seguir explorando las soluciones e intentar de nuevo más tarde.</p> : products.length ? (
+        <ul class="showcase-account__list">{products.map((product) => (
+          <li><details><summary><span><h3>{product.label}</h3><span class:list={["showcase-status", `status-${product.status.toLowerCase()}`]}>{product.status_label || statusLabel(product.status)}</span></span><span class="showcase-account__toggle">Ver detalle <span aria-hidden="true">+</span></span></summary>
+            <div class="showcase-account__detail"><p>{product.guidance}</p><dl><div><dt>Efecto en tu nivel</dt><dd>{product.level_impact}</dd></div>{product.activated_at && <div><dt>Confirmado desde</dt><dd>{date(product.activated_at)}</dd></div>}{product.ended_at && <div><dt>Finalizado</dt><dd>{date(product.ended_at)}</dd></div>}</dl></div>
+          </details></li>
+        ))}</ul>
+      ) : <div class="showcase-account__empty"><strong>Aún no hay productos confirmados</strong><p>Cuando se confirme tu primer producto, podrás consultar aquí su estado.</p></div>}
+    </section>
+
+    <footer class="showcase-advisor"><div><h2>Hablemos de lo que quieres lograr.</h2><p>Da el siguiente paso con el equipo Carobra.</p></div><a href="mailto:soporte@carobra.mx?subject=Quiero%20orientaci%C3%B3n%20sobre%20productos%20Carobra" aria-label="Contactar a un asesor por correo">Contactar a un asesor <span aria-hidden="true">↗</span></a></footer>
+  </main>
+  <script>
+    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
+    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+  </script>
+</ClientShellLayout>

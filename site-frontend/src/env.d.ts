@@ -20,6 +20,7 @@ declare namespace App {
       sisca_validation_status: string | null;
       afore_relation_status: string | null;
     };
+    rewardsPortal?: import("./lib/rewards-customer-portal-contract").RewardsCustomerPortal | null;
   }
 }
 
