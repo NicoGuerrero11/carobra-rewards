@@ -3,6 +3,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { RewardsApiClient, SiteApiError, type FetchImplementation } from "./api-client.js";
 import type { SiteBackendConfig } from "./config.js";
+import type { CoursesApplication } from './rewards/courses/application.js';
+import { CourseError } from './rewards/courses/types.js';
 import type {
   CustomerProfile,
   LoginRequest,
@@ -70,6 +72,7 @@ export function createSiteBackendServer(
   rewardsCustomerPortalApplication?: RewardsCustomerPortalApplication,
   bondaAffiliateProvisioningApplication?: BondaAffiliateProvisioningHttpApplication,
   bondaCouponApplication?: BondaCouponHttpApplication,
+  coursesApplication?: CoursesApplication,
 ): Server {
   const client = new RewardsApiClient(config, fetchImplementation);
   const rewardsV2TestScenarios = new RewardsV2TestScenarioApplication();
@@ -88,6 +91,7 @@ export function createSiteBackendServer(
       bondaCouponApplication,
       rewardsV2TestScenarios,
       customerContextCache,
+      coursesApplication,
     );
   });
 }
@@ -105,6 +109,7 @@ async function routeRequest(
   bondaCouponApplication: BondaCouponHttpApplication | undefined,
   rewardsV2TestScenarios: RewardsV2TestScenarioApplication,
   customerContextCache: CustomerContextCache,
+  coursesApplication: CoursesApplication | undefined,
 ): Promise<void> {
   try {
     const method = request.method ?? "GET";
@@ -288,6 +293,34 @@ async function routeRequest(
       sendJson(response, 200, { updated });
       return;
     }
+    const progressMatch = path.match(/^\/api\/v1\/rewards\/courses\/([1-9]\d{0,9})\/progress$/);
+    if ((method === 'GET' || method === 'POST') && progressMatch) {
+      response.setHeader('cache-control','private, no-store');
+      if (method === 'POST' && (request.headers['x-carobra-action'] !== 'course-progress'
+        || !request.headers['content-type']?.startsWith('application/json'))) throw new CourseError(403,'invalid_progress_request');
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (!coursesApplication) throw new CourseError(503,'courses_unavailable');
+      const customerId = asCustomerId(evidence.data.customer_id);
+      const courseId = Number(progressMatch[1]);
+      sendJson(response,200,method === 'GET'
+        ? await coursesApplication.getProgress(customerId,courseId)
+        : await coursesApplication.saveProgress(customerId,courseId,await readJsonBody<unknown>(request)));
+      return;
+    }
+    if (method === 'GET' && (path === '/api/v1/rewards/courses' || path.startsWith('/api/v1/rewards/courses/'))) {
+      response.setHeader('cache-control', 'private, no-store');
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (!coursesApplication) throw new CourseError(503, 'courses_unavailable');
+      const customerId = asCustomerId(evidence.data.customer_id);
+      if (path === '/api/v1/rewards/courses') {
+        sendJson(response, 200, await coursesApplication.list(customerId));
+      } else {
+        const match = path.match(/^\/api\/v1\/rewards\/courses\/([1-9]\d{0,9})$/);
+        if (!match) throw new CourseError(404, 'course_not_found');
+        sendJson(response, 200, await coursesApplication.detail(customerId, Number(match[1])));
+      }
+      return;
+    }
     if (method === "GET" && path === "/api/v1/rewards/coupons") {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
       const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
@@ -406,6 +439,10 @@ async function routeRequest(
 
     sendJson(response, 404, { error: { code: "not_found", message: "Route not found" } });
   } catch (error: unknown) {
+    if (error instanceof CourseError) {
+      sendJson(response, error.status, {error: {code: error.code, message: 'Course content is unavailable'}});
+      return;
+    }
     if (error instanceof InvalidRequestError) {
       sendJson(response, 400, { error: { code: "invalid_request", message: error.message } });
       return;
