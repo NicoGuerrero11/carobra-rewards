@@ -12,7 +12,9 @@ test("landing keeps dual CTA hierarchy and compliant copy", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Experiencia financiera con acompañamiento personal" })).toBeVisible();
   await expect(page.getByText("14 años de experiencia", { exact: true })).toBeVisible();
   await expect(page.getByText("Más de 2,000 asesores", { exact: true })).toBeVisible();
-  await expect(page.getByText("El video institucional se incorporará al recibir el archivo aprobado.")).toBeVisible();
+  await expect(page.getByText("El video institucional se incorporará al recibir el archivo aprobado.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "14 años acompañando decisiones financieras" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reproducir video institucional de Carobra" })).toBeVisible();
   for (const product of ["Skandia", "Quálitas", "Modalidad 40", "Infinity"]) {
     await expect(page.getByRole("heading", { name: product })).toBeVisible();
   }

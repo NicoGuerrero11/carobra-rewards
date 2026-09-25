@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import InstitutionalVideo from "../components/InstitutionalVideo.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -8,8 +9,6 @@ const navLinks = [
   { label: "Quiénes somos", href: "#quienes-somos" },
   { label: "Confianza", href: "#confianza" },
 ];
-
-const institutionalVideoUrl = import.meta.env.PUBLIC_CAROBRA_INSTITUTIONAL_VIDEO_URL?.trim() ?? "";
 
 const publicProducts = [
   { name: "Skandia", category: "Ahorro e inversión", description: "Soluciones para construir objetivos patrimoniales de largo plazo con acompañamiento personal.", className: "is-skandia" },
@@ -93,22 +92,7 @@ const timelineSteps = [
             </div>
           </div>
 
-          {institutionalVideoUrl ? (
-            <div class="hero-media hero-media--video">
-              <video controls preload="metadata" aria-label="Video institucional de Carobra de 90 segundos">
-                <source src={institutionalVideoUrl} />
-                Tu navegador no puede reproducir este video.
-              </video>
-            </div>
-          ) : (
-            <aside class="hero-media" aria-label="Presentación institucional de Carobra">
-              <span>Conoce Carobra</span>
-              <h2>14 años acompañando decisiones financieras</h2>
-              <p>Descubre quiénes somos, cómo trabajamos y por qué miles de personas confían en nuestra red de asesores.</p>
-              <a href="#quienes-somos">Conocer nuestra trayectoria</a>
-              <small>El video institucional se incorporará al recibir el archivo aprobado.</small>
-            </aside>
-          )}
+          <InstitutionalVideo />
         </div>
       </section>
 
