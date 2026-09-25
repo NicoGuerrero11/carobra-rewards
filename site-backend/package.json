@@ -15,6 +15,7 @@
     "rewards:v2:backfill": "npm run build && node dist/src/rewards/v2/backfill-cli.js",
     "rewards:v2:normalize-test-balances": "npm run build && node dist/src/rewards/v2/test-balance-normalization-cli.js",
     "bonda:reconcile": "npm run build && node dist/src/rewards/bonda/reconcile-cli.js",
+    "bonda:check": "npm run build && node dist/src/rewards/bonda/connection-check-cli.js",
     "bonda:affiliates": "npm run build && node dist/src/rewards/bonda/affiliate-operations-cli.js",
     "courses:progress:report": "node dist/src/rewards/courses/progress-report-cli.js",
     "start": "node dist/src/server.js",
