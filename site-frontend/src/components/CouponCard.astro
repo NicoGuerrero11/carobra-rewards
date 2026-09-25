@@ -1,0 +1,38 @@
+---
+import {carobraCouponCategory, couponChannelLabel, type BondaCouponSummary} from '../lib/bonda-coupon-contract';
+interface Props { item: BondaCouponSummary }
+const {item} = Astro.props;
+const category = carobraCouponCategory(item.category);
+---
+<article class="coupon-card" data-category={category} data-channels={item.channels.join(',')}>
+  <a class="coupon-card__link" href={`/cliente/beneficios/${encodeURIComponent(item.id)}`} aria-label={`${item.name}: ${item.discount || 'Beneficio'}. Ver beneficio`}>
+    <div class="coupon-card__visual">
+      {(item.heroImageUrl ?? item.imageUrl) && <img src={item.heroImageUrl ?? item.imageUrl ?? undefined} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />}
+      <span class="coupon-card__logo" aria-hidden="true">{item.logoImageUrl ? <img src={item.logoImageUrl} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" /> : <strong>{item.name.slice(0,1).toUpperCase()}</strong>}</span>
+    </div>
+    <div class="coupon-card__body">
+      <div class="coupon-card__meta"><span>{category}</span></div>
+      <strong class="coupon-card__discount">{item.discount || 'Beneficio'}</strong>
+      <p>{item.shortDescription || 'Consulta las condiciones y la forma de uso.'}</p>
+      <div class="coupon-card__channels">{item.channels.slice(0,2).map(channel => <span>{couponChannelLabel(channel)}</span>)}</div>
+      <span class="coupon-card__open">Ver beneficio <span aria-hidden="true">→</span></span>
+    </div>
+  </a>
+</article>
+<style>
+  .coupon-card{min-width:0;overflow:hidden;border:1px solid #dce6ec;border-radius:.8rem;background:#fff;box-shadow:0 6px 16px rgba(29,55,86,.06);transition:border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}
+  .coupon-card:hover{border-color:#91cbdc;box-shadow:0 10px 22px rgba(29,55,86,.12);transform:translateY(-2px)}
+  .coupon-card:focus-within{outline:3px solid rgba(0,163,224,.28);outline-offset:2px}.coupon-card[hidden]{display:none}
+  .coupon-card__link{height:100%;display:flex;flex-direction:column;color:inherit;text-decoration:none}
+  .coupon-card__visual{position:relative;height:7.35rem;display:grid;place-items:center;margin-bottom:1.35rem;background:#edf5f9}
+  .coupon-card__visual>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .coupon-card__logo{position:absolute;left:.8rem;bottom:-1.35rem;width:4.1rem;height:4.1rem;display:grid;place-items:center;overflow:hidden;border:4px solid #fff;border-radius:.8rem;color:#004b87;background:#fff;box-shadow:0 5px 13px rgba(23,63,104,.15)}
+  .coupon-card__logo img{width:100%;height:100%;padding:.3rem;object-fit:contain}.coupon-card__logo strong{font-size:1.45rem;font-weight:900}
+  .coupon-card__body{min-height:12.1rem;display:flex;flex:1;flex-direction:column;padding:.95rem .85rem .85rem}
+  .coupon-card__meta,.coupon-card__channels{display:flex;flex-wrap:wrap;gap:.3rem}
+  .coupon-card__meta span,.coupon-card__channels span{padding:.24rem .38rem;border-radius:999px;color:#28627c;background:#edf7fa;font-size:.6rem;font-weight:750}
+  .coupon-card__discount{display:block;margin:.7rem 0 .42rem;color:#041c2c;font-size:1.5rem;line-height:1.05;letter-spacing:-.025em}
+  .coupon-card p{display:-webkit-box;min-height:2.8em;margin:0;overflow:hidden;color:#536878;font-size:.78rem;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+  .coupon-card__channels{margin-top:.6rem;margin-bottom:.65rem}.coupon-card__open{width:100%;display:flex;justify-content:space-between;margin-top:auto;padding:.65rem 0 0;border-top:1px solid #e5ecef;color:#176f9e;font-size:.75rem;font-weight:800}
+  @media(prefers-reduced-motion:reduce){.coupon-card{transition:none}.coupon-card:hover{transform:none}}
+</style>

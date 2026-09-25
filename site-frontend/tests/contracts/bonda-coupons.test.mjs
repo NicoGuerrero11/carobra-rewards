@@ -19,6 +19,7 @@ test("coupon rendering is safe and stays separate from point redemption", async 
   const page = await readFile(new URL("../../src/pages/cliente/beneficios.astro", import.meta.url), "utf8");
   const detail = await readFile(new URL("../../src/pages/cliente/beneficios/[id].astro", import.meta.url), "utf8");
   const richText = await readFile(new URL("../../src/components/BenefitRichText.astro", import.meta.url), "utf8");
+  const card = await readFile(new URL("../../src/components/CouponCard.astro", import.meta.url), "utf8");
 
   assert.match(detail, /no descuenta puntos/i);
   assert.doesNotMatch(page + detail, /innerHTML|insertAdjacentHTML/);
@@ -43,12 +44,14 @@ test("coupon rendering is safe and stays separate from point redemption", async 
   assert.match(richText, /benefit-rich-text__highlight/);
   assert.match(richText, /matchAll\(emphasisPattern\)/);
   assert.doesNotMatch(richText, /innerHTML|set:html/);
-  assert.match(page, /coupon-card__link/);
-  assert.match(page, /coupon-card__logo/);
-  assert.match(page, /coupon-card__discount/);
-  assert.match(page, /<div class="coupon-card__visual"/);
-  assert.doesNotMatch(page, /<h3>\{item\.name\}<\/h3>/);
-  assert.match(page, /aria-label=\{`\$\{item\.name\}: \$\{item\.discount/);
+  assert.match(page, /<CouponCard item=\{item\}/);
+  assert.doesNotMatch(card, /innerHTML|set:html/);
+  assert.match(card, /coupon-card__link/);
+  assert.match(card, /coupon-card__logo/);
+  assert.match(card, /coupon-card__discount/);
+  assert.match(card, /<div class="coupon-card__visual"/);
+  assert.doesNotMatch(card, /<h3>\{item\.name\}<\/h3>/);
+  assert.match(card, /aria-label=\{`\$\{item\.name\}: \$\{item\.discount/);
   assert.doesNotMatch(page, /Tu nivel abre nuevas experiencias/);
   assert.doesNotMatch(page, /Otras experiencias|other-benefits-title/);
   assert.match(page, /grid-template-columns:repeat\(4/);
