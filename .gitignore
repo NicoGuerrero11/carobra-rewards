@@ -38,6 +38,7 @@ docs/*
 
 # Generated partner deliverables
 deliverables/sisca-uat/Guia-preparacion-UAT-SISCA-Carobra-Rewards.docx
+/output/docx/logro-integracion-carobra-rewards-sisca.docx
 
 # IDE / OS
 .DS_Store
