@@ -7,6 +7,7 @@ import PublicLearningPreview from "../components/PublicLearningPreview.astro";
 import PublicRewardsValue from "../components/PublicRewardsValue.astro";
 import PublicHowItWorks from "../components/PublicHowItWorks.astro";
 import PublicAbout from "../components/PublicAbout.astro";
+import PublicClosingCta from "../components/PublicClosingCta.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -88,18 +89,7 @@ const soporteLinks = [
 
       <PublicAbout />
 
-      <section id="confianza" class="trust">
-        <div class="shell trust__inner">
-          <h2>Un programa que crece contigo</h2>
-          <p>
-            Tú ves información clara y beneficios disponibles para tu cuenta. Carobra protege tus datos y confirma cada avance antes de mostrarlo.
-          </p>
-          <div class="trust__actions">
-            <a href="/registro" class="btn-primary trust__cta">Únete a Carobra Rewards</a>
-            <a href="/login" class="btn-secondary btn-secondary--dark trust__cta-secondary">Iniciar sesión</a>
-          </div>
-        </div>
-      </section>
+      <PublicClosingCta />
     </main>
 
     <footer class="landing-footer">

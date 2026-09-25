@@ -20,8 +20,8 @@ test("landing keeps dual CTA hierarchy and compliant copy", async ({ page }) => 
   }
 
   const trustSection = page.locator("#confianza");
-  await expect(trustSection.getByRole("link", { name: /Únete a Carobra Rewards/i })).toBeVisible();
-  await expect(trustSection.getByRole("link", { name: /Iniciar sesión/i })).toBeVisible();
+  await expect(trustSection.getByRole("link", { name: "Únete a Rewards", exact: true })).toBeVisible();
+  await expect(trustSection.getByRole("link", { name: "Inicia sesión", exact: true })).toBeVisible();
 
   await expect(page.getByText(/MVP/i)).toHaveCount(0);
   await expect(page.getByText(/Cashback/i)).toHaveCount(0);
