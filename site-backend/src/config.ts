@@ -12,6 +12,7 @@ export interface BondaConfig {
   catalogCacheTtlMs: number;
   catalogCacheMaxStaleMs: number;
   catalogEnabled: boolean;
+  coursesEnabled?: boolean;
   affiliateProvisioningEnabled: boolean;
   couponRequestsEnabled: boolean;
   localPreviewEnabled?: boolean;
@@ -156,6 +157,10 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   const couponApiKey = optionalValue(environment.BONDA_COUPON_API_KEY);
   const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN);
   const catalogAffiliateCode = optionalValue(environment.BONDA_CATALOG_AFFILIATE_CODE);
+  const coursesEnabled = parseBoolean('BONDA_COURSES_ENABLED', environment.BONDA_COURSES_ENABLED ?? 'false');
+  if (coursesEnabled && (!micrositeId || !couponApiKey || !catalogAffiliateCode)) {
+    throw new Error('Bonda Courses requires microsite, API key and catalog affiliate configuration');
+  }
 
   if (!localPreviewEnabled && (catalogEnabled || couponRequestsEnabled) && (!micrositeId || !couponApiKey)) {
     throw new Error(
@@ -194,6 +199,7 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
       3_600_000,
     ),
     catalogEnabled,
+    coursesEnabled,
     affiliateProvisioningEnabled,
     couponRequestsEnabled,
     localPreviewEnabled,
