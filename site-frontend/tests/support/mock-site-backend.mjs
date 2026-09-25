@@ -7,6 +7,16 @@ const eligibleSessionCookie = "carobra_session=e2e-eligible";
 const inactiveSessionCookie = "carobra_session=e2e-inactive";
 const attentionSessionCookie = "carobra_session=e2e-attention";
 const videoProgress = new Map();
+const notificationReads = new Map();
+function notificationKey(request, candidate) { return `${candidate.id}:${homeCookie(request, 'notifications-test') ?? 'default'}`; }
+function notificationPortal(request, candidate, portal) {
+  if (!homeCookie(request, 'notifications-test')) return portal;
+  const read = notificationReads.get(notificationKey(request, candidate)) ?? new Set();
+  const mode = homeCookie(request, 'notifications-state');
+  portal.notifications.items = mode === 'empty' ? [] : portal.notifications.items.map(item => ({ ...item, read: mode === 'read' || read.has(item.id) }));
+  portal.notifications.unread_count = portal.notifications.items.filter(item => !item.read).length;
+  return portal;
+}
 function progressKey(request,courseId) {return `${request.headers.cookie?.match(/progress-test=([^;]+)/)?.[1]??'default'}:${courseId}`;}
 function progressFor(request,courseId) {
   const chapters=videoProgress.get(progressKey(request,courseId))??[];
@@ -24,7 +34,7 @@ function homePortal(request,candidate) {
     portal.journey.progress={target_level:'SILVER',rule_available:true,remaining_active_products:1,remaining_registration_months:2,remaining_qualifying_activities:0};
     portal.journey.modules.expiry_policy_approved=true;
   }
-  return portal;
+  return notificationPortal(request, candidate, portal);
 }
 function homeProgress(request,id) {
   if(homeCookie(request,'home-progress')==='unavailable') return null;
@@ -345,6 +355,17 @@ const server = createServer(async (request, response) => {
     return authenticated
       ? json(response, 200, activityPortal(request, authenticated))
       : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
+  if (method === 'POST' && path === '/api/v1/rewards/portal/notifications/read') {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, 'unauthenticated', 'Authentication required');
+    const payload = await readJson(request);
+    const key = notificationKey(request, authenticated);
+    const read = notificationReads.get(key) ?? new Set();
+    read.add(payload.notification_id);
+    notificationReads.set(key, read);
+    return json(response, 200, { updated: true });
   }
 
   if (authenticatedProfile(request) && (
