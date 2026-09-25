@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1256,
+    "space": "cursos",
+    "title": "Gestión Financiera Personal",
+    "category": "Finanzas",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1900642057-857a69ddec2294ccfe2d989417c3ddf2fdbfaf6458b0817bee6fbfc830e27ed8-d_640x360?&r=pad&region=us"
+  },
+  {
+    "id": 707,
+    "space": "cursos",
+    "title": "Conoce tu Nivel de Inglés",
+    "category": "Inglés",
+    "minimumLevel": "SILVER",
+    "image": "https://i.vimeocdn.com/video/1940595396-53c49712f47b43159ff0c570e92cf04d27608eeaffa24524741d9eb1a88ed0af-d_640x360?&r=pad&region=us"
+  },
+  {
+    "id": 1052,
+    "space": "cursos",
+    "title": "Fundamentos Esenciales de Excel",
+    "category": "Excel",
+    "minimumLevel": "GOLD",
+    "image": "https://i.vimeocdn.com/video/2051418813-5b9182b5d89b1a504465caa87bef0995933754f6d28b417175cf96390fbca099-d_640x360?&r=pad&region=us"
+  },
+  {
+    "id": 564,
+    "space": "cursos",
+    "title": "Crear Hábitos Financieros Saludables",
+    "category": "Finanzas",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1865441255-292f8927c650a331add69d81363b36e22691017daf524b3ff2ec1ddf980246dc-d_640x360?r=pad"
+  },
+  {
+    "id": 1302,
+    "space": "cursos",
+    "title": "Presentaciones Efectivas en Inglés",
+    "category": "Inglés",
+    "minimumLevel": "PLATINUM",
+    "image": "https://i.vimeocdn.com/video/2135607542-08cb924dc948465c9f2a608b06979bc84f26896042d53dc35a8e6a231a8ca63e-d_640x360?&r=pad&region=us"
+  },
+  {
+    "id": 250,
+    "space": "cursos",
+    "title": "Blockchain y Disrupción en la Industria Financiera",
+    "category": "Finanzas",
+    "minimumLevel": "TITANIUM",
+    "image": "https://i.vimeocdn.com/video/1746666316-3ed090fede4f764caa89c9d028e3a0569caf6f57c358cd2688ea6f93099ff93d-d_640x360?r=pad"
+  },
+  {
+    "id": 24,
+    "space": "bienestar",
+    "title": "Fit Yoga",
+    "category": "Meditación",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1729085369-05138e34f569c97ec49d10a13e90b457984972823d89a41235999055f8173bfc-d_640x360?r=pad"
+  },
+  {
+    "id": 15,
+    "space": "bienestar",
+    "title": "Rutina de relajación cervical",
+    "category": "Meditación",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1729072216-01939f2c55e4a542733c4fb7b1e3cffc76de52adfed9b9ffd2dfc474d096a678-d_640x360?&r=pad&region=us"
+  },
+  {
+    "id": 14,
+    "space": "bienestar",
+    "title": "3 claves del Work Life Balance",
+    "category": "Meditación",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1729067830-e9f0315b75ef03f0d6e2c14737ff7853487be1952dcfa2bd85301eb64644f173-d_640x360?r=pad"
+  },
+  {
+    "id": 13,
+    "space": "bienestar",
+    "title": "Circuito funcional de 4 estaciones",
+    "category": "Entrenamiento",
+    "minimumLevel": "BRONZE",
+    "image": "https://i.vimeocdn.com/video/1729059148-5c4af2f28949911d01d1f3dcef951a7e5ae8e199e6dd555145fdf63e85ba7aa9-d_640x360?&r=pad&region=us"
+  }
+]

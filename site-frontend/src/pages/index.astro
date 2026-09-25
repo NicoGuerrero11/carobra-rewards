@@ -1,5 +1,13 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import InstitutionalVideo from "../components/InstitutionalVideo.astro";
+import PublicProducts from "../components/PublicProducts.astro";
+import PublicCouponBrands from "../components/PublicCouponBrands.astro";
+import PublicLearningPreview from "../components/PublicLearningPreview.astro";
+import PublicRewardsValue from "../components/PublicRewardsValue.astro";
+import PublicHowItWorks from "../components/PublicHowItWorks.astro";
+import PublicAbout from "../components/PublicAbout.astro";
+import PublicClosingCta from "../components/PublicClosingCta.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -9,40 +17,12 @@ const navLinks = [
   { label: "Confianza", href: "#confianza" },
 ];
 
-const institutionalVideoUrl = import.meta.env.PUBLIC_CAROBRA_INSTITUTIONAL_VIDEO_URL?.trim() ?? "";
-
-const publicProducts = [
-  { name: "Skandia", category: "Ahorro e inversión", description: "Soluciones para construir objetivos patrimoniales de largo plazo con acompañamiento personal.", className: "is-skandia" },
-  { name: "Quálitas", category: "Seguro de auto", description: "Opciones de protección para tu automóvil con orientación para comparar coberturas.", className: "is-qualitas" },
-  { name: "Modalidad 40", category: "Retiro", description: "Asesoría para entender esta alternativa y evaluar cómo puede apoyar tu estrategia de pensión.", className: "is-modalidad" },
-  { name: "Infinity", category: "Inversión", description: "Alternativas de inversión acompañadas por un asesor para revisar objetivos y condiciones.", className: "is-infinity" },
-];
-
-const catalogBrands = ["Amazon", "Cinépolis", "Soriana", "Uber", "Starbucks"];
-
 const soporteLinks = [
+  { label: "Catálogo", href: "#catalogo" },
   { label: "Términos", href: "#terminos" },
   { label: "Privacidad", href: "#privacidad" },
   { label: "Ayuda", href: "#ayuda" },
   { label: "Contacto", href: "#contacto" },
-];
-
-const timelineSteps = [
-  {
-    number: "01",
-    title: "Únete a Rewards",
-    text: "Crea tu cuenta para reunir en un solo lugar tu relación y tus avances con Carobra.",
-  },
-  {
-    number: "02",
-    title: "Validamos tu relación",
-    text: "Confirmamos tus productos Carobra de forma segura para mostrarte el nivel que te corresponde.",
-  },
-  {
-    number: "03",
-    title: "Avanza y disfruta",
-    text: "Consulta tus puntos, descubre tus siguientes pasos y explora los beneficios habilitados para ti.",
-  },
 ];
 
 ---
@@ -93,174 +73,23 @@ const timelineSteps = [
             </div>
           </div>
 
-          {institutionalVideoUrl ? (
-            <div class="hero-media hero-media--video">
-              <video controls preload="metadata" aria-label="Video institucional de Carobra de 90 segundos">
-                <source src={institutionalVideoUrl} />
-                Tu navegador no puede reproducir este video.
-              </video>
-            </div>
-          ) : (
-            <aside class="hero-media" aria-label="Presentación institucional de Carobra">
-              <span>Conoce Carobra</span>
-              <h2>14 años acompañando decisiones financieras</h2>
-              <p>Descubre quiénes somos, cómo trabajamos y por qué miles de personas confían en nuestra red de asesores.</p>
-              <a href="#quienes-somos">Conocer nuestra trayectoria</a>
-              <small>El video institucional se incorporará al recibir el archivo aprobado.</small>
-            </aside>
-          )}
+          <InstitutionalVideo />
         </div>
       </section>
 
-      <section id="productos" class="public-products">
-        <div class="shell">
-          <header class="section-heading public-products__heading">
-            <div><span>Soluciones Carobra</span><h2>Conoce lo que puedes contratar</h2></div>
-            <p>Explora nuestras principales líneas antes de registrarte. Un asesor te ayudará a revisar cuál corresponde a tus objetivos.</p>
-          </header>
-          <div class="public-products__controls" aria-label="Controles del carrusel de productos">
-            <button type="button" data-products-previous>Anterior</button>
-            <button type="button" data-products-next>Siguiente</button>
-          </div>
-          <div class="public-products__track" data-products-track tabindex="0" aria-label="Productos Carobra">
-            {publicProducts.map((product) => <article class:list={["public-product", product.className]}><span>{product.category}</span><h3>{product.name}</h3><p>{product.description}</p><a href="/registro">Quiero conocer esta solución</a></article>)}
-          </div>
-          <div class="catalog-strip" aria-labelledby="catalog-strip-title">
-            <div><span>Catálogo próximamente</span><h3 id="catalog-strip-title">Marcas consideradas para Rewards</h3></div>
-            <ul>{catalogBrands.map((brand) => <li>{brand}</li>)}</ul>
-            <p>La disponibilidad, los precios en puntos y el uso de logotipos se publicarán después de la confirmación del proveedor.</p>
-          </div>
-        </div>
-      </section>
+      <PublicProducts />
 
-      <section id="beneficios" class="capabilities">
-        <div class="shell">
-          <header class="section-heading">
-            <h2>Más valor en cada paso con Carobra</h2>
-            <p>Una experiencia que reúne tu progreso, tus puntos y las oportunidades disponibles para ti.</p>
-          </header>
+      <PublicCouponBrands />
 
-          <div class="capabilities-grid">
-            <article class="capability-card capability-card--wide">
-              <div class="capability-card__content">
-                <div class="capability-card__icon">▣</div>
-                <h3>Tu relación sí cuenta</h3>
-                <p>
-                  Cada producto confirmado y cada actividad aprobada ayudan a construir tu experiencia dentro de Rewards.
-                </p>
-                <a href="/registro" class="capability-card__link">Comenzar mi experiencia</a>
-              </div>
-              <div class="capability-visual" aria-hidden="true">
-                <div class="capability-visual__head">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div class="capability-visual__bars">
-                  <span style="height: 35%"></span>
-                  <span style="height: 52%"></span>
-                  <span style="height: 72%"></span>
-                  <span style="height: 63%"></span>
-                  <span style="height: 84%"></span>
-                  <span style="height: 58%"></span>
-                </div>
-                <div class="capability-visual__line"></div>
-              </div>
-            </article>
+      <PublicLearningPreview />
 
-            <article class="capability-card capability-card--dark">
-              <div class="capability-card__icon">◉</div>
-              <h3>Beneficios para disfrutar</h3>
-              <p>Explora las experiencias y opciones que se encuentren habilitadas para tu cuenta.</p>
-            </article>
+      <PublicRewardsValue />
 
-            <article class="capability-card">
-              <div class="capability-card__icon">◌</div>
-              <h3>Progreso que puedes ver</h3>
-              <p>Conoce tu nivel, revisa tus puntos y entiende qué puedes hacer para seguir avanzando.</p>
-              <div class="capability-chips" aria-hidden="true">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span class="is-active">Rewards</span>
-              </div>
-            </article>
+      <PublicHowItWorks />
 
-            <article class="capability-card capability-card--split">
-              <div class="capability-control">
-                <div class="capability-card__icon">⛨</div>
-                <h3>Todo en un solo lugar</h3>
-                <p>Entra de forma segura para consultar tus productos, movimientos y oportunidades Rewards.</p>
-                <a href="/login" class="btn-primary btn-compact capability-control__button">Entrar a mi cuenta</a>
-              </div>
-              <div class="split-stats">
-                <div class="split-stats__block">
-                  <span>Tu nivel</span>
-                  <strong>Claro</strong>
-                </div>
-                <div class="split-stats__block">
-                  <span>Tus puntos</span>
-                  <strong>Al día</strong>
-                </div>
-                <div class="split-stats__status">
-                  <span>Tu siguiente paso</span>
-                  <strong>Siempre a la vista</strong>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
+      <PublicAbout />
 
-      <section id="experiencia" class="experience">
-        <div class="shell experience-grid">
-          <aside class="experience-intro">
-            <h2>
-              Empieza hoy y
-              <span>crece con nosotros</span>
-            </h2>
-            <p>Un camino sencillo para convertir tu relación con Carobra en una experiencia con más valor.</p>
-            <blockquote>
-              "Tu progreso se construye paso a paso. Nosotros te ayudamos a verlo y aprovecharlo."
-            </blockquote>
-          </aside>
-
-          <div class="experience-timeline">
-            {timelineSteps.map((step, index) => (
-              <article class="experience-step">
-                <span class="experience-step__dot" data-variant={index}></span>
-                <p class="experience-step__number">{step.number}</p>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="quienes-somos" class="public-about">
-        <div class="shell public-about__grid">
-          <div class="public-about__copy"><span>Quiénes somos</span><h2>Experiencia financiera con acompañamiento personal</h2><p>Carobra es una firma de consultoría integral con soluciones en pensiones y AFORE, seguros, inversiones, crédito e inmobiliario.</p><a href="https://www.carobra.com/" target="_blank" rel="noreferrer">Conoce más en el sitio oficial de Carobra</a></div>
-          <dl class="public-about__facts">
-            <div><dt>Trayectoria</dt><dd>14 años de experiencia</dd></div>
-            <div><dt>Red nacional</dt><dd>Más de 2,000 asesores</dd></div>
-            <div><dt>Respaldo</dt><dd>Alianzas con instituciones líderes</dd></div>
-          </dl>
-        </div>
-      </section>
-
-      <section id="confianza" class="trust">
-        <div class="shell trust__inner">
-          <h2>Un programa que crece contigo</h2>
-          <p>
-            Tú ves información clara y beneficios disponibles para tu cuenta. Carobra protege tus datos y confirma cada avance antes de mostrarlo.
-          </p>
-          <div class="trust__actions">
-            <a href="/registro" class="btn-primary trust__cta">Únete a Carobra Rewards</a>
-            <a href="/login" class="btn-secondary btn-secondary--dark trust__cta-secondary">Iniciar sesión</a>
-          </div>
-        </div>
-      </section>
+      <PublicClosingCta />
     </main>
 
     <footer class="landing-footer">
@@ -302,12 +131,4 @@ const timelineSteps = [
       </div>
     </footer>
   </div>
-  <script>
-    const track = document.querySelector<HTMLElement>("[data-products-track]");
-    const previous = document.querySelector<HTMLButtonElement>("[data-products-previous]");
-    const next = document.querySelector<HTMLButtonElement>("[data-products-next]");
-    const move = (direction: number) => track?.scrollBy({ left: direction * Math.min(track.clientWidth * 0.82, 430), behavior: "smooth" });
-    previous?.addEventListener("click", () => move(-1));
-    next?.addEventListener("click", () => move(1));
-  </script>
 </BaseLayout>

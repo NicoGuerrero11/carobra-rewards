@@ -2762,64 +2762,6 @@ a {
   font-size: 0.9rem;
 }
 
-.trust {
-  background: linear-gradient(100deg, #0b2d60 0%, #0d4d88 52%, #0b2a58 100%);
-  padding: 5.6rem 0 5.1rem;
-}
-
-.trust__inner {
-  text-align: center;
-  color: #f4f8ff;
-}
-
-.trust__inner h2 {
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 4rem);
-  font-weight: 730;
-  line-height: 0.96;
-  letter-spacing: -0.03em;
-}
-
-.trust__inner p {
-  margin: 1.55rem auto 0;
-  max-width: 50ch;
-  font-size: clamp(1.02rem, 1.4vw, 1.3rem);
-  line-height: 1.5;
-  font-weight: 520;
-  color: #d7e6fb;
-}
-
-.trust__actions {
-  margin-top: 2.75rem;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.9rem;
-  flex-wrap: wrap;
-}
-
-.trust__cta {
-  width: min(100%, 26rem);
-  justify-content: center;
-  padding: 0.96rem 2.4rem;
-  border-radius: 0.9rem;
-  font-size: 1.04rem;
-  font-weight: 700;
-  box-shadow: 0 14px 26px rgba(1, 21, 48, 0.28);
-}
-
-.trust__cta:hover {
-  box-shadow: 0 16px 30px rgba(1, 21, 48, 0.34);
-}
-
-.trust__cta-secondary {
-  padding: 0.96rem 1.8rem;
-  border-radius: 0.9rem;
-  font-size: 1.01rem;
-  font-weight: 660;
-  min-width: 12rem;
-}
-
 .landing-footer {
   border-top: 1px solid #d5deea;
   background: #f7f9fc;
@@ -2973,14 +2915,6 @@ a {
   .experience-intro blockquote {
     margin-left: auto;
     margin-right: auto;
-  }
-
-  .trust__cta {
-    width: min(100%, 22rem);
-  }
-
-  .trust__cta-secondary {
-    width: min(100%, 22rem);
   }
 
   .landing-footer__grid {

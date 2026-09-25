@@ -1,56 +1,161 @@
 ---
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
+import ClientNavIcon from "../../components/ClientNavIcon.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
+import "../../styles/customer-account.css";
+
 const user = Astro.locals.user;
 const cookie = Astro.request.headers.get("cookie") ?? "";
 const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
 let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
 if (!portalLoadedWithContext) {
   try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
+      headers: { cookie },
+      signal: AbortSignal.timeout(6000),
+    });
     if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
     if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-  } catch {}
+  } catch { /* Identity and help remain available without preferences. */ }
 }
-const preferences = portal?.preferences ?? { activity_updates: true, learning_updates: true, product_updates: true };
+Astro.response.headers.set("Cache-Control", "private, no-store");
+const preferences = portal?.preferences ?? null;
+const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+const initials = [user?.firstName, user?.lastName].filter(Boolean).map(name => name?.trim().charAt(0)).join("").toLocaleUpperCase("es-MX");
+const preferenceOptions = [
+  { key: "activity_updates", title: "Actividad de Rewards", description: "Cuestionarios, documentos y movimientos de tu cuenta." },
+  { key: "learning_updates", title: "Cursos y contenidos", description: "Nuevos aprendizajes y recordatorios de avance." },
+  { key: "product_updates", title: "Actualizaciones de productos", description: "Confirmaciones y cambios en tus productos." },
+] as const;
 ---
 <ClientShellLayout title="Mi cuenta | Carobra" description="Perfil, preferencias y seguridad de tu cuenta." currentPath="/cliente/perfil" sectionLabel="Mi cuenta">
-  <main class="portal-page">
-    <header class="portal-welcome"><div><p class="portal-eyebrow">Tu espacio personal</p><h1>Mi cuenta</h1><p>Consulta tus datos, elige qué avisos recibir y encuentra ayuda.</p></div><span>Cuenta protegida</span></header>
-    <section class="account-grid">
-      <article class="portal-card account-card">
-        <p class="portal-eyebrow">Datos personales</p><h2>{user?.firstName} {user?.lastName}</h2><p>Estos son los datos asociados a tu sesión.</p>
-        <dl><div><dt>Correo</dt><dd>{user?.email}</dd></div><div><dt>Nombre</dt><dd>{user?.firstName} {user?.lastName}</dd></div></dl>
-        <a href="mailto:soporte@carobra.mx?subject=Actualizar%20datos%20de%20mi%20cuenta">Solicitar una corrección</a>
-      </article>
-      <article class="portal-card account-card">
-        <p class="portal-eyebrow">Seguridad</p><h2>Protege tu acceso</h2><p>Carobra nunca te pedirá tu contraseña por correo o teléfono.</p>
-        <ul><li>Usa una contraseña única.</li><li>Cierra sesión en equipos compartidos.</li><li>Reporta cualquier actividad que no reconozcas.</li></ul>
-        <a href="mailto:soporte@carobra.mx?subject=Ayuda%20con%20mi%20acceso">Ayuda con mi acceso</a>
-      </article>
-    </section>
-    <section class="portal-section" aria-labelledby="preferences-title">
-      <div class="portal-section-heading"><div><p class="portal-eyebrow">Preferencias</p><h2 id="preferences-title">Elige qué actualizaciones recibir</h2></div><p>Puedes cambiar estas opciones cuando quieras.</p></div>
-      <form id="preferences-form" class="preferences-form">
-        <label><span><strong>Actividad de Rewards</strong><small>Cuestionarios, documentos y movimientos relevantes.</small></span><input name="activity_updates" type="checkbox" checked={preferences.activity_updates} /></label>
-        <label><span><strong>Cursos y contenidos</strong><small>Nuevos aprendizajes asignados y recordatorios de avance.</small></span><input name="learning_updates" type="checkbox" checked={preferences.learning_updates} /></label>
-        <label><span><strong>Actualizaciones de productos</strong><small>Confirmaciones y cambios visibles en tu cuenta.</small></span><input name="product_updates" type="checkbox" checked={preferences.product_updates} /></label>
-        <div><button type="submit">Guardar preferencias</button><p id="preferences-feedback" role="status"></p></div>
-      </form>
-    </section>
-    <section class="help-center account-support"><div><p class="rewards-eyebrow">Soporte</p><h2>¿Necesitas hablar con nosotros?</h2><p>Explícanos qué necesitas y el equipo de Carobra revisará tu caso.</p></div><a href="mailto:soporte@carobra.mx">Contactar soporte</a></section>
+  <main class="customer-account">
+    <header class="customer-account__heading">
+      <p class="customer-account__eyebrow">Tu espacio personal</p>
+      <h1>Mi cuenta</h1>
+      <p>Tus datos, tus preferencias y la ayuda que necesitas, en un solo lugar.</p>
+    </header>
+
+    <div class="customer-account__columns">
+      <div class="customer-account__main">
+        <section class="customer-account__panel" aria-labelledby="personal-title">
+          <header class="customer-account__panel-heading">
+            <span class="customer-account__avatar" aria-hidden="true">{initials || "C"}</span>
+            <div><h2 id="personal-title">Datos personales</h2><p>La información asociada a tu cuenta.</p></div>
+          </header>
+          <dl class="customer-account__details">
+            <div><dt>Nombre completo</dt><dd>{fullName || "No disponible"}</dd></div>
+            <div><dt>Correo electrónico</dt><dd>{user?.email || "No disponible"}</dd></div>
+          </dl>
+          <a class="customer-account__link" href="/cliente/ayuda#soporte">Ayuda con mis datos <span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="customer-account__panel" aria-labelledby="preferences-title">
+          <header class="customer-account__preferences-heading">
+            <p class="customer-account__eyebrow">Preferencias</p>
+            <h2 id="preferences-title">Elige qué actualizaciones recibir</h2>
+            <p>Puedes cambiar estas opciones cuando quieras.</p>
+          </header>
+          {preferences ? <form id="preferences-form" aria-labelledby="preferences-title">
+            <fieldset id="preferences-fields" disabled>
+              <legend class="customer-account__sr-only">Tipos de actualizaciones</legend>
+              {preferenceOptions.map(option => <label class="customer-account__preference">
+                <span>
+                  <strong id={`${option.key}-title`}>{option.title}</strong>
+                  <small id={`${option.key}-description`}>{option.description}</small>
+                </span>
+                <span class="customer-account__switch">
+                  <input name={option.key} type="checkbox" role="switch" checked={preferences[option.key]} aria-labelledby={`${option.key}-title`} aria-describedby={`${option.key}-description`} />
+                  <span class="customer-account__switch-track" aria-hidden="true"></span>
+                </span>
+              </label>)}
+              <div class="customer-account__save">
+                <button id="preferences-save" type="submit">Guardar preferencias</button>
+                <p>Los cambios se aplican al guardar.</p>
+              </div>
+            </fieldset>
+            <p id="preferences-feedback" class="customer-account__feedback" role="status" aria-live="polite" aria-atomic="true"></p>
+            <noscript><p class="customer-account__notice">Activa JavaScript en tu navegador para cambiar tus preferencias.</p></noscript>
+          </form> : <div class="customer-account__notice" role="status">
+            <strong>No pudimos cargar tus preferencias</strong>
+            <p>Tus datos siguen disponibles. Vuelve a intentarlo para consultar o cambiar tus avisos.</p>
+            <a class="customer-account__link" href="/cliente/perfil">Volver a intentar <span aria-hidden="true">↻</span></a>
+          </div>}
+        </section>
+      </div>
+
+      <aside class="customer-account__sidebar" aria-label="Seguridad y ayuda">
+        <section class="customer-account__panel" aria-labelledby="security-title">
+          <header class="customer-account__panel-heading">
+            <span class="customer-account__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4.5 6v5c0 4.5 3 7.5 7.5 10 4.5-2.5 7.5-5.5 7.5-10V6L12 3Z" /><path d="m8.5 12 2.3 2.3 4.7-4.6" /></svg></span>
+            <div><h2 id="security-title">Cuida tu acceso</h2><p>Pequeños hábitos, más seguridad.</p></div>
+          </header>
+          <ul class="customer-account__security">
+            <li><strong>Tu contraseña es personal</strong><p>No la compartas. Carobra nunca te la pedirá por correo o teléfono.</p></li>
+            <li><strong>Usa una contraseña única</strong><p>Evita reutilizar la de otros servicios.</p></li>
+            <li><strong>Cierra sesión al terminar</strong><p>Especialmente si usas un equipo compartido.</p></li>
+          </ul>
+          <a class="customer-account__link" href="/cliente/ayuda#soporte">Ayuda con mi acceso <span aria-hidden="true">→</span></a>
+        </section>
+
+        <section class="customer-account__panel customer-account__help" aria-labelledby="account-help-title">
+          <span class="customer-account__icon"><ClientNavIcon name="help" /></span>
+          <h2 id="account-help-title">Estamos para orientarte</h2>
+          <p>Encuentra respuestas sobre tu cuenta, beneficios, cursos y puntos.</p>
+          <a class="customer-account__link" href="/cliente/ayuda">Ir al Centro de ayuda <span aria-hidden="true">→</span></a>
+        </section>
+      </aside>
+    </div>
   </main>
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
-    const form = requireElement<HTMLFormElement>("#preferences-form");
-    const feedback = requireElement<HTMLElement>("#preferences-feedback");
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const values = new FormData(form);
-      const response = await fetch("/api/v1/rewards/portal/preferences", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ activity_updates: values.has("activity_updates"), learning_updates: values.has("learning_updates"), product_updates: values.has("product_updates") }) });
-      feedback.textContent = response.ok ? "Preferencias guardadas." : "No pudimos guardar tus preferencias. Intenta de nuevo.";
-    });
+    const form = document.querySelector<HTMLFormElement>("#preferences-form");
+    if (form) {
+      const feedback = requireElement<HTMLElement>("#preferences-feedback");
+      const fields = requireElement<HTMLFieldSetElement>("#preferences-fields");
+      const button = requireElement<HTMLButtonElement>("#preferences-save");
+      let saving = false;
+      fields.disabled = false;
+      form.addEventListener("change", () => {
+        feedback.textContent = "Tienes cambios sin guardar.";
+        feedback.dataset.state = "pending";
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (saving) return;
+        const values = new FormData(form);
+        saving = true;
+        fields.disabled = true;
+        form.setAttribute("aria-busy", "true");
+        button.textContent = "Guardando…";
+        feedback.textContent = "Guardando tus preferencias…";
+        feedback.dataset.state = "pending";
+        try {
+          const response = await fetch("/api/v1/rewards/portal/preferences", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            signal: AbortSignal.timeout(10000),
+            body: JSON.stringify({
+              activity_updates: values.has("activity_updates"),
+              learning_updates: values.has("learning_updates"),
+              product_updates: values.has("product_updates"),
+            }),
+          });
+          if (!response.ok) throw new Error("preferences_save_failed");
+          feedback.textContent = "Preferencias guardadas.";
+          feedback.dataset.state = "success";
+        } catch {
+          feedback.textContent = "No pudimos guardar tus preferencias. Intenta de nuevo.";
+          feedback.dataset.state = "error";
+        } finally {
+          saving = false;
+          fields.disabled = false;
+          form.removeAttribute("aria-busy");
+          button.textContent = "Guardar preferencias";
+        }
+      });
+    }
   </script>
 </ClientShellLayout>
