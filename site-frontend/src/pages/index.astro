@@ -6,6 +6,7 @@ import PublicCouponBrands from "../components/PublicCouponBrands.astro";
 import PublicLearningPreview from "../components/PublicLearningPreview.astro";
 import PublicRewardsValue from "../components/PublicRewardsValue.astro";
 import PublicHowItWorks from "../components/PublicHowItWorks.astro";
+import PublicAbout from "../components/PublicAbout.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -85,16 +86,7 @@ const soporteLinks = [
 
       <PublicHowItWorks />
 
-      <section id="quienes-somos" class="public-about">
-        <div class="shell public-about__grid">
-          <div class="public-about__copy"><span>Quiénes somos</span><h2>Experiencia financiera con acompañamiento personal</h2><p>Carobra es una firma de consultoría integral con soluciones en pensiones y AFORE, seguros, inversiones, crédito e inmobiliario.</p><a href="https://www.carobra.com/" target="_blank" rel="noreferrer">Conoce más en el sitio oficial de Carobra</a></div>
-          <dl class="public-about__facts">
-            <div><dt>Trayectoria</dt><dd>14 años de experiencia</dd></div>
-            <div><dt>Red nacional</dt><dd>Más de 2,000 asesores</dd></div>
-            <div><dt>Respaldo</dt><dd>Alianzas con instituciones líderes</dd></div>
-          </dl>
-        </div>
-      </section>
+      <PublicAbout />
 
       <section id="confianza" class="trust">
         <div class="shell trust__inner">

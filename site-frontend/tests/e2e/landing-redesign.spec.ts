@@ -9,8 +9,8 @@ test("landing keeps dual CTA hierarchy and compliant copy", async ({ page }) => 
   await expect(page.locator("nav[aria-label='Navegación principal'] a[href='#productos']")).toHaveCount(1);
   await expect(page.locator("nav[aria-label='Navegación principal'] a[href='#quienes-somos']")).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Conoce lo que puedes contratar" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Experiencia financiera con acompañamiento personal" })).toBeVisible();
-  await expect(page.getByText("14 años de experiencia", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "El respaldo detrás de Rewards." })).toBeVisible();
+  await expect(page.getByText("15 años de experiencia", { exact: true })).toBeVisible();
   await expect(page.getByText("Más de 2,000 asesores", { exact: true })).toBeVisible();
   await expect(page.getByText("El video institucional se incorporará al recibir el archivo aprobado.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "14 años acompañando decisiones financieras" })).toHaveCount(0);
