@@ -15,6 +15,7 @@ build/
 site/
 *.egg-info/
 .tmp/
+.pnpm-store/
 
 # Local environment files
 .env
