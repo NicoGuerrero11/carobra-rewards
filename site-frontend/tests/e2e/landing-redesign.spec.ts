@@ -4,7 +4,7 @@ test("landing keeps dual CTA hierarchy and compliant copy", async ({ page }) => 
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: /Tu relación con Carobra ahora te da más/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Quiero ser parte/i })).toBeVisible();
+  await expect(page.locator('.landing-hero').getByRole("link", { name: /Quiero ser parte/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Descubre cómo funciona/i })).toBeVisible();
   await expect(page.locator("nav[aria-label='Navegación principal'] a[href='#productos']")).toHaveCount(1);
   await expect(page.locator("nav[aria-label='Navegación principal'] a[href='#quienes-somos']")).toHaveCount(1);

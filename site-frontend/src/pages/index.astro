@@ -4,6 +4,7 @@ import InstitutionalVideo from "../components/InstitutionalVideo.astro";
 import PublicProducts from "../components/PublicProducts.astro";
 import PublicCouponBrands from "../components/PublicCouponBrands.astro";
 import PublicLearningPreview from "../components/PublicLearningPreview.astro";
+import PublicRewardsValue from "../components/PublicRewardsValue.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -97,84 +98,7 @@ const timelineSteps = [
 
       <PublicLearningPreview />
 
-      <section id="beneficios" class="capabilities">
-        <div class="shell">
-          <header class="section-heading">
-            <h2>Más valor en cada paso con Carobra</h2>
-            <p>Una experiencia que reúne tu progreso, tus puntos y las oportunidades disponibles para ti.</p>
-          </header>
-
-          <div class="capabilities-grid">
-            <article class="capability-card capability-card--wide">
-              <div class="capability-card__content">
-                <div class="capability-card__icon">▣</div>
-                <h3>Tu relación sí cuenta</h3>
-                <p>
-                  Cada producto confirmado y cada actividad aprobada ayudan a construir tu experiencia dentro de Rewards.
-                </p>
-                <a href="/registro" class="capability-card__link">Comenzar mi experiencia</a>
-              </div>
-              <div class="capability-visual" aria-hidden="true">
-                <div class="capability-visual__head">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div class="capability-visual__bars">
-                  <span style="height: 35%"></span>
-                  <span style="height: 52%"></span>
-                  <span style="height: 72%"></span>
-                  <span style="height: 63%"></span>
-                  <span style="height: 84%"></span>
-                  <span style="height: 58%"></span>
-                </div>
-                <div class="capability-visual__line"></div>
-              </div>
-            </article>
-
-            <article class="capability-card capability-card--dark">
-              <div class="capability-card__icon">◉</div>
-              <h3>Beneficios para disfrutar</h3>
-              <p>Explora las experiencias y opciones que se encuentren habilitadas para tu cuenta.</p>
-            </article>
-
-            <article class="capability-card">
-              <div class="capability-card__icon">◌</div>
-              <h3>Progreso que puedes ver</h3>
-              <p>Conoce tu nivel, revisa tus puntos y entiende qué puedes hacer para seguir avanzando.</p>
-              <div class="capability-chips" aria-hidden="true">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span class="is-active">Rewards</span>
-              </div>
-            </article>
-
-            <article class="capability-card capability-card--split">
-              <div class="capability-control">
-                <div class="capability-card__icon">⛨</div>
-                <h3>Todo en un solo lugar</h3>
-                <p>Entra de forma segura para consultar tus productos, movimientos y oportunidades Rewards.</p>
-                <a href="/login" class="btn-primary btn-compact capability-control__button">Entrar a mi cuenta</a>
-              </div>
-              <div class="split-stats">
-                <div class="split-stats__block">
-                  <span>Tu nivel</span>
-                  <strong>Claro</strong>
-                </div>
-                <div class="split-stats__block">
-                  <span>Tus puntos</span>
-                  <strong>Al día</strong>
-                </div>
-                <div class="split-stats__status">
-                  <span>Tu siguiente paso</span>
-                  <strong>Siempre a la vista</strong>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
+      <PublicRewardsValue />
 
       <section id="experiencia" class="experience">
         <div class="shell experience-grid">
