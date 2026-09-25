@@ -24,56 +24,12 @@ body.carobra-public .landing-hero__grid > * {
   min-width: 0;
 }
 
-body.carobra-public .catalog-strip > div > span,
 body.carobra-public .public-about__copy > span {
   color: var(--public-cyan);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-body.carobra-public .catalog-strip {
-  display: grid;
-  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1.3fr);
-  align-items: center;
-  gap: 1rem 2rem;
-  margin-top: 1rem;
-  padding: 1.3rem;
-  border: 1px solid #cbd7df;
-  border-radius: 0.85rem;
-  background: #fff;
-}
-
-body.carobra-public .catalog-strip h3 {
-  margin: 0.3rem 0 0;
-  color: var(--public-navy);
-}
-
-body.carobra-public .catalog-strip ul {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-body.carobra-public .catalog-strip li {
-  padding: 0.5rem 0.7rem;
-  border-radius: 0.45rem;
-  background: #edf0f2;
-  color: #536878;
-  font-size: 0.75rem;
-  font-weight: 750;
-}
-
-body.carobra-public .catalog-strip > p {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: #71808a;
-  font-size: 0.7rem;
 }
 
 body.carobra-public .public-about {
@@ -141,9 +97,7 @@ body.carobra-public .public-about__facts dd {
 }
 
 @media (max-width: 720px) {
-  body.carobra-public .catalog-strip,
   body.carobra-public .public-about__grid { grid-template-columns: 1fr; }
-  body.carobra-public .catalog-strip ul { justify-content: flex-start; }
   body.carobra-public .public-about { padding: 3.5rem 0; }
 }
 

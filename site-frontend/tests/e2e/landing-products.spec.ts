@@ -49,14 +49,13 @@ test("product cards are keyboard accessible without nested controls", async ({ p
 
 test("coupon preview remains independent from contracting products", async ({ page }) => {
   await page.goto("/#catalogo");
-  const catalog = page.getByRole("region", { name: "Marcas consideradas para Rewards" });
+  const catalog = page.getByRole("region", { name: "Disfruta más con tus marcas favoritas." });
   await expect(catalog).toBeVisible();
   await expect(catalog).toHaveAttribute("id", "catalogo");
-  await expect(catalog.getByText("Catálogo próximamente")).toBeVisible();
-  await expect(catalog.getByText(/después de la confirmación del proveedor/)).toBeVisible();
-  await expect(catalog.getByText("Cinépolis", { exact: true })).toBeVisible();
+  await expect(catalog.getByText(/Beneficios disponibles según tu nivel/)).toBeVisible();
+  await expect(catalog.getByRole("img", { name: "Cinépolis", exact: true })).toBeVisible();
   await expect(catalog.locator("a")).toHaveCount(0);
-  await expect(page.locator("#productos #catalogo, #cursos")).toHaveCount(0);
+  await expect(page.locator("#productos #catalogo, .catalog-strip, #cursos")).toHaveCount(0);
   expect(await page.locator("#productos").evaluate(node => node.nextElementSibling?.id)).toBe("catalogo");
   await expect(page.locator('footer a[href="#catalogo"]')).toHaveText("Catálogo");
 });

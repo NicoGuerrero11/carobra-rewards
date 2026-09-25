@@ -2,6 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import InstitutionalVideo from "../components/InstitutionalVideo.astro";
 import PublicProducts from "../components/PublicProducts.astro";
+import PublicCouponBrands from "../components/PublicCouponBrands.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -10,8 +11,6 @@ const navLinks = [
   { label: "Quiénes somos", href: "#quienes-somos" },
   { label: "Confianza", href: "#confianza" },
 ];
-
-const catalogBrands = ["Amazon", "Cinépolis", "Soriana", "Uber", "Starbucks"];
 
 const soporteLinks = [
   { label: "Catálogo", href: "#catalogo" },
@@ -93,15 +92,7 @@ const timelineSteps = [
 
       <PublicProducts />
 
-      <section id="catalogo" aria-labelledby="catalog-strip-title">
-        <div class="shell">
-          <div class="catalog-strip">
-            <div><span>Catálogo próximamente</span><h3 id="catalog-strip-title">Marcas consideradas para Rewards</h3></div>
-            <ul>{catalogBrands.map((brand) => <li>{brand}</li>)}</ul>
-            <p>La disponibilidad, los precios en puntos y el uso de logotipos se publicarán después de la confirmación del proveedor.</p>
-          </div>
-        </div>
-      </section>
+      <PublicCouponBrands />
 
       <section id="beneficios" class="capabilities">
         <div class="shell">
