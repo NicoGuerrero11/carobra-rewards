@@ -8,6 +8,8 @@ const inactiveSessionCookie = "carobra_session=e2e-inactive";
 const attentionSessionCookie = "carobra_session=e2e-attention";
 const videoProgress = new Map();
 const notificationReads = new Map();
+const accountPreferences = new Map();
+function accountKey(request, candidate) { return `${candidate.id}:${homeCookie(request, 'account-test') ?? 'default'}`; }
 function notificationKey(request, candidate) { return `${candidate.id}:${homeCookie(request, 'notifications-test') ?? 'default'}`; }
 function notificationPortal(request, candidate, portal) {
   if (!homeCookie(request, 'notifications-test')) return portal;
@@ -26,6 +28,11 @@ function progressFor(request,courseId) {
 function homeCookie(request,name) {return request.headers.cookie?.match(new RegExp(`(?:^|; )${name}=([^;]+)`))?.[1];}
 function homePortal(request,candidate) {
   const portal=portalFor(candidate);
+  if (homeCookie(request, 'account-test')) {
+    portal.preferences = accountPreferences.get(accountKey(request, candidate)) ?? {
+      activity_updates: true, learning_updates: false, product_updates: true, updated_at: null,
+    };
+  }
   const level=homeCookie(request,'home-level');
   if(['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'].includes(level)) portal.journey.journey.current_level=level;
   const state=homeCookie(request,'home-state');
@@ -217,7 +224,12 @@ const server = createServer(async (request, response) => {
     const authenticated = authenticatedProfile(request);
     return authenticated
       ? json(response, 200, {
-          customer: authenticated,
+          customer: homeCookie(request, 'account-identity') === 'long' ? {
+            ...authenticated,
+            first_name: 'María Fernanda Alejandra',
+            last_name: 'Guerrero Fernández de la Concepción',
+            email: 'maria.fernanda.alejandra.guerrero.fernandez@clientes.ejemplo.test',
+          } : authenticated,
           validation: { status: validationFor(authenticated).status },
           portal: request.headers.cookie?.includes('products-failure=true') ? null : homePortal(request,authenticated),
         })
@@ -377,12 +389,18 @@ const server = createServer(async (request, response) => {
     return json(response, 200, { updated: true });
   }
 
-  if (authenticatedProfile(request) && (
-    (method === "PATCH" && path === "/api/v1/rewards/portal/preferences")
-    || (method === "POST" && path.startsWith("/api/v1/rewards/portal/"))
-  )) {
+  if (method === "PATCH" && path === "/api/v1/rewards/portal/preferences") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, 'unauthenticated', 'Authentication required');
     const payload = await readJson(request);
-    return json(response, 200, path.endsWith("preferences") ? { ...payload, updated_at: "2026-08-24T12:00:00.000Z" } : { updated: true });
+    const preferences = { ...payload, updated_at: "2026-08-24T12:00:00.000Z" };
+    if (homeCookie(request, 'account-test')) accountPreferences.set(accountKey(request, authenticated), preferences);
+    return json(response, 200, preferences);
+  }
+
+  if (authenticatedProfile(request) && method === "POST" && path.startsWith("/api/v1/rewards/portal/")) {
+    await readJson(request);
+    return json(response, 200, { updated: true });
   }
 
   if (method === "GET" && path === "/api/v1/rewards/activities") {
