@@ -5,6 +5,7 @@ import PublicProducts from "../components/PublicProducts.astro";
 import PublicCouponBrands from "../components/PublicCouponBrands.astro";
 import PublicLearningPreview from "../components/PublicLearningPreview.astro";
 import PublicRewardsValue from "../components/PublicRewardsValue.astro";
+import PublicHowItWorks from "../components/PublicHowItWorks.astro";
 
 const navLinks = [
   { label: "Beneficios", href: "#beneficios" },
@@ -20,24 +21,6 @@ const soporteLinks = [
   { label: "Privacidad", href: "#privacidad" },
   { label: "Ayuda", href: "#ayuda" },
   { label: "Contacto", href: "#contacto" },
-];
-
-const timelineSteps = [
-  {
-    number: "01",
-    title: "Únete a Rewards",
-    text: "Crea tu cuenta para reunir en un solo lugar tu relación y tus avances con Carobra.",
-  },
-  {
-    number: "02",
-    title: "Validamos tu relación",
-    text: "Confirmamos tus productos Carobra de forma segura para mostrarte el nivel que te corresponde.",
-  },
-  {
-    number: "03",
-    title: "Avanza y disfruta",
-    text: "Consulta tus puntos, descubre tus siguientes pasos y explora los beneficios habilitados para ti.",
-  },
 ];
 
 ---
@@ -100,31 +83,7 @@ const timelineSteps = [
 
       <PublicRewardsValue />
 
-      <section id="experiencia" class="experience">
-        <div class="shell experience-grid">
-          <aside class="experience-intro">
-            <h2>
-              Empieza hoy y
-              <span>crece con nosotros</span>
-            </h2>
-            <p>Un camino sencillo para convertir tu relación con Carobra en una experiencia con más valor.</p>
-            <blockquote>
-              "Tu progreso se construye paso a paso. Nosotros te ayudamos a verlo y aprovecharlo."
-            </blockquote>
-          </aside>
-
-          <div class="experience-timeline">
-            {timelineSteps.map((step, index) => (
-              <article class="experience-step">
-                <span class="experience-step__dot" data-variant={index}></span>
-                <p class="experience-step__number">{step.number}</p>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PublicHowItWorks />
 
       <section id="quienes-somos" class="public-about">
         <div class="shell public-about__grid">
