@@ -10,12 +10,18 @@ test("concise customer rewards home and BFF expose only V2 rewards contracts", a
   assert.doesNotMatch(page, /legacyAccount|LegacyAccountSummary/);
   assert.match(page, /Astro\.locals\.rewardsPortal/);
   assert.doesNotMatch(page, /\/api\/v1\/rewards\/(?:journey|activities|movements)/);
-  assert.equal((page.match(/\bfetch\(/g) ?? []).length, 1);
+  assert.match(page, /Promise\.all/);
+  assert.match(page, /\/api\/v1\/rewards\/coupons\?page_size=4&preview=true/);
+  assert.match(page, /\/api\/v1\/rewards\/courses/);
   assert.match(page, /portal\?\.journey/);
   assert.match(page, /portal\?\.timeline\.slice\(0, 3\)/);
   assert.doesNotMatch(page, /portal\?\.activity_details/);
   assert.doesNotMatch(page, /portal\?\.movement_details/);
-  assert.match(page, /unavailable && !portal/);
+  assert.match(page, /No pudimos actualizar tu cuenta/);
+  assert.match(page, /private, no-store/);
+  assert.doesNotMatch(page, /portal\?\.learning|fallbackProgress|progressPercent|catalogBrands/);
+  const loader = await readFile(new URL('../../src/lib/customer-home.ts',import.meta.url),'utf8');
+  assert.match(loader, /AbortSignal\.timeout\(5000\)/);
 
   assert.doesNotMatch(bff, /"rewards\/(?:account|eligibility)"/);
   assert.match(bff, /"rewards\/journey"/);

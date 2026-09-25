@@ -14,6 +14,18 @@ function progressFor(request,courseId) {
   return {completed_chapters:count,total_chapters:3,completed:count===3,chapters};
 }
 function homeCookie(request,name) {return request.headers.cookie?.match(new RegExp(`(?:^|; )${name}=([^;]+)`))?.[1];}
+function homePortal(request,candidate) {
+  const portal=portalFor(candidate);
+  const level=homeCookie(request,'home-level');
+  if(['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'].includes(level)) portal.journey.journey.current_level=level;
+  const state=homeCookie(request,'home-state');
+  if(['BLOCKED','INACTIVE'].includes(state)) portal.journey.journey.state=state;
+  if(homeCookie(request,'home-rules')==='true') {
+    portal.journey.progress={target_level:'SILVER',rule_available:true,remaining_active_products:1,remaining_registration_months:2,remaining_qualifying_activities:0};
+    portal.journey.modules.expiry_policy_approved=true;
+  }
+  return portal;
+}
 function homeProgress(request,id) {
   if(homeCookie(request,'home-progress')==='unavailable') return null;
   const progress=progressFor(request,id);
@@ -188,7 +200,7 @@ const server = createServer(async (request, response) => {
       ? json(response, 200, {
           customer: authenticated,
           validation: { status: validationFor(authenticated).status },
-          portal: request.headers.cookie?.includes('products-failure=true') ? null : portalFor(authenticated),
+          portal: request.headers.cookie?.includes('products-failure=true') ? null : homePortal(request,authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
@@ -240,13 +252,16 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && path === "/api/v1/rewards/coupons") {
     const authenticated = authenticatedProfile(request);
     if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
-    const active = authenticated === eligibleProfile;
+    const mode=homeCookie(request,'home-coupons');
+    if(mode==='failure') return siteError(response,503,'partner_unavailable','Unavailable');
+    if(mode==='slow') await new Promise(resolve=>setTimeout(resolve,6500));
+    const active = authenticated === eligibleProfile && !['BLOCKED','INACTIVE'].includes(homeCookie(request,'home-state'));
     const accountUnavailable = authenticated === inactiveProfile || authenticated === attentionProfile;
     return json(response, 200, {
       current_level: active ? "BRONZE" : null,
-      access_state: active ? "AVAILABLE" : accountUnavailable ? "ACCOUNT_UNAVAILABLE" : "NO_LEVEL",
+      access_state: mode==='disabled' ? 'FEATURE_DISABLED' : active ? "AVAILABLE" : accountUnavailable ? "ACCOUNT_UNAVAILABLE" : "NO_LEVEL",
       affiliate_state: active ? "ACTIVE" : "DISABLED",
-      items: active ? bronzeCoupons : [],
+      items: ['disabled','empty'].includes(mode) ? [] : active ? mode==='many'?Array.from({length:6},(_,i)=>({...bronzeCoupons[0],id:`example-${i}`})):bronzeCoupons : [],
       refreshed_at: active ? "2026-09-10T12:00:00.000Z" : null,
       page: 1,
       page_size: 50,

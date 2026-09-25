@@ -328,6 +328,7 @@ async function routeRequest(
         bondaIdentity(evidence),
         integerQuery(requestUrl, "page", 1),
         integerQuery(requestUrl, "page_size", 20),
+        requestUrl.searchParams.get("preview") === "true",
       ));
       return;
     }

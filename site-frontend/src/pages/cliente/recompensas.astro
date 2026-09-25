@@ -1,147 +1,117 @@
 ---
-import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
-import { getSiteBackendBaseUrl } from "../../lib/api";
-import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
-import { levelLabel, type RewardsV2JourneyState, type RewardsV2Level } from "../../lib/rewards-v2-contract";
+import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
+import CouponCard from '../../components/CouponCard.astro';
+import HomeLearningCard from '../../components/HomeLearningCard.astro';
+import {getSiteBackendBaseUrl} from '../../lib/api';
+import type {RewardsCustomerPortal} from '../../lib/rewards-customer-portal-contract';
+import {levelLabel, journeyStateLabel, type RewardsV2Level} from '../../lib/rewards-v2-contract';
+import type {BondaCouponCatalog} from '../../lib/bonda-coupon-contract';
+import type {CoursesCatalog} from '../../lib/courses';
+import {readHomeModule, selectHomeLearning, homeCouponMessage} from '../../lib/customer-home';
+import {productOffers} from '../../lib/product-offers';
+import '../../styles/customer-home.css';
 
-const user = Astro.locals.user;
-const eligibility = Astro.locals.rewardsEligibility;
-const cookie = Astro.request.headers.get("cookie") ?? "";
-const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
-let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
-let unavailable = portalLoadedWithContext && !portal;
-
-if (!portalLoadedWithContext) {
-  try {
-    const portalResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
-      headers: { cookie },
-    });
-    if (portalResponse.status === 401) {
-      return Astro.redirect("/login?error=unauthenticated");
-    }
-    if (portalResponse.ok) {
-      portal = (await portalResponse.json()) as RewardsCustomerPortal;
-    } else {
-      unavailable = true;
-    }
-  } catch {
-    unavailable = true;
-  }
-}
-
-const journey = portal?.journey ?? null;
-const state: RewardsV2JourneyState = journey?.journey.state === "ACTIVE" || eligibility?.eligible
-  ? "ACTIVE"
-  : "INVITED";
-const currentLevel: RewardsV2Level | null = journey?.journey.current_level ?? null;
-const activeProducts = portal?.products.filter((product) => product.status === "ACTIVE").length ?? 0;
-const points = (value: string | null | undefined) => value == null ? "—" : new Intl.NumberFormat("es-MX").format(BigInt(value));
-const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(new Date(value));
-const levelTitle = state === "INVITED" ? "Invitado" : currentLevel ? levelLabel(currentLevel) : "Nivel en actualización";
-const heroCopy = state === "INVITED"
-  ? "Tu registro está completo. Puedes recorrer Rewards como Invitado hasta que exista un producto confirmado."
-  : currentLevel ? `Tu nivel ${levelLabel(currentLevel)} refleja la información vigente de tu cuenta.` : "Tus productos ya están validados y tu nivel se está actualizando.";
-const invitedDiscoveryAction = state === "INVITED" && portal?.primary_action.type === "STATUS" && !portal.primary_action.href;
-const actionTitle = invitedDiscoveryAction ? "Contrata tu primer producto y activa tu camino Rewards" : portal?.primary_action.title;
-const actionDescription = invitedDiscoveryAction ? "Conoce las soluciones de Carobra y habla con un asesor. Las recompensas y el nivel se confirmarán según la regla vigente de tu cuenta." : portal?.primary_action.description;
-const actionHref = invitedDiscoveryAction ? "/cliente/productos" : portal?.primary_action.href && !portal.primary_action.href.startsWith("#") && portal.primary_action.href !== "/cliente/ganar-puntos" ? portal.primary_action.href : null;
-const actionLabel = invitedDiscoveryAction ? "Ver productos" : portal?.primary_action.type === "SUPPORT" ? "Contactar soporte" : "Continuar";
+const cookie = Astro.request.headers.get('cookie') ?? '';
+const base = getSiteBackendBaseUrl();
+const [accountResult, couponResult, learningResult] = await Promise.all([
+  Astro.locals.rewardsPortal !== undefined
+    ? Promise.resolve({status:200, data:Astro.locals.rewardsPortal})
+    : readHomeModule<RewardsCustomerPortal>(base, '/api/v1/rewards/portal', cookie),
+  readHomeModule<BondaCouponCatalog>(base, '/api/v1/rewards/coupons?page_size=4&preview=true', cookie),
+  readHomeModule<CoursesCatalog>(base, '/api/v1/rewards/courses', cookie),
+]);
+if ([accountResult, couponResult, learningResult].some(result => result.status === 401)) return Astro.redirect('/login?error=unauthenticated');
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+const portal = accountResult.data;
+const journey = portal?.journey;
+const state = journey?.journey.state;
+const currentLevel = journey?.journey.current_level ?? null;
+const invited = state === 'INVITED';
+const restricted = state === 'BLOCKED' || state === 'INACTIVE';
+const levelTitle = invited ? 'Invitado' : currentLevel ? levelLabel(currentLevel) : 'Nivel en actualización';
+const catalog = couponResult.data;
+const coupons = !invited && !restricted && catalog?.access_state === 'AVAILABLE' ? catalog.items.slice(0,4) : [];
+const learning = learningResult.data;
+const picks = selectHomeLearning(learning, invited || restricted);
+const levels: RewardsV2Level[] = ['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'];
+const target = journey?.progress.target_level;
+const approvedTarget = state === 'ACTIVE' && currentLevel && target && journey?.progress.rule_available && levels.indexOf(target) > levels.indexOf(currentLevel);
+const requirements = approvedTarget ? [
+  {remaining:journey!.progress.remaining_active_products, singular:'producto activo', plural:'productos activos'},
+  {remaining:journey!.progress.remaining_registration_months, singular:'mes de permanencia', plural:'meses de permanencia'},
+  {remaining:journey!.progress.remaining_qualifying_activities, singular:'actividad válida', plural:'actividades válidas'},
+].filter(item => item.remaining !== null && item.remaining > 0) : [];
+const points = (value: string | null | undefined) => value == null ? '—' : new Intl.NumberFormat('es-MX').format(BigInt(value));
+const date = (value:string) => new Intl.DateTimeFormat('es-MX',{dateStyle:'medium'}).format(new Date(value));
+const expiry = journey?.modules.expiry_policy_approved && journey.points.next_expiration_at ? date(journey.points.next_expiration_at) : null;
 const recentActivity = portal?.timeline.slice(0, 3) ?? [];
-const assignedCourses = portal?.learning.items.length ?? 0;
-const catalogEnabled = journey?.modules.benefits_enabled === true;
-const isMaximumLevel = currentLevel === "TITANIUM";
-const progressTitle = journey?.progress.target_level ? `Camino a ${levelLabel(journey.progress.target_level)}` : isMaximumLevel ? "Llegaste al nivel más alto" : "Tu siguiente nivel";
-const expiryLabel = journey?.modules.expiry_policy_approved && journey.points.next_expiration_at
-  ? new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(journey.points.next_expiration_at))
-  : null;
-const configuredProgress = journey?.progress.rule_available ? [
-  { label: "Productos activos", remaining: journey.progress.remaining_active_products },
-  { label: "Permanencia", remaining: journey.progress.remaining_registration_months },
-  { label: "Actividades", remaining: journey.progress.remaining_qualifying_activities },
-].filter((item): item is { label: string; remaining: number } => item.remaining !== null) : [];
-const fallbackProgress = [
-  { label: "Registro completo", complete: true },
-  { label: "Primer producto", complete: activeProducts > 0 },
-  { label: "Actividad confirmada", complete: false },
-];
-const progressSteps = configuredProgress.length
-  ? configuredProgress.map((item) => ({ label: item.label, complete: item.remaining === 0 }))
-  : fallbackProgress;
-const completedProgressSteps = progressSteps.filter((step) => step.complete).length;
-const progressPercent = Math.round((completedProgressSteps / progressSteps.length) * 100);
-const progressDestination = journey?.progress.target_level ? levelLabel(journey.progress.target_level) : "Bronce";
-const catalogBrands = ["Amazon", "Cinépolis", "Soriana", "Uber", "Starbucks"];
+const action = portal?.primary_action;
+const pendingHref = action?.status === 'PENDING' && action.href && /^\/cliente\/(perfil|activities|productos|ayuda|cursos)(?:[/?#]|$)/.test(action.href) && !action.href.includes('\\') ? action.href : null;
+const learningEmpty = !learning ? 'No pudimos cargar estos contenidos. Puedes volver a intentarlo desde su catálogo.'
+  : learning.status === 'DISABLED' ? 'Este catálogo no está habilitado por el momento.'
+  : restricted ? 'Revisa el estado de tu cuenta para acceder a estos contenidos.'
+  : invited ? 'Los contenidos comienzan en Bronce. Puedes explorar el catálogo y conocer los niveles de acceso.'
+  : 'No hay contenidos disponibles para tu cuenta en este momento.';
 ---
-
-<ClientShellLayout title="Inicio Rewards | Carobra" description="Tu nivel, saldo y siguiente acción en Carobra Rewards." currentPath="/cliente/recompensas" sectionLabel="Inicio Rewards">
-  <main class="rewards-home">
-    <header class="rewards-home__welcome">
-      <div><p class="rewards-home__eyebrow">Carobra Rewards</p><h1>Hola, {user?.firstName ?? "cliente"}</h1></div>
-      <a href="/cliente/perfil">Ver mi cuenta</a>
+<ClientShellLayout title="Inicio Rewards | Carobra" description="Tus beneficios, aprendizaje y nuevas posibilidades en Carobra Rewards." currentPath="/cliente/recompensas" sectionLabel="Inicio Rewards">
+  <main class="customer-home">
+    <header class="home-welcome">
+      <div><p class="home-eyebrow">Tu espacio Carobra Rewards</p><h1>Hola, {Astro.locals.user?.firstName ?? 'cliente'}<span aria-hidden="true">.</span></h1></div>
+      <a class="home-text-link" href="/cliente/perfil">Ver mi cuenta <span aria-hidden="true">↗</span></a>
     </header>
 
-    {unavailable && !portal ? (
-      <section class="rewards-home__unavailable" role="status">
-        <span aria-hidden="true">!</span><div><h2>No pudimos actualizar tu cuenta</h2><p>Tu información sigue protegida. Intenta de nuevo en unos minutos.</p></div>
+    {journey ? <section class="home-account" aria-label="Resumen de tu cuenta">
+      <div class="home-level" data-level={invited ? 'INVITED' : currentLevel ?? 'UNKNOWN'}>
+        <div class="home-level__heading"><div><p class="home-eyebrow">{restricted ? 'Estado de tu cuenta' : 'Tu nivel actual'}</p><h2>{restricted ? journeyStateLabel(state!) : levelTitle}</h2></div><span class="home-level__emblem" aria-hidden="true">✦</span></div>
+        <p>{invited ? 'Tu próximo paso comienza con un producto confirmado.' : restricted ? 'Consulta tu cuenta o contacta a Ayuda para conocer los siguientes pasos.' : currentLevel === 'TITANIUM' ? 'Llegaste a lo más alto. Disfruta lo que tu nivel tiene para ti.' : 'Haz espacio para aprender, disfrutar y seguir creciendo.'}</p>
+        {state === 'ACTIVE' && currentLevel && <ol class="home-levels" aria-label="Niveles del programa">{levels.map(level => <li data-level={level} aria-current={level === currentLevel ? 'step' : undefined}><span class="home-levels__marker" aria-hidden="true">{level === currentLevel ? '✓' : '●'}</span>{levelLabel(level)}</li>)}</ol>}
+        {invited ? <a href="/cliente/productos">Descubrir productos <span aria-hidden="true">→</span></a> : restricted && <a href="/cliente/ayuda">Ir a Ayuda <span aria-hidden="true">→</span></a>}
+      </div>
+      <div class="home-balance">
+        <div><p class="home-eyebrow">Tus puntos Rewards</p><p class="home-balance__amount">{points(journey.points.available)} <span>pts</span></p>{expiry && <p class="home-expiry">Próximo vencimiento: {expiry}</p>}<a class="home-text-link" href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a></div>
+        {requirements.length > 0 ? <div class="home-next-level"><strong>Tu camino a {levelLabel(target!)}</strong><p>Te faltan:</p><ul>{requirements.map(item => <li>{item.remaining} {item.remaining === 1 ? item.singular : item.plural}</li>)}</ul></div> : <div class="home-balance__note"><span aria-hidden="true">✦</span><p>{state === 'ACTIVE' ? 'Tus cupones y descuentos no consumen puntos.' : 'Consulta el detalle de tu saldo y los movimientos de tu cuenta.'}</p></div>}
+      </div>
+    </section> : <section class="home-notice" role="status"><h2>No pudimos actualizar tu cuenta</h2><p>No podemos mostrar tu nivel y saldo en este momento. Puedes seguir explorando las secciones disponibles.</p><a class="home-text-link" href="/cliente/recompensas">Volver a intentar →</a></section>}
+
+    {pendingHref && !restricted && <aside class="home-pending"><div><strong>{action!.title}</strong><p>{action!.description}</p></div><a class="home-text-link" href={pendingHref}>Continuar →</a></aside>}
+
+    <section class="home-section" aria-labelledby="home-benefits-title">
+      <div class="home-section-heading"><div><p class="home-eyebrow">Más para tu día a día</p><h2 id="home-benefits-title">Aprovecha tus beneficios</h2></div><a class="home-text-link" href="/cliente/beneficios">Ver todos <span aria-hidden="true">→</span></a></div>
+      {coupons.length ? <><p class="home-section-intro">Descuentos disponibles para ti, sin usar tus puntos.</p><div class="home-benefits-grid">{coupons.map(item => <CouponCard item={item} />)}</div></> : <div class="home-empty" role="status"><p>{restricted ? 'Revisa el estado de tu cuenta para consultar tus beneficios.' : invited ? 'Tus descuentos comienzan en Bronce, cuando tengas un producto confirmado y un nivel activo.' : homeCouponMessage(catalog)}</p>{invited && <a class="home-text-link" href="/cliente/productos">Descubrir productos →</a>}</div>}
+    </section>
+
+    <div class="home-learning-grid">
+      <section class="home-section" aria-labelledby="home-courses-title">
+        <div class="home-section-heading"><div><p class="home-eyebrow">A tu ritmo</p><h2 id="home-courses-title">Sigue aprendiendo</h2></div><a class="home-text-link" href="/cliente/cursos?tipo=cursos">Ver cursos →</a></div>
+        <p class="home-section-intro">{picks.courses.some(c => c.progress?.started && !c.progress.completed) ? 'Retoma lo que empezaste y sigue avanzando.' : 'Nuevas habilidades para lo que viene.'}</p>
+        {picks.courses.length ? <div class="home-learning-list">{picks.courses.map(course => <HomeLearningCard course={course} />)}</div> : <div class="home-empty" role="status"><p>{learningEmpty}</p></div>}
+        {learning?.progress_available === false && picks.courseCount > 0 && <p class="home-inline-notice" role="status">Tu avance guardado no está disponible en este momento. Puedes seguir explorando cursos.</p>}
       </section>
-    ) : portal && (
-      <>
-        <section class:list={["rewards-home__hero", `is-${state.toLowerCase()}`]} aria-labelledby="home-level-title">
-          <div class="rewards-home__hero-copy">
-            <p class="rewards-home__eyebrow">Tu nivel actual</p><h2 id="home-level-title">{levelTitle}</h2><p>{heroCopy}</p>
-            <div class="rewards-home__tags"><span>{activeProducts} {activeProducts === 1 ? "producto activo" : "productos activos"}</span><span>{state === "ACTIVE" ? "Producto confirmado" : "Miembro Invitado"}</span></div>
-          </div>
-          <article class="rewards-home__balance" aria-label="Saldo disponible">
-            <p>Saldo disponible</p><strong>{points(journey?.points.available)} <small>pts</small></strong><span>{journey?.redemption.eligible ? "Disponible para opciones habilitadas." : "Tu saldo se conserva mientras se habilitan opciones para tu cuenta."}</span>{expiryLabel ? <small class="rewards-home__expiry status-expiring">Vencen el {expiryLabel}</small> : <small class="rewards-home__expiry status-future">Sin vencimiento confirmado</small>}<a href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a>
-          </article>
-        </section>
+      <section class="home-section" aria-labelledby="home-wellness-title">
+        <div class="home-section-heading"><div><p class="home-eyebrow">Bienestar</p><h2 id="home-wellness-title">Un momento para ti</h2></div><a class="home-text-link" href="/cliente/cursos?tipo=bienestar">Ver bienestar →</a></div>
+        <p class="home-section-intro">Videos y lecturas para cuidarte. Desde Bronce.</p>
+        {picks.wellness.length ? <div class="home-learning-list">{picks.wellness.map(course => <HomeLearningCard course={course} />)}</div> : <div class="home-empty" role="status"><p>{learningEmpty}</p></div>}
+      </section>
+    </div>
 
-        <section class="rewards-home__action" aria-labelledby="home-action-title">
-          <span aria-hidden="true">→</span><div><p class="rewards-home__eyebrow">Tu siguiente acción</p><h2 id="home-action-title">{actionTitle}</h2><p>{actionDescription}</p></div>{actionHref && <a href={actionHref}>{actionLabel}</a>}
-        </section>
+    <section class="home-section home-products" aria-labelledby="home-products-title">
+      <div class="home-section-heading"><div><p class="home-eyebrow">Tu siguiente gran paso</p><h2 id="home-products-title">Haz más por lo que te importa</h2></div><a class="home-text-link" href="/cliente/productos">Ver productos →</a></div>
+      <p class="home-section-intro">Tus metas, tu tranquilidad, tu futuro. Descubre las soluciones de Carobra.</p>
+      <div class="home-products-grid">{productOffers.map(offer => <article class={`home-product home-product--${offer.id}`} aria-label={offer.name}>
+        <a href={`/cliente/productos#producto-${offer.id}`} aria-label={`Descubrir ${offer.name}`}>
+          <div class="home-product__brand">{offer.logo ? <img src={offer.logo} width={offer.logoWidth} height={offer.logoHeight} alt={offer.name} loading="lazy" /> : <span class="home-product__service">Modalidad <strong>40.</strong></span>}</div>
+          <div class="home-product__copy"><h3>{offer.category}</h3><p>{offer.headline}</p><span class="home-product__points">✦ +{offer.displayRewardPoints} puntos Rewards</span><strong class="home-product__open">Descubrir <span aria-hidden="true">→</span></strong></div>
+        </a>
+      </article>)}</div>
+    </section>
 
-        <section class="rewards-home__decision-grid">
-          <article class="rewards-home__panel rewards-home__panel--progress" aria-labelledby="home-progress-title">
-            <div class="rewards-home__panel-heading"><div><p class="rewards-home__eyebrow">Tu avance</p><h2 id="home-progress-title">{progressTitle}</h2></div></div>
-            {isMaximumLevel ? (
-              <div class="rewards-home__message"><strong>Máximo reconocimiento actual</strong><p>Tu nivel refleja el nivel más alto definido hoy en Rewards.</p></div>
-            ) : (
-              <div class="rewards-home__progress" aria-label={`${completedProgressSteps} de ${progressSteps.length} pasos hacia ${progressDestination}`}>
-                <div><strong>{completedProgressSteps} de {progressSteps.length} pasos hacia {progressDestination}</strong><span>{progressPercent}%</span></div>
-                <progress max="100" value={progressPercent}>{progressPercent}%</progress>
-                <ol>{progressSteps.map((step) => <li class:list={[step.complete && "is-complete"]}><span aria-hidden="true">{step.complete ? "✓" : ""}</span>{step.label}</li>)}</ol>
-              </div>
-            )}
-          </article>
-
-          <article class="rewards-home__panel rewards-home__panel--benefits" aria-labelledby="home-benefits-title">
-            <div class="rewards-home__panel-heading"><div><p class="rewards-home__eyebrow">Beneficios para ti</p><h2 id="home-benefits-title">Lo disponible hoy</h2></div><a href="/cliente/beneficios">Explorar</a></div>
-            <ul class="rewards-home__benefit-list">
-              <li><span aria-hidden="true">▶</span><div><strong>Contenido y cursos</strong><small>{assignedCourses ? `${assignedCourses} asignado${assignedCourses === 1 ? "" : "s"}` : "Sin contenido asignado"}</small></div></li>
-              <li><span aria-hidden="true">G</span><div><strong>Gift Cards</strong><small>{catalogEnabled ? "Consulta opciones disponibles" : "Categoría en preparación"}</small></div></li>
-            </ul>
-          </article>
-        </section>
-
-        <section class="rewards-home__recent" aria-labelledby="home-recent-title">
-          <div class="rewards-home__recent-heading"><div><p class="rewards-home__eyebrow">Actividad reciente</p><h2 id="home-recent-title">Últimos movimientos de tu cuenta</h2></div><a href="/cliente/activities">Ver toda la actividad</a></div>
-          {recentActivity.length ? <ol>{recentActivity.map((entry) => <li><span aria-hidden="true"></span><div><strong>{entry.title}</strong><p>{entry.description}</p><small>{date(entry.occurred_at)}</small></div></li>)}</ol> : <div class="rewards-home__message"><strong>Aún no hay actividad para mostrar</strong><p>Las confirmaciones y movimientos aparecerán aquí cuando estén disponibles.</p></div>}
-        </section>
-
-        <section class="rewards-home__catalog-preview" aria-labelledby="catalog-preview-title">
-          <div><p class="rewards-home__eyebrow">Catálogo próximamente</p><h2 id="catalog-preview-title">Tus puntos tendrán destinos concretos</h2><p>Estas marcas forman parte de la propuesta de catálogo y se mostrarán como disponibles cuando Carobra confirme inventario y condiciones.</p></div>
-          <ul>{catalogBrands.map((brand) => <li>{brand}</li>)}</ul>
-        </section>
-      </>
-    )}
+    <section class="home-section home-activity" aria-labelledby="home-activity-title">
+      <div class="home-section-heading"><h2 id="home-activity-title">Tu actividad reciente</h2><a class="home-text-link" href="/cliente/activities">Ver actividad →</a></div>
+      {recentActivity.length ? <ol>{recentActivity.map(entry => <li><span class="home-activity__dot" aria-hidden="true"></span><div><h3>{entry.title}</h3><p>{entry.description}</p><time datetime={entry.occurred_at}>{date(entry.occurred_at)}</time></div></li>)}</ol> : <p class="home-section-intro">{portal ? 'Aquí aparecerán las confirmaciones y los movimientos de tu cuenta.' : 'No pudimos consultar los movimientos de tu cuenta en este momento.'}</p>}
+    </section>
   </main>
-
   <script>
-    import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
-    attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
+    import {attachLogoutHandler, requireElement} from '../../lib/client-page-utils';
+    attachLogoutHandler(requireElement<HTMLButtonElement>('#logout'), '');
   </script>
-
-  <style>
-    .rewards-home{width:min(74rem,calc(100% - 2.2rem));margin:0 auto;padding:1.5rem 0 4rem;color:#173f68}.rewards-home__welcome{display:flex;justify-content:space-between;align-items:end;gap:1rem;margin-bottom:1.25rem}.rewards-home__welcome h1{margin:.2rem 0 0;font-size:clamp(2.45rem,5vw,4.4rem);line-height:.94;letter-spacing:-.055em}.rewards-home__welcome>a,.rewards-home__panel-heading>a,.rewards-home__recent-heading>a{color:#176f9e;font-size:.8rem;font-weight:850}.rewards-home__eyebrow{margin:0;color:#4380a7;font-size:.68rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.rewards-home__hero{min-height:23rem;display:grid;grid-template-columns:minmax(0,1fr) 19rem;align-items:end;gap:2.5rem;padding:clamp(1.6rem,5vw,3.5rem);border-radius:2rem;color:#fff;background:linear-gradient(125deg,#041c2c,#004b87);box-shadow:0 26px 58px rgba(54,75,127,.2);overflow:hidden}.rewards-home__hero.is-blocked,.rewards-home__hero.is-inactive{background:linear-gradient(120deg,#273d52,#526779)}.rewards-home__hero .rewards-home__eyebrow{color:#bce2f2}.rewards-home__hero-copy h2{margin:.3rem 0 .7rem;font-size:clamp(3.2rem,8vw,6.2rem);line-height:.84;letter-spacing:-.065em}.rewards-home__hero-copy>p:not(.rewards-home__eyebrow){max-width:42rem;margin:0;color:#e1edf5;line-height:1.6}.rewards-home__tags{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.2rem}.rewards-home__tags span{padding:.42rem .68rem;border:1px solid rgba(255,255,255,.23);border-radius:999px;background:rgba(255,255,255,.1);font-size:.72rem;font-weight:800}.rewards-home__balance{padding:1.45rem;border-radius:1.35rem;color:#173f68;background:#fffdf8;box-shadow:0 20px 42px rgba(31,36,78,.2)}.rewards-home__balance p{margin:0;color:#6c8094;font-size:.68rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.rewards-home__balance strong{display:block;margin:.4rem 0;font-size:3rem;line-height:1}.rewards-home__balance>span{display:block;color:#667e92;font-size:.78rem;line-height:1.5}.rewards-home__balance a{display:inline-flex;margin-top:1rem;color:#6754a6;font-size:.78rem;font-weight:900}.rewards-home__expiry{display:block;width:max-content;max-width:100%;margin-top:.8rem;padding:.35rem .5rem;border-radius:.45rem;font-size:.7rem;font-weight:800}.rewards-home__action{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1.1rem;margin-top:1rem;padding:1.35rem 1.5rem;border-radius:1.35rem;background:#fff;box-shadow:0 16px 34px rgba(77,57,91,.08)}.rewards-home__action>span{width:2.6rem;height:2.6rem;display:grid;place-items:center;border-radius:50%;color:#fff;background:#041c2c;font-size:1.25rem}.rewards-home__action h2{margin:.2rem 0;color:#173f68;font-size:clamp(1.25rem,3vw,1.8rem)}.rewards-home__action p:last-child{margin:0;color:#58738b}.rewards-home__action>a{padding:.7rem .95rem;border-radius:.55rem;color:#fff;background:#041c2c;font-size:.8rem;font-weight:850}.rewards-home__decision-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:1rem;margin-top:1rem}.rewards-home__panel,.rewards-home__recent,.rewards-home__catalog-preview{padding:clamp(1.4rem,3vw,2rem);border-radius:1.15rem;box-shadow:0 15px 34px rgba(28,54,83,.07);background:#fff}.rewards-home__panel-heading,.rewards-home__recent-heading{display:flex;justify-content:space-between;align-items:start;gap:1rem}.rewards-home__panel h2,.rewards-home__recent h2,.rewards-home__catalog-preview h2{margin:.25rem 0 0;font-size:clamp(1.3rem,3vw,1.8rem)}.rewards-home__message{margin-top:1rem;padding:1rem;border-radius:.9rem;background:#f2f8fc}.rewards-home__message p{margin:.3rem 0 0;color:#617a91;font-size:.86rem;line-height:1.55}.rewards-home__progress{margin-top:1rem}.rewards-home__progress>div{display:flex;justify-content:space-between;gap:1rem}.rewards-home__progress>div span{color:#536878;font-size:.78rem;font-weight:800}.rewards-home__progress progress{width:100%;height:.65rem;margin:.75rem 0;border:0;border-radius:999px;overflow:hidden;background:#e4e9ed;accent-color:#00a3e0}.rewards-home__progress progress::-webkit-progress-bar{background:#e4e9ed}.rewards-home__progress progress::-webkit-progress-value{background:#00a3e0}.rewards-home__progress ol{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:.2rem 0 0;padding:0;list-style:none}.rewards-home__progress li{display:flex;align-items:center;gap:.4rem;color:#687985;font-size:.72rem}.rewards-home__progress li>span{width:1.15rem;height:1.15rem;display:grid;place-items:center;border:1px solid #a7a8aa;border-radius:50%;font-size:.6rem}.rewards-home__progress li.is-complete{color:#19734a;font-weight:750}.rewards-home__progress li.is-complete>span{border-color:#19734a;background:#e9f7ef}.rewards-home__benefit-list{display:grid;gap:.65rem;margin:1rem 0 0;padding:0;list-style:none}.rewards-home__benefit-list li{display:flex;align-items:center;gap:.75rem;padding:.8rem;border-radius:.9rem;background:#f2f8fc}.rewards-home__benefit-list>li>span{width:2rem;height:2rem;display:grid;place-items:center;border-radius:50%;color:#004b87;background:#dff5fd;font-size:.7rem;font-weight:900}.rewards-home__benefit-list div{display:grid}.rewards-home__benefit-list small{color:#6b8092}.rewards-home__recent{margin-top:1rem}.rewards-home__recent ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;margin:1.1rem 0 0;padding:0;list-style:none}.rewards-home__recent li{display:grid;grid-template-columns:auto 1fr;gap:.7rem;padding:.95rem;border-radius:1rem;background:#f4f8fb}.rewards-home__recent li>span{width:.7rem;height:.7rem;margin-top:.35rem;border-radius:50%;background:#3a94ad;box-shadow:0 0 0 3px #d6efee}.rewards-home__recent p{margin:.25rem 0;color:#607990;font-size:.8rem;line-height:1.45}.rewards-home__recent small{color:#8393a0}.rewards-home__catalog-preview{display:grid;grid-template-columns:minmax(0,1fr) minmax(22rem,.8fr);align-items:center;gap:2rem;margin-top:1rem}.rewards-home__catalog-preview p:last-child{margin:.45rem 0 0;color:#607990}.rewards-home__catalog-preview ul{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.5rem;margin:0;padding:0;list-style:none}.rewards-home__catalog-preview li{padding:.55rem .75rem;border:1px solid #cbd7df;border-radius:.55rem;color:#5f6c75;background:#edf0f2;font-size:.78rem;font-weight:800}.rewards-home__unavailable{display:flex;align-items:center;gap:1rem;padding:1.5rem;border-radius:1.35rem;background:#fff}.rewards-home__unavailable>span{width:2.5rem;height:2.5rem;display:grid;place-items:center;border-radius:50%;color:#8a5147;background:#fde7df;font-weight:900}.rewards-home__unavailable h2{margin:0}.rewards-home__unavailable p{margin:.3rem 0 0;color:#627b90}@media(max-width:760px){.rewards-home{width:min(100% - 1.1rem,74rem);padding-top:1rem}.rewards-home__welcome{align-items:flex-start}.rewards-home__hero{min-height:auto;grid-template-columns:1fr;gap:1.5rem;padding:1.35rem;border-radius:1.35rem}.rewards-home__balance{width:100%}.rewards-home__action{grid-template-columns:auto 1fr}.rewards-home__action>a{grid-column:1/-1;text-align:center}.rewards-home__decision-grid,.rewards-home__catalog-preview{grid-template-columns:1fr}.rewards-home__catalog-preview ul{justify-content:flex-start}.rewards-home__recent ol{grid-template-columns:1fr}}@media(max-width:420px){.rewards-home__welcome{flex-direction:column}.rewards-home__hero-copy h2{font-size:3.1rem}.rewards-home__panel-heading,.rewards-home__recent-heading{flex-direction:column}.rewards-home__progress ol{grid-template-columns:1fr}.rewards-home__action{padding:1.1rem}.rewards-home__action>span{display:none}}
-  </style>
 </ClientShellLayout>

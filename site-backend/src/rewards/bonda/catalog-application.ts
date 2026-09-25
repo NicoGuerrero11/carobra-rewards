@@ -133,7 +133,7 @@ export class BondaCouponApplicationError extends Error {
 }
 
 export interface BondaCouponHttpApplication {
-  getCatalog(identity: BondaCouponCustomerIdentity, page?: number, pageSize?: number): Promise<BondaCouponCatalogHttpResponse>;
+  getCatalog(identity: BondaCouponCustomerIdentity, page?: number, pageSize?: number, previewOnly?: boolean): Promise<BondaCouponCatalogHttpResponse>;
   getDetail(identity: BondaCouponCustomerIdentity, couponId: string): Promise<BondaCouponDetailHttpResponse>;
   getBranches(identity: BondaCouponCustomerIdentity, couponId: string): Promise<BondaCouponBranchesHttpResponse>;
   requestCode(identity: BondaCouponCustomerIdentity, couponId: string, requestId?: string): Promise<BondaCouponCodeHttpResponse>;
@@ -158,9 +158,10 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     identity: BondaCouponCustomerIdentity,
     page = 1,
     pageSize = 20,
+    previewOnly = false,
   ): Promise<BondaCouponCatalogHttpResponse> {
     validatePage(page, pageSize);
-    const context = await this.readContext(identity);
+    const context = await this.readContext(identity, previewOnly);
     if (context.accessState !== "AVAILABLE") {
       return assertBondaCouponCatalogContract({
         current_level: context.journey?.currentLevel ?? null,
@@ -376,7 +377,7 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     };
   }
 
-  private async readContext(identity: BondaCouponCustomerIdentity): Promise<{
+  private async readContext(identity: BondaCouponCustomerIdentity, previewOnly = false): Promise<{
     journey: BondaCouponJourney | null;
     policies: readonly BondaCouponPolicyRecord[];
     affiliateState: BondaAffiliateIntegrationState;
@@ -395,6 +396,11 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
     }
     if (journey.state === "INVITED" || !journey.currentLevel) {
       return { journey, policies: [], affiliateState: "DISABLED", accessState: "NO_LEVEL" };
+    }
+    // Inicio is discovery only: never provision a customer affiliate on a home visit.
+    if (previewOnly) {
+      if (!this.catalogAffiliateCode) return { journey, policies: [], affiliateState: "DISABLED", accessState: "AFFILIATE_PENDING" };
+      return { journey, policies: await this.policies.listEffective(now), affiliateState: "DISABLED", accessState: "AVAILABLE" };
     }
     const [affiliate, policies] = await Promise.all([
       this.affiliateProvisioning.ensureForBenefits(identity),

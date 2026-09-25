@@ -35,6 +35,23 @@ const policies: readonly BondaCouponPolicyRecord[] = [
   policy("titanium", "TITANIUM", 5),
 ];
 
+test("home preview is authorized and never provisions affiliates or issues codes", async () => {
+  const gateway = new CountingGateway({coupons: policies.map(p => fakeBondaCoupon({id:p.bondaCouponId}))});
+  let provisioning = 0;
+  let journey: BondaCouponJourney = {state:'ACTIVE',currentLevel:'BRONZE'};
+  const create = (affiliate?: string) => new BondaCouponApplication(gateway,{listEffective:async()=>policies},{get:async()=>journey},
+    {ensureForBenefits:async()=>{provisioning++;throw Error('must not provision');}},new MemoryRequestStore(),new EnabledRuleLookup(),new FixedClock(now),()=> 'test',undefined,affiliate);
+  const app = create('990910001');
+  assert.deepEqual((await app.getCatalog(identity,1,4,true)).items.map(item=>item.id),['bronze']);
+  for (const state of ['INVITED','BLOCKED','INACTIVE'] as const) {
+    journey={state,currentLevel:'TITANIUM'};
+    assert.equal((await app.getCatalog(identity,1,4,true)).items.length,0);
+  }
+  journey={state:'ACTIVE',currentLevel:'BRONZE'};
+  assert.equal((await create().getCatalog(identity,1,4,true)).access_state,'AFFILIATE_PENDING');
+  assert.equal(provisioning,0);assert.equal(gateway.codeRequests.length,0);
+});
+
 test("applies cumulative Carobra policy over live Bonda content", async () => {
   const gateway = new FakeBondaGateway({
     coupons: policies.map((item) => fakeBondaCoupon({ id: item.bondaCouponId, name: item.bondaCouponId })),

@@ -26,7 +26,7 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   const activeNavigation = page.getByRole("navigation", { name: isMobile ? /Navegación móvil/ : /Navegación cliente/ });
   await expect(activeNavigation.getByText("Inicio", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Servicios", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Contrata tu primer producto y activa tu camino Rewards" })).toBeVisible();
+  await expect(page.locator('.home-level').getByRole('link', {name:/Descubrir productos/})).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
   const rendered = await page.reload();
   expect(rendered?.headers()["server-timing"]).toMatch(/auth-context;dur=\d+\.\d, page-render;dur=\d+\.\d, total;dur=\d+\.\d/);
@@ -52,7 +52,8 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Bronce" })).toBeVisible();
   await expect(page.getByText("150 pts").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Completa tu perfil financiero" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Aprovecha tus beneficios" })).toBeVisible();
+  await expect(page.getByText("Completa tu perfil financiero")).toHaveCount(0); // Legacy hash-only action is not actionable from Inicio.
   await expect(page.getByText("Cuenta de retiro")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
 

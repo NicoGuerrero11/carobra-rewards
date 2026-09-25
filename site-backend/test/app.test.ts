@@ -162,6 +162,17 @@ test("authenticated coupon routes bind customer and Rewards ID from API evidence
     identity: { customerId: profile.id, rewardsId: profile.rewards_id },
     page: 2,
     pageSize: 5,
+    previewOnly: false,
+  });
+  const preview = await fetch(`${bff.url}/api/v1/rewards/coupons?page_size=4&preview=true&customer_id=other`, {
+    headers: { cookie: "carobra_session=api-secret" },
+  });
+  assert.equal(preview.status, 200);
+  assert.deepEqual(coupons.catalogRequest, {
+    identity: { customerId: profile.id, rewardsId: profile.rewards_id },
+    page: 1,
+    pageSize: 4,
+    previewOnly: true,
   });
 });
 
@@ -465,10 +476,10 @@ class CapturingBondaAffiliateApplication implements BondaAffiliateProvisioningHt
 }
 
 class CapturingBondaCouponApplication implements BondaCouponHttpApplication {
-  catalogRequest: { identity: BondaCouponCustomerIdentity; page: number; pageSize: number } | null = null;
+  catalogRequest: { identity: BondaCouponCustomerIdentity; page: number; pageSize: number; previewOnly: boolean } | null = null;
 
-  async getCatalog(identity: BondaCouponCustomerIdentity, page = 1, pageSize = 20): Promise<BondaCouponCatalogHttpResponse> {
-    this.catalogRequest = { identity, page, pageSize };
+  async getCatalog(identity: BondaCouponCustomerIdentity, page = 1, pageSize = 20, previewOnly = false): Promise<BondaCouponCatalogHttpResponse> {
+    this.catalogRequest = { identity, page, pageSize, previewOnly };
     return {
       current_level: null,
       access_state: "NO_LEVEL",
