@@ -43,6 +43,8 @@ test("customer navigation exposes courses and labeled utility actions", async ()
   assert.doesNotMatch(shell, /label: "Ganar puntos"/);
   assert.match(shell, /data-tooltip="Ayuda"/);
   assert.match(shell, /data-tooltip="Notificaciones"/);
-  assert.match(courses, /<h1 id="courses-coming-soon-title">Próximamente<\/h1>/);
+  assert.match(courses, /\/api\/v1\/rewards\/courses/);
+  assert.match(courses, /Cursos para seguir creciendo/);
+  assert.match(courses, /catalog.status === 'DISABLED'/);
   assert.doesNotMatch(benefits, /Otras experiencias|other-benefits-title/);
 });

@@ -133,6 +133,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const requestStartedAt = performance.now();
   const pathname = context.url.pathname;
   const isCustomerEntryPath = customerEntryPaths.has(pathname)
+    || /^\/cliente\/cursos\/[^/]{1,200}$/.test(pathname)
     || /^\/cliente\/beneficios\/[^/]{1,200}$/.test(pathname);
 
   // The admin workspace remains outside the authenticated customer MVP.

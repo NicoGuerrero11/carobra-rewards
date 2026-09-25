@@ -6,6 +6,22 @@ const pendingSessionCookie = "carobra_session=e2e-pending";
 const eligibleSessionCookie = "carobra_session=e2e-eligible";
 const inactiveSessionCookie = "carobra_session=e2e-inactive";
 const attentionSessionCookie = "carobra_session=e2e-attention";
+const videoProgress = new Map();
+function progressKey(request,courseId) {return `${request.headers.cookie?.match(/progress-test=([^;]+)/)?.[1]??'default'}:${courseId}`;}
+function progressFor(request,courseId) {
+  const chapters=videoProgress.get(progressKey(request,courseId))??[];
+  const count=chapters.filter(c=>c.manual_completed_at||c.playback_completed_at).length;
+  return {completed_chapters:count,total_chapters:3,completed:count===3,chapters};
+}
+function homeCookie(request,name) {return request.headers.cookie?.match(new RegExp(`(?:^|; )${name}=([^;]+)`))?.[1];}
+function homeProgress(request,id) {
+  if(homeCookie(request,'home-progress')==='unavailable') return null;
+  const progress=progressFor(request,id);
+  const rows=progress.chapters.filter(row=>row.watched_seconds>0||row.manual_completed_at||row.playback_completed_at).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));
+  const unfinished=rows.find(row=>!row.manual_completed_at&&!row.playback_completed_at);
+  const number=unfinished?unfinished.chapter_id-1255:[1,2,3].find(n=>!rows.some(row=>row.chapter_id===1255+n&&(row.manual_completed_at||row.playback_completed_at)));
+  return {...progress,started:rows.length>0,last_activity_at:rows[0]?.updated_at??null,resume_chapter_number:rows.length&&!progress.completed?number:null};
+}
 
 const profile = {
   id: "00000000-0000-0000-0000-000000000301",
@@ -175,6 +191,50 @@ const server = createServer(async (request, response) => {
           portal: portalFor(authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");
+  }
+
+  const progressMatch=path.match(/^\/api\/v1\/rewards\/courses\/(1256|1500)\/progress$/);
+  if(progressMatch && ['GET','POST'].includes(method)) {
+    const authenticated=authenticatedProfile(request);
+    if(!authenticated) return siteError(response,401,'unauthenticated','Authentication required');
+    if(authenticated!==eligibleProfile) return siteError(response,403,'course_locked','Locked');
+    if(request.headers.cookie?.includes('progress-failure=true')) return siteError(response,503,'progress_unavailable','Unavailable');
+    const courseId=Number(progressMatch[1]);
+    if(method==='POST') {
+      const input=await readJson(request);
+      const data=progressFor(request,courseId);
+      const old=data.chapters.find(c=>c.chapter_id===input.chapter_id);
+      const ranges=[...(old?.played_ranges??[]),...input.ranges].sort((a,b)=>a[0]-b[0]);
+      const merged=[];
+      for(const range of ranges){const last=merged.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else merged.push([...range]);}
+      const seconds=merged.reduce((sum,[a,b])=>sum+b-a,0);
+      const row={course_id:courseId,chapter_id:input.chapter_id,played_ranges:merged,duration_seconds:600,watched_seconds:seconds,
+        manual_completed_at:old?.manual_completed_at??(input.manual?new Date().toISOString():null),
+        playback_completed_at:old?.playback_completed_at??(seconds>=480?new Date().toISOString():null),updated_at:new Date().toISOString()};
+      videoProgress.set(progressKey(request,courseId),[...data.chapters.filter(c=>c.chapter_id!==input.chapter_id),row]);
+    }
+    return json(response,200,progressFor(request,courseId));
+  }
+  if (method === 'GET' && path.startsWith('/api/v1/rewards/courses')) {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, 'unauthenticated', 'Authentication is required');
+    if (request.headers.cookie?.includes('courses-failure=true')) return siteError(response,503,'courses_unavailable','Unavailable');
+    const accessible = authenticated === eligibleProfile && !['BLOCKED','INACTIVE'].includes(homeCookie(request,'home-state'));
+    const gold = accessible && request.headers.cookie?.includes('courses-level=GOLD');
+    const first = {id:1256,title:'Gestión Financiera Personal',space:'cursos',content_type:'video',category:'Finanzas',minimum_level:'BRONZE',summary:'Organiza tus finanzas y construye hábitos de ahorro.',image_url:'https://i.vimeocdn.com/video/1726147607-d_640x360',chapter_count:3,duration_seconds:1800,accessible};
+    const second = {...first,id:226,title:'Cómo Potenciar tus Conocimientos de Inglés',category:'Inglés',minimum_level:'SILVER',summary:'Mejora tu inglés.',image_url:null,chapter_count:1,duration_seconds:900,accessible:Boolean(gold)};
+    const emotional = {...first,id:273,title:'Inteligencia Emocional',category:'Bienestar',minimum_level:'GOLD',chapter_count:1,accessible:Boolean(gold)};
+    const wellness = {...first,id:1500,title:'Rutina de relajación cervical',space:'bienestar',category:'Meditación'};
+    const article = {...wellness,id:61,title:'7 ejercicios para realizar con pelota medicinal',content_type:'text',category:'Entrenamiento',chapter_count:1,duration_seconds:null};
+    if (path === '/api/v1/rewards/courses') {
+      const mode=homeCookie(request,'home-learning');
+      return json(response,200,{status:mode==='disabled'?'DISABLED':'AVAILABLE',progress_available:homeCookie(request,'home-progress')!=='unavailable',current_level:accessible?(gold?'GOLD':'BRONZE'):null,reviewed_at:'2026-09-24',courses:['empty','disabled'].includes(mode)?[]:[first,second,emotional,wellness,article].map(c=>({...c,progress:c.content_type==='text'?null:homeProgress(request,c.id)}))});
+    }
+    const selected=[first,second,emotional,wellness,article].find(c=>path===`/api/v1/rewards/courses/${c.id}` && c.accessible);
+    if (!selected) return siteError(response,403,'course_locked','Locked');
+    if (!accessible) return siteError(response,403,'course_locked','Locked');
+    if(selected.content_type==='text') return json(response,200,{course:selected,progress:null,chapters:[{id:61,number:1,title:selected.title,summary:'Ideas para entrenar a tu ritmo.',content:'Primera recomendación.\n\nSegunda recomendación. <script>alert("unsafe")</script>',duration_seconds:null,presenters:['Equipo de Bienestar'],embed_url:null}]});
+    return json(response,200,{course:selected,progress:progressFor(request,selected.id),chapters:[1,2,3].map(n=>({id:1255+n,number:n,title:`Gestión Financiera Personal Cap ${n}`,summary:`Resumen del capítulo ${n}`,content:`Contenido del capítulo ${n}`,duration_seconds:600,presenters:['Docente de prueba'],embed_url:`https://player.vimeo.com/video/${123450+n}?dnt=1`}))});
   }
 
   if (method === "GET" && path === "/api/v1/rewards/coupons") {

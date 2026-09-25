@@ -26,8 +26,15 @@ const proxy: APIRoute = async ({ params, request }) => {
     return siteError(404, "not_found", "Route not found");
   }
 
+  if (request.method === 'POST' && /^rewards\/courses\/\d+\/progress$/.test(path)
+    && (request.headers.get('origin') !== new URL(request.url).origin
+      || request.headers.get('x-carobra-action') !== 'course-progress'
+      || !request.headers.get('content-type')?.startsWith('application/json'))) {
+    return siteError(403,'invalid_progress_request','Same-origin JSON request required');
+  }
+
   const headers = new Headers({ accept: "application/json" });
-  for (const name of ["content-type", "cookie"]) {
+  for (const name of ["content-type", "cookie", "x-carobra-action"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -69,6 +76,7 @@ const proxy: APIRoute = async ({ params, request }) => {
 };
 
 function isAllowedPath(path: string): boolean {
+  if (/^rewards\/courses\/[1-9]\d{0,9}\/progress$/.test(path)) return true;
   if (allowedPaths.has(path)) return true;
   return /^rewards\/coupons(?:\/affiliate-status|\/history|\/[^/]{1,200}(?:\/(?:code|branches))?)?$/.test(path);
 }

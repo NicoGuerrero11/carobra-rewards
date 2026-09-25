@@ -37,7 +37,7 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page.getByRole("button", { name: /canjear|redimir/i })).toHaveCount(0);
 
   await page.goto("/cliente/cursos");
-  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cursos y bienestar" })).toBeVisible();
 
   await page.goto("/cliente/gift-cards");
   await expect(page.getByRole("heading", { name: "Esta categoría aún no está habilitada" })).toBeVisible();
@@ -57,7 +57,7 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.locator("body")).not.toContainText(/SISCA|H24|H72|D3|D5/i);
 
   await page.goto("/cliente/cursos");
-  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cursos y bienestar" })).toBeVisible();
 
   await page.goto("/cliente/notificaciones");
   await expect(page.getByRole("heading", { name: "Notificaciones" })).toBeVisible();
@@ -114,7 +114,7 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
 
   await page.goto("/cliente/ganar-puntos");
   await expect(page).toHaveURL(/\/cliente\/cursos$/);
-  await expect(page.getByRole("heading", { name: "Próximamente" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cursos y bienestar" })).toBeVisible();
 
   await page.goto("/cliente/productos");
   await expect(page.getByRole("heading", { name: "Productos", exact: true })).toBeVisible();
