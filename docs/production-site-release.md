@@ -58,7 +58,8 @@ contenido; no autoriza altas de afiliados ni emisión de cupones.
    de afiliaciones externas. Para el BFF, `npm run db:migrate` aplica **todas**
    las migraciones pendientes; revisar esa lista antes de ejecutarlo.
 4. Con las credenciales cargadas, desplegar API y BFF antes de promover el
-   frontend. Verificar los healthchecks de ambos servicios.
+   frontend. Verificar `/health` en API y que `/api/v1/me` en BFF responda
+   `401` sin sesión; el BFF no expone un endpoint `/health`.
 5. En el BFF ya actualizado, ejecutar `npm run bonda:check` con las variables
    de Railway. Debe devolver `ready: true` y cuatro comprobaciones `OK`.
    No imprime secretos ni escribe en Bonda.
@@ -93,14 +94,18 @@ el runtime compatible y verificar el resultado del despliegue.
   temporal y sus conexiones se eliminaron al finalizar.
 - Se cargaron las 12 variables Bonda en Railway `site-backend`, entorno
   `production`, y se verificó que las 11 variables preexistentes no cambian.
-  Railway las mantiene como cambios pendientes hasta ejecutar `Deploy Changes`,
-  que redespliega el BFF y requiere autorización explícita de producción.
+  El responsable confirmó que aplicó las variables y reinició el BFF.
+  Se verificaron las 23 variables en Railway y las respuestas públicas:
+  API `/health` HTTP 200; BFF `/api/v1/me` HTTP 401 sin sesión.
+  Estas comprobaciones no sustituyen el diagnóstico Bonda en el BFF actualizado
+  después de publicar el código de esta entrega.
 - GitGuardian reporta un posible `Generic Password` en
   `site-backend/src/rewards/courses/activities-gateway.ts:29`, commit `39389b5`.
-  La línea comprueba `url.password` para rechazar URLs con credenciales;
-  no contiene una contraseña literal. El hallazgo se documenta como falso
-  positivo pendiente de clasificación en GitGuardian; no se deshabilitó el
-  control ni se reescribió el historial.
+  El incidente `37627936` resaltaba `url.port` después de `url.password` en
+  una condición que rechaza URLs con credenciales o puertos no permitidos.
+  No hay una contraseña literal. Se clasificó como `Not a secret (false
+  positive)` en GitGuardian; el control permanece activo y el historial
+  se conserva.
 
 ## Reversión
 
