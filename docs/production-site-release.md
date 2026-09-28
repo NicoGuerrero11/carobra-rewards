@@ -77,8 +77,8 @@ el runtime compatible y verificar el resultado del despliegue.
   y bienestar; el diagnóstico devolvió `ready: true`.
 - La base accesible mediante la configuración local de API tiene la revisión
   `20260928_customer_birth_date`, la columna `customers.birth_date` y todas las
-  migraciones del BFF aplicadas. Falta comparar ese destino con las variables
-  actuales de Railway; este dato no sustituye esa comprobación.
+  migraciones del BFF aplicadas. Se cotejaron el host y nombre de base con
+  `DATABASE_URL` de Railway `site-backend`: corresponden al mismo destino.
 - No se encontraron valores de los secretos locales configurados en los
   archivos versionados ni en el historial de commits de la entrega.
 - BFF: 276 pruebas aprobadas y 7 omitidas por requerir infraestructura opcional.
@@ -86,12 +86,21 @@ el runtime compatible y verificar el resultado del despliegue.
   corrida completa y las 10 de elegibilidad aprobadas al actualizar sus
   comprobaciones al rediseño (8 de ellas fallaban por textos anteriores).
 - El build con Node 20 terminó correctamente y generó `runtime: nodejs20.x`.
-  Ruff y Pyright pasaron. La validación de API con base aislada se registra en
-  el PR al finalizar.
-- La sesión de Railway disponible no tiene acceso al proyecto de producción
-  identificado en los estados de GitHub. La transferencia de variables sigue
-  pendiente hasta recuperar ese acceso. No fusionar contando con que el PR
-  transfiera credenciales.
+  Ruff y Pyright pasaron. CI de GitHub: 151 pruebas API aprobadas y 39 omitidas
+  por no disponer de base de integración. La corrida remota en una base
+  temporal aislada llegó a 161 pruebas aprobadas, pero falló después por DNS
+  de Neon; no se considera una validación completa de integración. La base
+  temporal y sus conexiones se eliminaron al finalizar.
+- Se cargaron las 12 variables Bonda en Railway `site-backend`, entorno
+  `production`, y se verificó que las 11 variables preexistentes no cambian.
+  Railway las mantiene como cambios pendientes hasta ejecutar `Deploy Changes`,
+  que redespliega el BFF y requiere autorización explícita de producción.
+- GitGuardian reporta un posible `Generic Password` en
+  `site-backend/src/rewards/courses/activities-gateway.ts:29`, commit `39389b5`.
+  La línea comprueba `url.password` para rechazar URLs con credenciales;
+  no contiene una contraseña literal. El hallazgo se documenta como falso
+  positivo pendiente de clasificación en GitGuardian; no se deshabilitó el
+  control ni se reescribió el historial.
 
 ## Reversión
 
