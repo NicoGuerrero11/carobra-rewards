@@ -45,6 +45,12 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
         </label>
 
         <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
+          Fecha de nacimiento
+          <input id="birth_date" class="mt-1 w-full min-w-0 rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="date" name="birth_date" min="1900-01-01" autocomplete="bday" aria-describedby="birth-date-error" />
+          <span id="birth-date-error" data-error-for="birth_date" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
+        </label>
+
+        <label class="block text-sm font-semibold text-[#244b73] sm:col-span-2">
           Email
           <input id="email" class="mt-1 w-full rounded-xl border border-[#c7d7e7] bg-white px-3 py-2 text-sm text-[#102745]" type="email" name="email" required autocomplete="email" aria-describedby="email-error" />
           <span id="email-error" data-error-for="email" class="mt-1 block text-xs font-medium text-[#8a2f2f]" hidden></span>
@@ -116,6 +122,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
       | "duplicate_curp"
       | "rewards_id_collision_exhausted"
       | "password_mismatch"
+      | "invalid_birth_date"
       | "terms_not_accepted"
       | "invalid_credentials"
       | "unauthenticated"
@@ -133,6 +140,23 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
     const passwordInput = requireElement<HTMLInputElement>("#password");
     const confirmInput = requireElement<HTMLInputElement>("#confirm_password");
     const showPassword = requireElement<HTMLInputElement>("#show-password");
+    const birthDateInput = requireElement<HTMLInputElement>("#birth_date");
+
+    function currentRegistrationDate(): string {
+      const parts = new Intl.DateTimeFormat("en", {
+        timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit",
+      }).formatToParts(new Date());
+      return ["year", "month", "day"].map(type => parts.find(part => part.type === type)?.value).join("-");
+    }
+
+    function validBirthDate(value: string): boolean {
+      if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false;
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+        && value >= "1900-01-01" && value <= currentRegistrationDate();
+    }
+
+    birthDateInput.max = currentRegistrationDate();
 
     const fieldMessages: Record<string, string> = {
       curp: "Ingresa tu CURP.",
@@ -203,6 +227,12 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
         valid = false;
       }
 
+      birthDateInput.max = currentRegistrationDate();
+      if (birthDateInput.validity.badInput || (payload.birth_date && !validBirthDate(String(payload.birth_date)))) {
+        setFieldError("birth_date", stableMessages.invalid_birth_date);
+        valid = false;
+      }
+
       if (payload.password && payload.confirm_password && payload.password !== payload.confirm_password) {
         setFieldError("confirm_password", "Las contraseñas no coinciden.");
         valid = false;
@@ -215,6 +245,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
       duplicate_curp: "Ya existe una cuenta registrada con esta CURP.",
       rewards_id_collision_exhausted: "No pudimos generar tu Rewards ID. Intenta nuevamente.",
       password_mismatch: "Las contraseñas no coinciden.",
+      invalid_birth_date: "Ingresa una fecha de nacimiento válida, desde 1900 y no posterior a hoy.",
       terms_not_accepted: "Debes aceptar los términos y condiciones.",
       invalid_credentials: "No pudimos validar los datos enviados.",
       unauthenticated: "Tu sesión no está autenticada.",
@@ -235,6 +266,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
         curp: String(formData.get("curp") ?? "").trim().toUpperCase(),
         first_name: String(formData.get("first_name") ?? "").trim(),
         last_name: String(formData.get("last_name") ?? "").trim(),
+        ...(birthDateInput.value ? { birth_date: birthDateInput.value } : {}),
         email: String(formData.get("email") ?? "").trim(),
         phone: String(formData.get("phone") ?? "").trim(),
         password: String(formData.get("password") ?? ""),
@@ -273,6 +305,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
           if (code === "duplicate_email") setFieldError("email", stableMessages[code]);
           if (code === "duplicate_curp") setFieldError("curp", stableMessages[code]);
           if (code === "password_mismatch") setFieldError("confirm_password", stableMessages[code]);
+          if (code === "invalid_birth_date") setFieldError("birth_date", stableMessages[code]);
           if (code === "terms_not_accepted") setFieldError("terms_accepted", stableMessages[code]);
           setFeedback(stableMessages[code], true);
           focusFirstInvalid();
