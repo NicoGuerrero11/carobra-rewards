@@ -35,6 +35,7 @@ docs/*
 !docs/rewards-scheduler-runbook.md
 !docs/bonda-courses-reconciliation.md
 !docs/course-video-progress.md
+!docs/production-site-release.md
 
 # Generated partner deliverables
 deliverables/sisca-uat/Guia-preparacion-UAT-SISCA-Carobra-Rewards.docx

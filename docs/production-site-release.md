@@ -1,0 +1,102 @@
+# Actualización del sitio y configuración Bonda
+
+Esta entrega reúne el rediseño público y del portal, catálogo Bonda de consulta,
+cursos/bienestar por nivel, progreso de videos y fecha de nacimiento en registro.
+El PR se dirige a `main`; fusionarlo y desplegarlo son pasos posteriores.
+
+## Destino de las variables
+
+Las credenciales no viajan en Git. Se conservan en las variables privadas de cada
+servicio. Los secretos de GitHub Actions no configuran Railway automáticamente.
+
+| Servicio | Configuración que debe conservarse |
+| --- | --- |
+| Railway `rewards-api` | `DATABASE_URL` de producción, configuración SISCA existente, cookies seguras, orígenes autorizados y scheduler existentes |
+| Railway `site-backend` | `DATABASE_URL` de la misma base con esquema `postgresql://`, `API_BASE_URL` de producción, host/puerto del servicio, cookies y `REFERRAL_IDENTITY_HMAC_SECRET` si ya se usa |
+| Vercel `carobra-rewards`, entorno Production | `SITE_BACKEND_BASE_URL` apuntando al BFF de producción |
+
+No sustituir las variables actuales con un `.env` local completo: contiene URLs
+locales y configuración de desarrollo. No copiar `TEST_DATABASE_URL`, claves de
+acceso de pruebas ni credenciales de Bonda al frontend.
+
+## Bonda: importar solamente en `site-backend`
+
+Copiar desde la configuración privada validada los valores de:
+
+- `BONDA_BASE_URL`, `BONDA_ALLOWED_HOSTS`, `BONDA_ALLOWED_IMAGE_HOSTS`.
+- `BONDA_MICROSITE_ID`, `BONDA_COUPON_API_KEY`, `BONDA_CATALOG_AFFILIATE_CODE`.
+- `BONDA_REQUEST_TIMEOUT_MS`.
+- `BONDA_AFFILIATE_TOKEN` solamente si existe un token específico aprobado. El
+  diagnóstico de lectura actual usa la clave de cupones como alternativa cuando
+  no hay token específico.
+
+Configurar explícitamente:
+
+```dotenv
+BONDA_CATALOG_ENABLED=true
+BONDA_COURSES_ENABLED=true
+BONDA_AFFILIATE_PROVISIONING_ENABLED=false
+BONDA_COUPON_REQUESTS_ENABLED=false
+BONDA_LOCAL_PREVIEW_ENABLED=false
+```
+
+Guardar como variables del entorno de producción de Railway, preservando todas
+las variables existentes ajenas a Bonda. La integración de esta entrega consulta
+contenido; no autoriza altas de afiliados ni emisión de cupones.
+
+## Secuencia de publicación
+
+1. Confirmar acceso al proyecto y servicio de producción, variables anteriores y
+   destino de la base. Revisar si guardar variables dispara un redespliegue.
+2. Consultar `alembic_version` y `site_backend_migrations` en la base que usa
+   realmente Railway. La revisión API esperada es
+   `20260928_customer_birth_date`; el BFF incluye hasta
+   `026_course_video_progress`. Aplicar sólo pendientes revisadas. El predeploy
+   de `api/railway.toml` ejecuta `alembic upgrade head`.
+3. Si está pendiente la migración de IDs numéricos, seguir primero
+   [su procedimiento](numeric-rewards-id-runbook.md), incluyendo el inventario
+   de afiliaciones externas. Para el BFF, `npm run db:migrate` aplica **todas**
+   las migraciones pendientes; revisar esa lista antes de ejecutarlo.
+4. Con las credenciales cargadas, desplegar API y BFF antes de promover el
+   frontend. Verificar los healthchecks de ambos servicios.
+5. En el BFF ya actualizado, ejecutar `npm run bonda:check` con las variables
+   de Railway. Debe devolver `ready: true` y cuatro comprobaciones `OK`.
+   No imprime secretos ni escribe en Bonda.
+6. Promover el frontend en Vercel y comprobar login, estado Invitado, catálogo
+   por nivel, detalle de beneficios, cursos/bienestar y formulario de registro.
+   Usar cuentas autorizadas y no emitir cupones para comprobar la conexión.
+
+El frontend declara Node 20. Compilar con esa versión; el adaptador instalado
+elige incorrectamente Node 18 al compilar localmente con Node 26. No subir una
+compilación local realizada con ese fallback; usar el build del proveedor con
+el runtime compatible y verificar el resultado del despliegue.
+
+## Verificación del 28 de septiembre de 2026
+
+- Las credenciales locales respondieron HTTP 200 en afiliado, cupones, cursos
+  y bienestar; el diagnóstico devolvió `ready: true`.
+- La base accesible mediante la configuración local de API tiene la revisión
+  `20260928_customer_birth_date`, la columna `customers.birth_date` y todas las
+  migraciones del BFF aplicadas. Falta comparar ese destino con las variables
+  actuales de Railway; este dato no sustituye esa comprobación.
+- No se encontraron valores de los secretos locales configurados en los
+  archivos versionados ni en el historial de commits de la entrega.
+- BFF: 276 pruebas aprobadas y 7 omitidas por requerir infraestructura opcional.
+  Frontend: 6 contratos aprobados; 292 pruebas de navegador aprobadas en la
+  corrida completa y las 10 de elegibilidad aprobadas al actualizar sus
+  comprobaciones al rediseño (8 de ellas fallaban por textos anteriores).
+- El build con Node 20 terminó correctamente y generó `runtime: nodejs20.x`.
+  Ruff y Pyright pasaron. La validación de API con base aislada se registra en
+  el PR al finalizar.
+- La sesión de Railway disponible no tiene acceso al proyecto de producción
+  identificado en los estados de GitHub. La transferencia de variables sigue
+  pendiente hasta recuperar ese acceso. No fusionar contando con que el PR
+  transfiera credenciales.
+
+## Reversión
+
+Ante un fallo del catálogo, apagar `BONDA_CATALOG_ENABLED` y
+`BONDA_COURSES_ENABLED`, conservando las credenciales privadas y las banderas de
+escritura apagadas. Revertir el despliegue de aplicación si es necesario;
+conservar las tablas y el historial. No ejecutar downgrades destructivos como
+parte de una reversión rutinaria.
