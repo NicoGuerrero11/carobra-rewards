@@ -110,6 +110,20 @@ test("captures a referral token after registration without forwarding it to Fast
   assert.equal(referrals.capture?.referredCustomerId, profile.id);
 });
 
+test("forwards the optional birth date without conversion and preserves the profile value", async (t) => {
+  const payload = { ...registrationPayload, birth_date: "1992-02-29" };
+  const upstream = await startServer(async (request, response) => {
+    assert.deepEqual(await readJson(request), payload);
+    json(response, 201, { customer: { ...profile, birth_date: payload.birth_date }, validation_status: "PENDING" });
+  });
+  const bff = await startBff(t, upstream.url);
+  const response = await fetch(`${bff.url}/api/v1/auth/register`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json() as { customer: { birth_date: string } }).customer.birth_date, payload.birth_date);
+});
+
 test("successful registration schedules Rewards-ID-only Bonda provisioning", async (t) => {
   const upstream = await startServer((_request, response) => {
     json(response, 201, {
@@ -290,7 +304,7 @@ for (const [code, status] of [["duplicate_email", 409], ["duplicate_curp", 409]]
   });
 }
 
-for (const code of ["password_mismatch", "terms_not_accepted"] as const) {
+for (const code of ["password_mismatch", "terms_not_accepted", "invalid_birth_date"] as const) {
   test(`maps ${code} from registration`, async (t) => {
     const upstream = await startServer((_request, response) => {
       apiError(response, 422, code, "Registration rejected");

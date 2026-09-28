@@ -73,7 +73,7 @@ endpoint:
 - `GET /api/v1/me/validation-status`
 
 Errors are returned as `{ "error": { "code", "message" } }`. The stable form
-codes are `duplicate_email`, `duplicate_curp`, `password_mismatch`,
+codes are `duplicate_email`, `duplicate_curp`, `password_mismatch`, `invalid_birth_date`,
 `terms_not_accepted`, `invalid_credentials`, `unauthenticated`, and
 `api_unavailable`.
 

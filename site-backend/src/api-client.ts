@@ -186,6 +186,7 @@ const stableApiCodes = new Set<SiteErrorCode>([
   "duplicate_curp",
   "rewards_id_collision_exhausted",
   "password_mismatch",
+  "invalid_birth_date",
   "terms_not_accepted",
   "invalid_credentials",
   "unauthenticated",

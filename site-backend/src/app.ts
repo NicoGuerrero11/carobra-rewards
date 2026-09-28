@@ -612,6 +612,7 @@ function toApiRegisterRequest(body: SiteRegisterRequest): RegisterRequest {
     city: body.city,
     terms_accepted: body.terms_accepted,
     terms_version: body.terms_version,
+    ...(body.birth_date !== undefined ? { birth_date: body.birth_date } : {}),
   };
 }
 
