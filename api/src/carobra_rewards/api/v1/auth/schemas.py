@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -11,9 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from carobra_rewards.modules.customer_auth.application.models import (
     CustomerProfile,
     CustomerValidationStatus,
+    InvalidBirthDateError,
     LoginCommand,
     RegisterCustomerCommand,
     RegistrationResult,
+)
+from carobra_rewards.modules.customer_auth.domain.birth_date import (
+    REGISTRATION_TIMEZONE,
+    parse_birth_date,
 )
 
 _CURP_PATTERN = re.compile(r"^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$")
@@ -35,6 +40,15 @@ class RegisterRequest(BaseModel):
     city: str = Field(min_length=1, max_length=100)
     terms_accepted: bool = False
     terms_version: str = Field(min_length=1, max_length=64)
+    birth_date: date | None = None
+
+    @field_validator("birth_date", mode="before")
+    @classmethod
+    def validate_birth_date(cls, value: object) -> date | None:
+        try:
+            return parse_birth_date(value, today=datetime.now(REGISTRATION_TIMEZONE).date())
+        except InvalidBirthDateError as exc:
+            raise ValueError("Invalid birth date") from exc
 
     @field_validator("curp")
     @classmethod
@@ -97,6 +111,7 @@ class CustomerProfileResponse(BaseModel):
     city: str
     customer_status: str
     onboarding_status: str
+    birth_date: date | None = None
 
     @classmethod
     def from_profile(cls, profile: CustomerProfile) -> CustomerProfileResponse:

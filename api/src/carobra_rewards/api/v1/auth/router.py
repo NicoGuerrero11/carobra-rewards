@@ -20,6 +20,7 @@ from carobra_rewards.modules.customer_auth.application.models import (
     CustomerValidationNotFoundError,
     DuplicateCurpError,
     DuplicateEmailError,
+    InvalidBirthDateError,
     InvalidCredentialsError,
     PasswordMismatchError,
     PasswordValidationError,
@@ -166,6 +167,10 @@ def _raise_http_error(exc: Exception) -> NoReturn:
         ) from exc
     if isinstance(exc, PasswordMismatchError):
         raise _safe_error(422, "password_mismatch", "Passwords do not match") from exc
+    if isinstance(exc, InvalidBirthDateError):
+        raise _safe_error(
+            422, "invalid_birth_date", "Birth date must be a valid past or present date"
+        ) from exc
     if isinstance(exc, TermsNotAcceptedError):
         raise _safe_error(422, "terms_not_accepted", "Terms must be accepted") from exc
     if isinstance(exc, PasswordValidationError):

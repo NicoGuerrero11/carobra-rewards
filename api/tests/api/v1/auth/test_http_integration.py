@@ -44,9 +44,11 @@ def _payload(**overrides: object) -> dict[str, object]:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+@pytest.mark.parametrize("birth_date", [None, "1992-02-29"])
 async def test_customer_auth_http_flow_and_stable_errors(
     postgres_session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
+    birth_date: str | None,
 ) -> None:
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("AUTH_SESSION_COOKIE_SECURE", "false")
@@ -84,10 +86,13 @@ async def test_customer_auth_http_flow_and_stable_errors(
         assert mismatch.status_code == 422
         assert mismatch.json()["detail"]["code"] == "password_mismatch"
 
-        registered = await client.post("/api/v1/auth/register", json=_payload())
+        registered = await client.post(
+            "/api/v1/auth/register", json=_payload(birth_date=birth_date)
+        )
         assert registered.status_code == 201
         assert registered.json()["customer"]["customer_status"] == "PENDING_VALIDATION"
         assert registered.json()["validation_status"] == "PENDING"
+        assert registered.json()["customer"]["birth_date"] == birth_date
 
         duplicate_email = await client.post(
             "/api/v1/auth/register",
@@ -115,11 +120,13 @@ async def test_customer_auth_http_flow_and_stable_errors(
             json={"email": "ADA@example.com", "password": "correct-horse-7"},
         )
         assert logged_in.status_code == 200
+        assert logged_in.json()["customer"]["birth_date"] == birth_date
         assert "HttpOnly" in logged_in.headers["set-cookie"]
 
         me = await client.get("/api/v1/me")
         validation = await client.get("/api/v1/me/validation-status")
         assert me.status_code == 200 and me.json()["email"] == "ada@example.com"
+        assert me.json()["birth_date"] == birth_date
         assert validation.status_code == 200 and validation.json()["status"] == "PENDING"
 
         logged_out = await client.post("/api/v1/auth/logout")

@@ -30,6 +30,10 @@ from carobra_rewards.modules.customer_auth.application.models import (
     TermsNotAcceptedError,
     UnauthenticatedError,
 )
+from carobra_rewards.modules.customer_auth.domain.birth_date import (
+    REGISTRATION_TIMEZONE,
+    parse_birth_date,
+)
 from carobra_rewards.modules.customer_auth.domain.passwords import (
     hash_password,
     verify_password,
@@ -96,6 +100,7 @@ class CustomerAuthService:
             raise TermsNotAcceptedError()
 
         now = self._clock().astimezone(UTC)
+        parse_birth_date(command.birth_date, today=now.astimezone(REGISTRATION_TIMEZONE).date())
         password_hash = hash_password(command.password)
         registration = None
         for attempt in range(_MAX_REWARDS_ID_ATTEMPTS):
@@ -187,6 +192,7 @@ class CustomerAuthService:
             postal_code=command.postal_code.strip(),
             state=command.state.strip(),
             city=command.city.strip(),
+            birth_date=command.birth_date,
             customer_status="PENDING_VALIDATION",
             onboarding_status="COMPLETED",
             created_at=now,
@@ -351,6 +357,7 @@ def _profile(customer: CustomerModel) -> CustomerProfile:
         city=customer.city,
         customer_status=customer.customer_status,
         onboarding_status=customer.onboarding_status,
+        birth_date=customer.birth_date,
     )
 
 
