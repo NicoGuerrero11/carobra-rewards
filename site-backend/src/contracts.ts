@@ -11,6 +11,7 @@ export interface RegisterRequest {
   city: string;
   terms_accepted: boolean;
   terms_version: string;
+  birth_date?: string | null;
 }
 
 export interface SiteRegisterRequest extends RegisterRequest {
@@ -35,6 +36,7 @@ export interface CustomerProfile {
   city: string;
   customer_status: string;
   onboarding_status: string;
+  birth_date?: string | null;
 }
 
 export interface RegistrationResponse {
@@ -70,6 +72,7 @@ export interface ValidationStatusResponse {
 
 export interface RewardsIdentityEvidence {
   customer_id: string;
+  rewards_id: string;
   customer_status: string;
   validation_id: string;
   validation_status: string;
@@ -89,6 +92,7 @@ export type SiteErrorCode =
   | "duplicate_curp"
   | "rewards_id_collision_exhausted"
   | "password_mismatch"
+  | "invalid_birth_date"
   | "terms_not_accepted"
   | "invalid_credentials"
   | "unauthenticated"

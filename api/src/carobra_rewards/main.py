@@ -39,6 +39,18 @@ async def _handle_request_validation_error(
     exc: Exception,
 ) -> Response:
     validation_exc = cast(RequestValidationError, exc)
+    if request.url.path == "/api/v1/auth/register" and any(
+        error["loc"] == ("body", "birth_date") for error in validation_exc.errors()
+    ):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": {
+                    "code": "invalid_birth_date",
+                    "message": "Birth date must be a valid past or present date",
+                }
+            },
+        )
     if is_customer_intake_http_request(request):
         return build_validation_error_response()
     if request.url.path.startswith("/api/v1/internal/sisca-validations/"):

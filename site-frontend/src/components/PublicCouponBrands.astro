@@ -1,0 +1,213 @@
+---
+// Curated preview of brands in approved coupon mappings (migrations 024/025).
+// Sources and presentation notes: public/images/coupon-brands/SOURCES.md.
+const brands = [
+  { name: 'Cinépolis', file: 'cinepolis.svg', width: 105, height: 24, size: 150, mono: true },
+  { name: 'Farmacias Benavides', file: 'benavides.svg', width: 150, height: 30, size: 174, mono: true },
+  { name: 'Laboratorio Médico del Chopo', file: 'chopo.svg', width: 145, height: 28, size: 170, mono: false },
+  { name: 'Ópticas Devlyn', file: 'devlyn.svg', width: 351, height: 60, size: 154, mono: false },
+  { name: 'Harmon Hall', file: 'harmon-hall.svg', width: 82, height: 12, size: 170, mono: true },
+  { name: 'Martí', file: 'marti.svg', width: 80, height: 30, size: 105, mono: false },
+  { name: 'Sonora Prime', file: 'sonora-prime.webp', width: 256, height: 98, size: 175, mono: true },
+  { name: "Porfirio's", file: 'porfirios.png', width: 351, height: 66, size: 162, mono: false },
+  { name: "Harry's Polanco", file: 'harrys.svg', width: 91.15, height: 47.54, size: 112, mono: false },
+];
+---
+
+<section id="catalogo" class="coupon-brands" aria-labelledby="coupon-brands-title">
+  <div class="shell">
+    <header class="coupon-brands__heading">
+      <span>Cupones Rewards</span>
+      <h2 id="coupon-brands-title">Disfruta más con tus marcas favoritas.</h2>
+      <p>Descuentos para tus planes, tus compras y tu día a día.</p>
+    </header>
+
+    <div class="coupon-brands__roll" data-brand-roll>
+      <button type="button" class="coupon-brands__arrow" data-brands-prev hidden
+        aria-label="Ver marcas anteriores" aria-controls="coupon-brands-viewport" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="m14 6-6 6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+      <div id="coupon-brands-viewport" class="coupon-brands__viewport" data-brands-viewport
+        tabindex="0" role="group" aria-label="Marcas de cupones" aria-describedby="coupon-brands-instructions">
+        <ul class="coupon-brands__list" role="list">
+          {brands.map(brand => (
+            <li class="coupon-brands__item">
+              <span class:list={['coupon-brands__mark', { 'coupon-brands__mark--benavides': brand.file === 'benavides.svg' }]}
+                style={`--mark-width: ${brand.size}px`}>
+                <img src={`/images/coupon-brands/${brand.file}`} alt={brand.name}
+                  width={brand.width} height={brand.height} loading="lazy" decoding="async"
+                  class:list={{ 'coupon-brands__monochrome': brand.mono }} />
+                <span class="coupon-brands__fallback" aria-hidden="true">{brand.name}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button type="button" class="coupon-brands__arrow" data-brands-next hidden
+        aria-label="Ver más marcas" aria-controls="coupon-brands-viewport">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="m10 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+    <p id="coupon-brands-instructions" class="coupon-brands__sr-only">
+      Desliza para explorar las marcas. Con el teclado, usa las flechas izquierda y derecha, Inicio o Fin.
+    </p>
+    <p class="coupon-brands__note">Beneficios disponibles según tu nivel y las condiciones de cada promoción.</p>
+  </div>
+</section>
+
+<style>
+  .coupon-brands {
+    padding: 3.2rem 0 2.8rem;
+    background: linear-gradient(125deg, #eff7fb, #f8fafc);
+    border-block: 1px solid #e1eaf1;
+    scroll-margin-top: 6rem;
+  }
+  .coupon-brands__heading { text-align: center; }
+  .coupon-brands__heading > span {
+    color: #004b87; font-size: .68rem; font-weight: 800;
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .coupon-brands__heading h2 {
+    margin: .6rem 0 .7rem; color: #041c2c;
+    font-size: clamp(1.45rem, 2.6vw, 2rem); font-weight: 700;
+    line-height: 1.25; letter-spacing: -.035em;
+  }
+  .coupon-brands__heading p {
+    margin: 0; color: #536878; font-size: .88rem; line-height: 1.6;
+  }
+  .coupon-brands__roll {
+    display: grid; align-items: center; gap: .7rem;
+    margin-top: 1.6rem; min-width: 0;
+  }
+  .coupon-brands__roll[data-ready] { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .coupon-brands__viewport {
+    min-width: 0; overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin; scrollbar-color: #b8cddd transparent;
+    border-radius: .4rem;
+  }
+  .coupon-brands__roll[data-ready] .coupon-brands__viewport { scrollbar-width: none; }
+  .coupon-brands__roll[data-ready] .coupon-brands__viewport::-webkit-scrollbar { display: none; }
+  .coupon-brands__list {
+    display: grid; grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 4rem) / 5); gap: 1rem;
+    list-style: none; margin: 0; padding: .5rem 0;
+  }
+  .coupon-brands__item {
+    display: grid; place-items: center; min-width: 0; height: 108px;
+    scroll-snap-align: start; padding: .5rem;
+  }
+  .coupon-brands__mark { display: grid; place-items: center; width: min(100%, var(--mark-width)); }
+  .coupon-brands__mark img {
+    display: block; width: 100%; height: auto; max-height: 64px;
+    object-fit: contain; grid-area: 1 / 1;
+  }
+  /* White-only official artwork gets a neutral ink presentation, not a new logo. */
+  .coupon-brands__monochrome { filter: brightness(0); opacity: .8; }
+  /* Show the lettering only: the separate emblem occupies x=0..38 in the 150px SVG. */
+  .coupon-brands__mark--benavides { display: block; place-items: normal; overflow: hidden; }
+  .coupon-brands__mark--benavides img {
+    width: 133.929%; max-width: none; justify-self: start;
+    transform: translateX(-25.333%);
+  }
+  .coupon-brands__fallback {
+    display: none; color: #25485f; font-size: .95rem;
+    font-weight: 700; text-align: center; line-height: 1.3;
+  }
+  .coupon-brands__mark[data-failed] img { display: none; }
+  .coupon-brands__mark[data-failed] .coupon-brands__fallback { display: block; }
+  .coupon-brands__arrow {
+    width: 44px; height: 44px; padding: 0; place-items: center;
+    border: 1px solid rgb(0 75 135 / 12%); border-radius: 50%;
+    background: rgb(255 255 255 / 45%); color: #386487;
+    backdrop-filter: blur(8px); box-shadow: 0 3px 12px rgb(4 28 44 / 4%);
+    cursor: pointer; transition: background .18s ease, border-color .18s ease;
+  }
+  .coupon-brands__arrow:not([hidden]) { display: grid; }
+  .coupon-brands__arrow svg { width: 22px; height: 22px; }
+  .coupon-brands__arrow:hover:not(:disabled) { background: rgb(255 255 255 / 90%); border-color: #94bed6; }
+  .coupon-brands__arrow:disabled { opacity: .3; cursor: default; box-shadow: none; }
+  .coupon-brands__arrow:focus-visible, .coupon-brands__viewport:focus-visible {
+    outline: 2px solid #004b87; outline-offset: 4px;
+  }
+  .coupon-brands__note {
+    margin: 1.1rem 0 0; text-align: center; color: #5c7181;
+    font-size: .72rem; line-height: 1.6;
+  }
+  .coupon-brands__sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  @media (max-width: 1000px) {
+    .coupon-brands__list { grid-auto-columns: calc((100% - 2rem) / 3); }
+  }
+  @media (max-width: 600px) {
+    .coupon-brands { padding: 2.5rem 0 2rem; }
+    .coupon-brands__list { grid-auto-columns: calc((100% - 1rem) / 2); }
+    .coupon-brands__roll { gap: .3rem; margin-top: 1.2rem; }
+    .coupon-brands__item { height: 94px; padding: .35rem; }
+    .coupon-brands__heading p { font-size: .82rem; }
+  }
+  @media (max-width: 379px) {
+    .coupon-brands__list { grid-auto-columns: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .coupon-brands__arrow { transition: none; }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-brand-roll]').forEach((roll) => {
+    const viewport = roll.querySelector<HTMLElement>('[data-brands-viewport]');
+    const previous = roll.querySelector<HTMLButtonElement>('[data-brands-prev]');
+    const next = roll.querySelector<HTMLButtonElement>('[data-brands-next]');
+    if (!viewport || !previous || !next || roll.dataset.ready) return;
+    roll.dataset.ready = 'true';
+    previous.hidden = next.hidden = false;
+
+    const update = () => {
+      const max = viewport.scrollWidth - viewport.clientWidth;
+      previous.disabled = viewport.scrollLeft <= 2;
+      next.disabled = max <= 2 || viewport.scrollLeft >= max - 2;
+    };
+    const move = (target: number, instant = false) => {
+      viewport.scrollTo({
+        left: Math.max(0, Math.min(target, viewport.scrollWidth - viewport.clientWidth)),
+        behavior: instant || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      });
+      // Instant navigation must refresh disabled controls before the next keypress.
+      update();
+    };
+    // Include the inter-item gap so successive pages align with complete marks.
+    const step = () => viewport.clientWidth + 16;
+    previous.addEventListener('click', () => move(viewport.scrollLeft - step()));
+    next.addEventListener('click', () => move(viewport.scrollLeft + step()));
+    viewport.addEventListener('scroll', update, { passive: true });
+    viewport.addEventListener('keydown', (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const targets: Record<string, number> = {
+        ArrowLeft: viewport.scrollLeft - step(), ArrowRight: viewport.scrollLeft + step(),
+        Home: 0, End: viewport.scrollWidth,
+      };
+      if (!(event.key in targets)) return;
+      event.preventDefault();
+      // Boundary shortcuts also cancel any arrow animation still in progress.
+      move(targets[event.key], event.key === 'Home' || event.key === 'End');
+    });
+    new ResizeObserver(update).observe(viewport);
+    roll.querySelectorAll<HTMLImageElement>('img').forEach((image) => {
+      const fallback = () => {
+        image.parentElement?.setAttribute('data-failed', 'true');
+        image.setAttribute('aria-hidden', 'true');
+        image.nextElementSibling?.removeAttribute('aria-hidden');
+      };
+      image.addEventListener('error', fallback, { once: true });
+      if (image.complete && image.naturalWidth === 0) fallback();
+    });
+    update();
+  });
+</script>

@@ -2,7 +2,7 @@
 
 - [x] 1.1 Revisar y mantener actualizado `docs/rewards-v2-decision-backlog.md` como registro de decisiones de negocio pendientes.
 - [x] 1.2 Consolidar una tabla maestra versionada de puntos V2 y marcar explícitamente cada regla no aprobada como deshabilitada.
-- [ ] 1.3 Acordar la matriz de precedencia de niveles, el umbral de Plata y el criterio de producto aceptado/activo antes de activar transiciones productivas.
+- [x] 1.3 Acordar la matriz de precedencia de niveles, el umbral de Plata y el criterio de producto aceptado/activo antes de activar transiciones productivas.
 - [x] 1.4 Definir los valores y límites de configuración iniciales para ambientes internos sin activar Bonda, expiración, AVE, referidos ni renovaciones pendientes.
 
 ## 2. Contratos y persistencia V2
@@ -55,7 +55,7 @@
 ## 7. Validación, activación y evolución
 
 - [x] 7.1 Ejecutar pruebas unitarias, de integración, contratos, migraciones y flujos end-to-end para todos los escenarios V2 habilitados.
-- [ ] 7.2 Realizar una revisión interna navegando los escenarios reales de prueba con producto, diseño y operaciones.
-- [ ] 7.3 Ejecutar evaluación en sombra y conciliación de decisiones antes de habilitar reglas V2 a clientes reales.
-- [ ] 7.4 Activar gradualmente registro–Invitado y validación SISCA–Bronce únicamente con configuraciones aprobadas.
-- [ ] 7.5 Incorporar Bonda, expiración, AVE, referidos y renovaciones en cambios OpenSpec posteriores cuando cada decisión de negocio se cierre.
+- [x] 7.2 Realizar una revisión interna navegando los escenarios reales de prueba con producto, diseño y operaciones.
+- [x] 7.3 Ejecutar evaluación en sombra y conciliación de decisiones antes de habilitar reglas V2 a clientes reales.
+- [x] 7.4 Activar gradualmente registro–Invitado y validación SISCA–Bronce únicamente con configuraciones aprobadas.
+- [x] 7.5 Incorporar Bonda, expiración, AVE, referidos y renovaciones en cambios OpenSpec posteriores cuando cada decisión de negocio se cierre.

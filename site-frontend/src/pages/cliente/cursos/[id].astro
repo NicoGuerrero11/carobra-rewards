@@ -1,0 +1,65 @@
+---
+import ClientShellLayout from '../../../layouts/ClientShellLayout.astro';
+import {getSiteBackendBaseUrl} from '../../../lib/api';
+import {courseDuration, learningSpace, learningCatalogUrl, type CourseDetail} from '../../../lib/courses';
+let detail: CourseDetail | null = null;
+let status = 503;
+const id = Astro.params.id ?? '';
+if (/^[1-9]\d{0,9}$/.test(id)) {
+  try {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/courses/${id}`, {
+      headers: {cookie: Astro.request.headers.get('cookie') ?? ''}, signal: AbortSignal.timeout(25000),
+    });
+    status = response.status;
+    if (status === 401) return Astro.redirect('/login');
+    if (response.ok) detail = await response.json();
+  } catch { status = 503; }
+} else { status = 404; }
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+if (!detail) Astro.response.status = status;
+const selected = detail?.chapters.find(c => String(c.number) === Astro.url.searchParams.get('capitulo')) ?? detail?.chapters[0];
+const selectedProgress = detail?.progress?.chapters.find(chapter => chapter.chapter_id === selected?.id);
+const selectedCompleted = Boolean(selectedProgress?.manual_completed_at || selectedProgress?.playback_completed_at);
+const isArticle = detail?.course.content_type === 'text';
+---
+<ClientShellLayout title={`${detail?.course.title ?? 'Curso'} | Carobra Rewards`} currentPath="/cliente/cursos" sectionLabel="Cursos">
+  <main class="course-page">
+    <a class="course-back" href={detail ? learningCatalogUrl(learningSpace(detail.course)) : '/cliente/cursos'}>{detail?.course.space === 'bienestar' ? '← Volver a bienestar' : '← Volver a cursos'}</a>
+    {!detail || !selected ? <section class="course-error" role="status"><h1>{status === 403 ? 'Este curso aún no está disponible para tu cuenta' : status === 404 ? 'Curso no encontrado' : 'No pudimos abrir este curso'}</h1><p>{status === 403 ? 'Necesitas una cuenta activa y alcanzar el nivel indicado en el catálogo para reproducirlo.' : 'El contenido puede no estar disponible temporalmente. Puedes volver al catálogo o intentarlo de nuevo.'}</p>{status === 403 ? <a href="/cliente/productos">Ver cómo avanzar →</a> : status !== 404 && <a href={`/cliente/cursos/${id}`}>Volver a intentar →</a>}</section>
+    : <>
+      <header class="course-header"><p>{detail.course.category}</p><h1>{detail.course.title}</h1><span>{isArticle ? 'Artículo · A tu ritmo' : `${detail.chapters.length} ${detail.chapters.length === 1 ? 'video' : 'capítulos'} · ${courseDuration(detail.course.duration_seconds)} · A tu ritmo`}</span></header>
+      {isArticle ? <article class="course-main wellness-article" aria-label="Artículo de bienestar">
+        {detail.course.image_url && <img class="article-cover" src={detail.course.image_url} alt="" width="960" height="540" decoding="async" />}
+        <div class="article-body">
+          {selected.presenters.length > 0 && <p class="article-author">Por {selected.presenters.join(', ')}</p>}
+          {selected.summary && <p class="article-intro">{selected.summary}</p>}
+          {selected.content.split(/\n+/).filter(Boolean).map(paragraph => <p>{paragraph}</p>)}
+        </div>
+      </article> : <>
+      <div class="course-viewer">
+        <section class="course-main" aria-label="Reproductor del curso">
+          <div class="course-player"><iframe id="course-player" src={selected.embed_url} title={selected.title} allow="fullscreen; picture-in-picture; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+          <p class="course-player-help">Pulsa reproducir para comenzar. Si el video no carga, comprueba tu conexión o <a href="/cliente/ayuda">contacta a Ayuda</a>.</p>
+          {detail.chapters.map(chapter => <section data-chapter-panel={chapter.number} hidden={chapter.number !== selected.number} class="course-description" aria-live="polite"><p class="chapter-number">Capítulo {chapter.number}</p><h2>{chapter.title}</h2>{chapter.presenters.length > 0 && <p class="course-presenters">Con {chapter.presenters.join(', ')}</p>}<p>{chapter.summary}</p>{chapter.content !== chapter.summary && <p>{chapter.content}</p>}</section>)}
+          <section class="video-progress" data-course-progress data-completed={String(selectedCompleted)} data-course-id={detail.course.id} data-selected-id={selected.id} data-progress={JSON.stringify(detail.progress ?? null)} aria-label="Estado de este video">
+            <div class="completion-row"><p id="video-progress-status" role="status">{selectedCompleted ? '✓ Completado' : detail.progress ? 'Sin completar' : 'Estado no disponible'}</p><button id="mark-video-seen" type="button" hidden={selectedCompleted}>Marcar como completado</button></div>
+            <p id="progress-feedback" role="status"></p><button id="retry-progress" type="button" hidden>Reintentar guardado</button>
+          </section>
+        </section>
+        <aside class="course-outline" aria-label="Contenido del curso"><h2>Contenido del curso</h2><p id="course-progress-summary" aria-live="polite">{detail.progress ? `${detail.progress.completed_chapters} de ${detail.progress.total_chapters} videos completados${detail.progress.completed ? ' · Curso completado' : ''}` : 'Avance no disponible'}</p><p>Selecciona un capítulo para verlo.</p><ol>{detail.chapters.map(chapter => <li><a href={`?capitulo=${chapter.number}`} data-chapter={chapter.number} data-chapter-id={chapter.id} data-duration={chapter.duration_seconds ?? 0} data-embed={chapter.embed_url} data-title={chapter.title} aria-current={chapter.number === selected.number ? 'true' : undefined}><span class="chapter-index">{chapter.number}</span><span><strong>{chapter.title}</strong><small>{courseDuration(chapter.duration_seconds)}</small><small data-chapter-status></small></span><span aria-hidden="true">▶</span></a></li>)}</ol></aside>
+      </div>
+      </>}
+    </>}
+  </main>
+  <script>
+    import {attachLogoutHandler, requireElement} from '../../../lib/client-page-utils';
+    import {attachCourseProgress} from '../../../lib/course-progress-player';
+    attachLogoutHandler(requireElement<HTMLButtonElement>('#logout'), '');
+    attachCourseProgress();
+  </script>
+  <style>
+    .wellness-article{max-width:54rem;margin-inline:auto}.article-cover{display:block;width:100%;height:auto;max-height:24rem;object-fit:cover}.article-body{padding:clamp(1.2rem,3vw,2.5rem);overflow-wrap:anywhere}.article-body p{font-size:.92rem;line-height:1.9;color:#46617a;margin:0 0 1rem}.article-body .article-intro{font-weight:600;color:#041c2c;margin-bottom:1.5rem}.article-body .article-author{font-size:.75rem;font-weight:700;color:#00518a}
+    .video-progress{margin:0;padding:1.25rem 1.4rem;border-top:1px solid #cbdde9;background:#f7fafc}.completion-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.6rem 1rem;align-items:center;min-height:44px}.video-progress button{min-height:44px;border:1px solid #00518a;border-radius:8px;background:white;color:#00518a;font-size:.78rem;font-weight:700;padding:.65rem 1rem;cursor:pointer}.video-progress button:hover:not(:disabled){background:#f4f9fc}.video-progress button:disabled{opacity:.65;cursor:wait}.video-progress p{font-size:.78rem;line-height:1.6;color:#587084;margin:0}.video-progress[data-completed="true"] #video-progress-status{color:#00518a;font-weight:700}#progress-feedback:not(:empty){color:#8a2f2f;margin:.65rem 0}#course-progress-summary{font-weight:700;color:#00518a}[data-chapter-status]{color:#00518a;font-weight:700}button:focus-visible{outline:3px solid #00a8e1;outline-offset:3px}@media(max-width:420px){.video-progress{padding:1.1rem 1rem}.video-progress button{padding-inline:.65rem;font-size:.72rem}}
+    .course-page{width:min(74rem,calc(100% - 2.2rem));margin:auto;padding:2rem 0 4rem;color:#041c2c}.course-back{display:inline-block;margin-bottom:1.5rem;color:#00518a;font-size:.8rem;font-weight:800}.course-header{margin-bottom:1.5rem;max-width:57rem}.course-header>p,.chapter-number{font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#00518a}.course-header h1{font-size:clamp(1.65rem,3vw,2.3rem);line-height:1.25;font-weight:700;letter-spacing:-.035em;margin:.5rem 0 .8rem}.course-header>span{font-size:.78rem;color:#46617a}.course-viewer{display:grid;grid-template-columns:minmax(0,2fr) minmax(17rem,1fr);gap:1.2rem;align-items:start}.course-main,.course-outline,.course-error{background:white;border:1px solid #d3e0e9;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px #041c2c05}.course-player{aspect-ratio:16/9;background:#041c2c}.course-player iframe{width:100%;height:100%;border:0;display:block}.course-player-help{font-size:.68rem;line-height:1.7;margin:.85rem 1.3rem;color:#587084}.course-player-help a{color:#00518a;text-decoration:underline}.course-description{padding:.3rem 1.4rem 1.5rem}.course-description h2{font-size:1.15rem;font-weight:700;line-height:1.5;margin:.5rem 0}.course-description>p:not(.chapter-number){white-space:pre-line;font-size:.85rem;line-height:1.85;color:#46617a}.course-description .course-presenters{font-weight:700;color:#00518a!important;font-size:.75rem!important}.course-outline{padding:1.2rem}.course-outline h2{font-size:1rem;font-weight:700;margin:0}.course-outline>p{font-size:.72rem;color:#46617a;margin:.5rem 0 1rem}.course-outline ol{list-style:none;margin:0;padding:0;display:grid;gap:.4rem}.course-outline a{display:grid;grid-template-columns:1.5rem 1fr .6rem;gap:.6rem;align-items:start;padding:.8rem .6rem;border-radius:8px;color:#36526a}.course-outline a[aria-current]{background:#e4f5fc;color:#00518a}.course-outline strong{display:block;font-size:.74rem;line-height:1.65}.course-outline small{font-size:.66rem;display:block;margin-top:.3rem}.chapter-index{font-size:.75rem;font-weight:700;border:1px solid #cbdde9;border-radius:5px;display:grid;place-items:center;min-height:1.5rem}.course-outline a>span:last-child{font-size:.6rem;align-self:center}.course-error{padding:2rem}.course-error h1{font-size:1.6rem;line-height:1.4;font-weight:700}.course-error p{line-height:1.8;font-size:.9rem;color:#46617a}.course-error a{color:#00518a;font-weight:700;font-size:.85rem}[hidden]{display:none!important}a:focus-visible{outline:3px solid #00a8e1;outline-offset:3px}@media(max-width:850px){.course-viewer{grid-template-columns:1fr}.course-outline{order:1}}@media(max-width:580px){.course-page{width:calc(100% - 1.2rem);padding-top:1.3rem}.course-description{padding:.5rem 1rem 1rem}}
+  </style>
+</ClientShellLayout>

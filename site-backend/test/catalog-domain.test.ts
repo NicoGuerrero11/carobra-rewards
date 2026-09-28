@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   evaluateCatalogAvailability,
+  hasCumulativeBondaCouponAccess,
+  readBondaCouponPolicy,
   fulfillCatalogInventory,
   releaseCatalogInventory,
   reserveCatalogInventory,
@@ -96,4 +98,34 @@ test("inventory reservation, fulfillment, and release preserve controlled totals
   assert.deepEqual(reserveCatalogInventory("UNLIMITED", {
     ...inventory, totalCapacity: null,
   }, 10).reservedQuantity, 10);
+});
+
+test("Bonda coupon policies require stable identifiers and cumulative V2 levels", () => {
+  const bonda = {
+    ...item,
+    mode: "FREE_ENTITLEMENT" as const,
+    pointPrice: null,
+    inventoryMode: "UNLIMITED" as const,
+    fulfillmentMode: "BONDA_COUPON_CODE",
+    partnerDependency: "BONDA",
+    partnerItemReference: "10792",
+    eligibilityRule: { minimumLevel: "SILVER", cumulative: true, displayOrder: 6 },
+  };
+  validateCatalogItemPolicy(bonda);
+  assert.deepEqual(readBondaCouponPolicy(bonda.eligibilityRule), {
+    minimumLevel: "SILVER",
+    cumulative: true,
+    displayOrder: 6,
+  });
+  assert.equal(hasCumulativeBondaCouponAccess("BRONZE", "SILVER"), false);
+  assert.equal(hasCumulativeBondaCouponAccess("SILVER", "SILVER"), true);
+  assert.equal(hasCumulativeBondaCouponAccess("TITANIUM", "SILVER"), true);
+  assert.throws(
+    () => validateCatalogItemPolicy({ ...bonda, partnerItemReference: null }),
+    /stable partner identifier/,
+  );
+  assert.throws(
+    () => validateCatalogItemPolicy({ ...bonda, eligibilityRule: { minimumLevel: "SILVER", cumulative: false, displayOrder: 6 } }),
+    /must be cumulative/,
+  );
 });

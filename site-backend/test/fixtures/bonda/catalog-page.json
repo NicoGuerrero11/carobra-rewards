@@ -1,0 +1,30 @@
+{
+  "count": 1,
+  "previous": null,
+  "next": null,
+  "results": [
+    {
+      "id": "10792",
+      "descuento": "20%",
+      "nombre": "Baires IT",
+      "descripcion_breve": "<p>20% de descuento extra en tu compra</p>",
+      "usage_instructions": "<p>1- Ingresa en el sitio.</p><script>alert('unsafe')</script><p>2- Usa tu codigo.</p>",
+      "descripcion_micrositio": "<p><b>Productos de tecnologia</b> con descuento.</p>",
+      "legales": "<p>Sujeto a disponibilidad.</p>",
+      "fecha_vencimiento": "2027-06-30 23:59:59",
+      "usar_en": {
+        "email": false,
+        "phone": false,
+        "online": true,
+        "onsite": false,
+        "whatsapp": false
+      },
+      "foto_thumbnail": {
+        "90x90": "https://cuponstar-ar.s3.amazonaws.com/public/files/example.png"
+      },
+      "categorias": [
+        { "id": "63", "nombre": "Tecnologia" }
+      ]
+    }
+  ]
+}

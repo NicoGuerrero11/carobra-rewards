@@ -130,3 +130,6 @@ Consulta [api/README.md](api/README.md),
 [site-backend/README.md](site-backend/README.md) y
 [site-frontend/README.md](site-frontend/README.md) para el detalle de cada
 aplicación.
+
+Para publicar el rediseño y conservar la integración Bonda, seguir la
+[guía de actualización de producción](docs/production-site-release.md).

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -19,6 +19,7 @@ class RegisterCustomerCommand:
     city: str
     terms_accepted: bool
     terms_version: str
+    birth_date: date | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -41,6 +42,7 @@ class CustomerProfile:
     city: str
     customer_status: str
     onboarding_status: str
+    birth_date: date | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -92,6 +94,10 @@ class PasswordMismatchError(CustomerAuthError):
 
 
 class PasswordValidationError(CustomerAuthError):
+    pass
+
+
+class InvalidBirthDateError(CustomerAuthError):
     pass
 
 

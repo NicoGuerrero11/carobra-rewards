@@ -1,0 +1,120 @@
+.portal-page.product-showcase {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+  display: grid;
+  gap: 24px;
+}
+.product-showcase .showcase-kicker {
+  margin: 0 0 10px;
+  color: #004b87;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.showcase-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+.product-showcase .showcase-intro h1 { margin: 0; font-size: clamp(26px, 2.8vw, 34px); font-weight: 650; letter-spacing: -.045em; line-height: 1.15; color: #041c2c; }
+.showcase-intro > div > p:last-child { margin: 12px 0 0; font-size: 14px; line-height: 1.65; }
+.showcase-account-link { font-size: 12px; font-weight: 750; white-space: nowrap; padding: 10px 0; color: #004b87; }
+.showcase-account-link span { margin-left: 10px; }
+.showcase-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.brand-skandia { --product-accent: #008545; --product-vivid: #00c83c; --product-tint: #eff8ed; --product-line: #d8edcd; }
+.brand-qualitas { --product-accent: #682e79; --product-vivid: #682e79; --product-tint: #f4eff8; --product-line: #e5d9ee; }
+.brand-modalidad { --product-accent: #004b87; --product-vivid: #00a7df; --product-tint: #eaf5fb; --product-line: #cee8f5; }
+.showcase-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dae4eb;
+  border-radius: 14px;
+  box-shadow: 0 5px 18px #041c2c05;
+}
+.showcase-card__brand {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  padding: 22px 24px 36px;
+  background: var(--product-tint);
+  border-bottom: 4px solid var(--product-vivid);
+}
+.showcase-card__brand::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--product-line);
+  clip-path: polygon(92% 0, 100% 0, 100% 100%, 68% 100%);
+}
+.showcase-card__mark { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 66px; }
+.showcase-card__mark img { object-fit: contain; width: min(100%, 196px); height: auto; }
+.showcase-card__themes { position: absolute; bottom: 12px; display: flex; align-items: center; gap: 12px; color: var(--product-accent); font-size: 9px; font-weight: 650; letter-spacing: .04em; }
+.showcase-card__themes > span + span::before { content: "/"; margin-right: 12px; opacity: .5; }
+.showcase-service-mark { display: flex; align-items: center; gap: 6px; color: #004b87; }
+.showcase-service-mark > span { font-size: 19px; line-height: 1; font-weight: 650; letter-spacing: -.04em; }
+.showcase-service-mark strong { font-size: 60px; line-height: 1; font-weight: 800; letter-spacing: -.07em; }
+.showcase-service-mark strong span { color: #00a7df; }
+.showcase-card__body { min-width: 0; flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: flex-start; }
+.product-showcase .showcase-card__category { margin: 0 0 10px; color: var(--product-accent); font-size: 10px; line-height: 1.4; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.product-showcase .showcase-card__headline { font-size: 21px; line-height: 1.25; letter-spacing: -.035em; color: #041c2c; font-weight: 650; margin: 0 0 12px; }
+.product-showcase .showcase-card__description { font-size: 13px; line-height: 1.65; margin: 0; color: #536878; }
+.showcase-card__action { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: auto; padding-top: 14px; width: 100%; }
+.product-showcase .showcase-card__reward { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 3px 8px; border-radius: 6px; background: #e8f6fd; color: #004b87; font-size: 11px; line-height: 18px; }
+.showcase-card__reward strong { font-size: 12px; font-weight: 800; }
+.showcase-card__reward > span[aria-hidden] { color: #007dad; font-size: 14px; margin-right: 2px; }
+.product-showcase .showcase-primary { width: 100%; display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 10px 14px; background: #041c2c; color: #fff; border: 1px solid #041c2c; border-radius: 8px; font-size: 12px; font-weight: 750; text-decoration: none; line-height: 1.5; transition: background .15s; }
+.product-showcase .showcase-primary:hover { background: #004b87; border-color: #004b87; }
+.showcase-primary > span { font-size: 18px; font-weight: 400; }
+.showcase-card__action > span { color: #536878; font-size: 10px; }
+.showcase-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.product-showcase .showcase-section-heading h2 { font-size: 18px; font-weight: 750; letter-spacing: -.025em; margin: 0; color: #041c2c; }
+.showcase-section-heading > span { font-size: 11px; color: #536878; }
+.showcase-account { scroll-margin-top: 120px; background: #fff; border: 1px solid #dae4eb; border-radius: 14px; padding: 24px; }
+.showcase-account__list { list-style: none; margin: 0; padding: 0; }
+.showcase-account__list > li + li { border-top: 1px solid #e8eef2; }
+.showcase-account summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; }
+.showcase-account summary::-webkit-details-marker { display: none; }
+.showcase-account summary > span:first-child { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.product-showcase .showcase-account h3 { font-size: 13px; margin: 0; font-weight: 700; }
+.showcase-status { font-size: 10px; font-weight: 650; padding: 4px 9px; border-radius: 20px; background: #eff2f5; color: #536878; }
+.showcase-status.status-active { background: #e9f6ee; color: #19643e; }
+.showcase-status.status-pending, .showcase-status.status-signed { background: #fff4dd; color: #77530d; }
+.showcase-account__toggle { font-size: 10px; font-weight: 650; color: #004b87; white-space: nowrap; }
+.showcase-account__toggle > span { display: inline-block; margin-left: 8px; font-size: 18px; }
+.showcase-account details[open] .showcase-account__toggle > span { transform: rotate(45deg); }
+.showcase-account__detail { padding: 0 0 16px; font-size: 12px; line-height: 1.65; }
+.showcase-account__detail p { margin: 0 0 12px; }
+.showcase-account__detail dl { display: flex; gap: 24px; flex-wrap: wrap; margin: 0; }
+.showcase-account__detail dt { font-size: 10px; font-weight: 700; color: #536878; }
+.showcase-account__detail dd { margin: 3px 0 0; color: #173f68; }
+.showcase-account__empty { font-size: 12px; line-height: 1.7; margin: 0; padding-top: 4px; }
+.showcase-account__empty p { margin: 4px 0 0; }
+.showcase-advisor { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 0 4px; }
+.product-showcase .showcase-advisor h2 { font-size: 17px; margin: 0 0 6px; font-weight: 750; }
+.showcase-advisor p { font-size: 12px; line-height: 1.6; margin: 0; }
+.showcase-advisor a { border: 1px solid #b9ccd9; border-radius: 8px; padding: 12px 16px; font-size: 11px; font-weight: 750; white-space: nowrap; color: #004b87; background: white; }
+.showcase-advisor a:hover { background: #edf6fc; }
+@media (max-width: 999px) {
+  .showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 599px) {
+  .portal-page.product-showcase { padding: 24px 12px 32px; gap: 20px; }
+  .showcase-intro { display: block; }
+  .showcase-account-link { display: inline-flex; gap: 10px; margin-top: 8px; }
+  .showcase-grid { grid-template-columns: 1fr; }
+  .showcase-card__body { padding: 18px; }
+  .showcase-account { padding: 18px; }
+  .showcase-account summary { align-items: flex-start; }
+  .showcase-account summary > span:first-child { gap: 6px; display: grid; }
+  .showcase-advisor { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .product-showcase .showcase-section-heading h2 { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .product-showcase .showcase-primary { transition: none; } }

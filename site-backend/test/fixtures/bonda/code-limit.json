@@ -1,0 +1,5 @@
+{
+  "error": "Alcanzaste el limite para este cupon. Puedes pedir otro mas adelante.",
+  "code": "COUPON_RESTRICTED",
+  "next_date": "2027-02-21 00:00:00"
+}

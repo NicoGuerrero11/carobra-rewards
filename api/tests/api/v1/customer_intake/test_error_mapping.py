@@ -15,7 +15,7 @@ def test_map_result_to_http_status_uses_201_only_for_new_accepted_intakes() -> N
     accepted = SimulatedCustomerIntakeResult(
         intake_request_id="intake-1",
         customer_id="customer-1",
-        rewards_id="RWD-1",
+        rewards_id="456789016",
         status=SimulatedCustomerIntakeStatus.ACCEPTED,
         replayed=False,
     )

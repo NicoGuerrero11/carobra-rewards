@@ -9,7 +9,7 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.reposito
     SqlAlchemyCustomerIntakeUnitOfWork,
 )
 from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator import (
-    TokenHexRewardsIdGenerator,
+    NumericRewardsIdGenerator,
 )
 
 
@@ -19,6 +19,6 @@ def get_process_customer_intake() -> ProcessSimulatedCustomerIntake:
 
     return ProcessSimulatedCustomerIntake(
         unit_of_work=SqlAlchemyCustomerIntakeUnitOfWork(get_session_factory()),
-        rewards_id_generator=TokenHexRewardsIdGenerator(),
+        rewards_id_generator=NumericRewardsIdGenerator(),
         mvp_start_date=settings.customer_intake_mvp_start_date,
     )

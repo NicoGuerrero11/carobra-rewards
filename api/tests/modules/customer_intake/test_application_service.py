@@ -95,7 +95,7 @@ def _service(
     )
     return ProcessSimulatedCustomerIntake(
         uow,
-        StubRewardsIdGenerator(["RWD-accepted"]),
+        StubRewardsIdGenerator(["123456789"]),
         mvp_start_date=mvp_start_date,
     )
 
@@ -103,7 +103,7 @@ def _service(
 def _existing_customer(curp: str = "ABCD123456HMNLRS09", nss: str = "0012345678901234") -> Customer:
     now = utc_now()
     return Customer.create(
-        rewards_id="RWD-existing",
+        rewards_id="123456790",
         curp=curp,
         nss=nss,
         name="Existing Customer",
@@ -153,7 +153,7 @@ async def test_accepts_valid_payload_and_creates_internal_customer_data() -> Non
     assert result.status is SimulatedCustomerIntakeStatus.ACCEPTED
     assert result.replayed is False
     assert result.customer_id is not None
-    assert result.rewards_id == "RWD-accepted"
+    assert result.rewards_id == "123456789"
     stored_intake = repository.list_submissions()[0]
     assert stored_intake.processing_status is IntakeProcessingStatus.ACCEPTED
     assert "source" not in stored_intake.original_payload
@@ -303,7 +303,7 @@ async def test_duplicate_customer_by_nss_reuses_existing_customer_without_duplic
             services=InMemoryServiceRepository([service_entity]),
             customer_services=customer_services,
         ),
-        StubRewardsIdGenerator(["RWD-unused"]),
+        StubRewardsIdGenerator(["123456791"]),
         mvp_start_date=date(2026, 7, 1),
     )
 

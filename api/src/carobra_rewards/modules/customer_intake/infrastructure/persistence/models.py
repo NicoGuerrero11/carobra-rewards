@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -94,6 +95,10 @@ class AuthSessionModel(TimestampMixin, Base):
 class CustomerModel(TimestampMixin, Base):
     __tablename__ = "customers"
     __table_args__ = (
+        CheckConstraint(
+            "rewards_id ~ '^[1-9][0-9]{8}$'",
+            name="ck_customers_rewards_id_numeric",
+        ),
         UniqueConstraint("rewards_id", name="uq_customers_rewards_id"),
         UniqueConstraint("curp", name="uq_customers_curp"),
         UniqueConstraint("auth_user_id", name="uq_customers_auth_user_id"),
@@ -118,6 +123,8 @@ class CustomerModel(TimestampMixin, Base):
     postal_code: Mapped[str] = mapped_column(String(16), nullable=False)
     state: Mapped[str] = mapped_column(String(100), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
+    # Self-reported registration data; not verified Rewards birthday evidence.
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     customer_status: Mapped[str] = mapped_column(String(32), nullable=False)
     onboarding_status: Mapped[str] = mapped_column(String(32), nullable=False)
 

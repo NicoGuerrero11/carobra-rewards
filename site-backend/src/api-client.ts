@@ -93,6 +93,7 @@ export class RewardsApiClient {
         validation: validation.data,
         evidence: {
           customer_id: profile.data.id,
+          rewards_id: profile.data.rewards_id,
           customer_status: profile.data.customer_status,
           validation_id: validation.data.validation_id,
           validation_status: validation.data.status,
@@ -185,6 +186,7 @@ const stableApiCodes = new Set<SiteErrorCode>([
   "duplicate_curp",
   "rewards_id_collision_exhausted",
   "password_mismatch",
+  "invalid_birth_date",
   "terms_not_accepted",
   "invalid_credentials",
   "unauthenticated",

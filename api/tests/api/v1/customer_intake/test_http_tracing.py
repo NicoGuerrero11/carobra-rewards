@@ -64,7 +64,7 @@ def test_customer_intake_logs_single_safe_event_for_success(
         SimulatedCustomerIntakeResult(
             intake_request_id="intake-1",
             customer_id="customer-1",
-            rewards_id="RWD-1",
+            rewards_id="456789013",
             status=SimulatedCustomerIntakeStatus.ACCEPTED,
             replayed=False,
         )

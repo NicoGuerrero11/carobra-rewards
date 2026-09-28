@@ -51,9 +51,9 @@
 - [x] 5.5 Implement atomic point-redemption creation across eligibility, monthly policy, FIFO allocation, ledger consumption, and controlled inventory reservation.
 - [ ] 5.6 Implement redemption confirmation, fulfillment, cancellation, refund, inventory release, and waitlist promotion state transitions.
 - [x] 5.7 Implement configurable monthly redemption-limit policies and keep redemption disabled until an approved limit version exists.
-- [ ] 5.8 Add authenticated site-backend contracts for catalog, entitlement, redemption creation/cancellation, and redemption history.
-- [ ] 5.9 Replace demo benefits and activity pages with site-backend-backed catalog, detail, confirmation, feedback, movement, and redemption-status views.
-- [ ] 5.10 Add concurrency, rollback, error-contract, accessibility, desktop, and mobile tests for the complete redemption flow.
+- [x] 5.8 Add authenticated site-backend contracts for catalog, entitlement, redemption creation/cancellation, and redemption history.
+- [x] 5.9 Replace demo benefits and activity pages with site-backend-backed catalog, detail, confirmation, feedback, movement, and redemption-status views.
+- [x] 5.10 Add concurrency, rollback, error-contract, accessibility, desktop, and mobile tests for the complete redemption flow.
 
 ## 6. Referrals and permanence
 

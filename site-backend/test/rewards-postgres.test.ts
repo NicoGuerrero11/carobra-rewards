@@ -78,7 +78,12 @@ import { RewardsError } from "../src/rewards/shared/errors.js";
 import { FixedClock } from "../src/rewards/shared/clock.js";
 import { PostgresRewardsV2LiveJourney } from "../src/rewards/v2/live-journey.js";
 import {
+  PostgresBondaAffiliateProvisioning,
+  PostgresBondaCouponRequests,
+} from "../src/rewards/bonda/persistence.js";
+import {
   asCustomerId,
+  type CatalogItemId,
   type CorrelationId,
   type RewardsAccountId,
 } from "../src/rewards/shared/identifiers.js";
@@ -192,7 +197,7 @@ test(
         FROM rewards_v2_rule_versions
         ORDER BY code
       `);
-      assert.equal(v2Rules.rows.length, 12);
+      assert.equal(v2Rules.rows.length, 13);
       assert.deepEqual(
         v2Rules.rows.find((rule) => rule.code === "V2_INVITED_REGISTRATION"),
         {
@@ -219,6 +224,7 @@ test(
         "V2_AVE",
         "V2_REFERRALS",
         "V2_RENEWALS",
+        "V2_BONDA_COUPONS",
       ]) {
         const rule = v2Rules.rows.find((candidate) => candidate.code === code);
         assert.equal(rule?.enabled, false);
@@ -271,6 +277,72 @@ test(
         available_points: "45",
         event_count: "1",
       });
+
+      const schemaDatabase = new SchemaTransactionalDatabase(database, schema);
+      const affiliateStore = new PostgresBondaAffiliateProvisioning(schemaDatabase);
+      const firstAffiliate = await affiliateStore.ensurePending(
+        asCustomerId(liveCustomerId),
+        "RWD-BONDA-TEST",
+        new Date("2026-09-10T12:00:00.000Z"),
+      );
+      const replayedAffiliate = await affiliateStore.ensurePending(
+        asCustomerId(liveCustomerId),
+        "RWD-BONDA-TEST",
+        new Date("2026-09-10T12:01:00.000Z"),
+      );
+      assert.equal(firstAffiliate.customerId, replayedAffiliate.customerId);
+      const claimedAffiliate = await affiliateStore.claimCustomer(
+        asCustomerId(liveCustomerId),
+        new Date("2026-09-10T12:02:00.000Z"),
+      );
+      assert.equal(claimedAffiliate?.attemptCount, 1);
+      await affiliateStore.markActive(
+        asCustomerId(liveCustomerId),
+        "member-test",
+        new Date("2026-09-10T12:03:00.000Z"),
+      );
+      assert.equal((await affiliateStore.find(asCustomerId(liveCustomerId)))?.state, "ACTIVE");
+
+      const couponRequests = new PostgresBondaCouponRequests(
+        schemaDatabase,
+        () => "00000000-0000-4000-8000-000000009999",
+      );
+      const requestCommand = {
+        customerId: asCustomerId(liveCustomerId),
+        catalogItemId: "00000000-0000-4000-8000-000000002301" as CatalogItemId,
+        bondaCouponId: "10792",
+        externalId: "bonda-request-1",
+        requestedAt: new Date("2026-09-10T12:04:00.000Z"),
+      };
+      const firstCouponRequest = await couponRequests.begin(requestCommand);
+      const replayedCouponRequest = await couponRequests.begin(requestCommand);
+      assert.equal(firstCouponRequest.replayed, false);
+      assert.equal(replayedCouponRequest.replayed, true);
+      assert.equal(firstCouponRequest.request.id, replayedCouponRequest.request.id);
+      await couponRequests.resolve(
+        firstCouponRequest.request.id,
+        "VERIFICATION_REQUIRED",
+        null,
+        { safeError: "verification_required" },
+        new Date("2026-09-10T12:05:00.000Z"),
+      );
+      assert.equal(
+        (await couponRequests.listVerificationRequiredForCustomer(
+          asCustomerId(liveCustomerId),
+          25,
+        )).length,
+        1,
+      );
+      await assert.rejects(
+        couponRequests.resolve(
+          firstCouponRequest.request.id,
+          "ISSUED",
+          null,
+          { api_token: "must-not-persist" },
+          new Date("2026-09-10T12:06:00.000Z"),
+        ),
+        /Sensitive metadata/,
+      );
 
       const validatedCommand = {
         ...invitedCommand,
@@ -336,7 +408,7 @@ test(
         JOIN catalog_inventory AS inventory ON inventory.catalog_item_id = item.id
         ORDER BY item.code
       `);
-      assert.equal(catalogItems.rows.length, 12);
+      assert.equal(catalogItems.rows.length, 37);
       assert.ok(catalogItems.rows.every((item) => !item.enabled && item.disabled_reason));
       const catalogByCode = new Map(catalogItems.rows.map((item) => [item.code, item]));
       assert.deepEqual(catalogByCode.get("CINEPOLIS_ONBOARDING_2_TICKETS"), {

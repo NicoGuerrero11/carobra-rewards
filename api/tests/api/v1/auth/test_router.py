@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 import pytest
@@ -31,7 +32,7 @@ NOW = datetime(2026, 7, 9, 23, 30, tzinfo=UTC)
 def _profile() -> CustomerProfile:
     return CustomerProfile(
         id=CUSTOMER_ID,
-        rewards_id="RWD-test",
+        rewards_id="567890123",
         curp="ABCD123456HMNLRS09",
         first_name="Ada",
         last_name="Lovelace",
@@ -50,11 +51,15 @@ class FakeAuthService:
     logout_token: str | None = None
     validated: bool = False
     initial_validation_id: UUID | None = None
+    registration_command = None
 
     async def register(self, command):
+        self.registration_command = command
         if self.error:
             raise self.error
-        return RegistrationResult(_profile(), VALIDATION_ID, "PENDING", NOW)
+        return RegistrationResult(
+            replace(_profile(), birth_date=command.birth_date), VALIDATION_ID, "PENDING", NOW
+        )
 
     async def run_initial_validation(self, registration):
         self.initial_validation_id = registration.validation_id
@@ -258,6 +263,45 @@ def test_registration_rejects_invalid_or_blank_identity_fields(
     response = http.post("/api/v1/auth/register", json=_payload(**{field: value}))
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("value", ["1992-02-29", "1900-01-01", None])
+def test_registration_accepts_optional_date_only_birth_date(client, value) -> None:
+    http, service = client
+    response = http.post("/api/v1/auth/register", json=_payload(birth_date=value))
+    assert response.status_code == 201
+    assert response.json()["customer"]["birth_date"] == value
+    assert service.registration_command.birth_date == (date.fromisoformat(value) if value else None)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "1991-02-29",
+        "2020-04-31",
+        "1899-12-31",
+        "2999-01-01",
+        "1990-1-1",
+        "",
+        "1990-01-01T00:00:00Z",
+        631152000,
+        True,
+        {"date": "1990-01-01"},
+        "private-input",
+    ],
+)
+def test_registration_rejects_invalid_birth_dates_with_safe_field_error(client, value) -> None:
+    http, service = client
+    response = http.post("/api/v1/auth/register", json=_payload(birth_date=value))
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": {
+            "code": "invalid_birth_date",
+            "message": "Birth date must be a valid past or present date",
+        }
+    }
+    assert service.registration_command is None
+    assert "correct-horse" not in response.text
 
 
 def test_cookie_attributes_are_environment_configurable(monkeypatch: pytest.MonkeyPatch) -> None:

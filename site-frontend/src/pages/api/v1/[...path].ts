@@ -22,12 +22,19 @@ const allowedPaths = new Set([
 
 const proxy: APIRoute = async ({ params, request }) => {
   const path = params.path ?? "";
-  if (!allowedPaths.has(path)) {
+  if (!isAllowedPath(path)) {
     return siteError(404, "not_found", "Route not found");
   }
 
+  if (request.method === 'POST' && /^rewards\/courses\/\d+\/progress$/.test(path)
+    && (request.headers.get('origin') !== new URL(request.url).origin
+      || request.headers.get('x-carobra-action') !== 'course-progress'
+      || !request.headers.get('content-type')?.startsWith('application/json'))) {
+    return siteError(403,'invalid_progress_request','Same-origin JSON request required');
+  }
+
   const headers = new Headers({ accept: "application/json" });
-  for (const name of ["content-type", "cookie"]) {
+  for (const name of ["content-type", "cookie", "x-carobra-action"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -44,7 +51,11 @@ const proxy: APIRoute = async ({ params, request }) => {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${getSiteBackendBaseUrl()}/api/v1/${path}`, init);
+    const incomingUrl = new URL(request.url);
+    upstream = await fetch(
+      `${getSiteBackendBaseUrl()}/api/v1/${path}${incomingUrl.search}`,
+      init,
+    );
   } catch {
     return siteError(503, "api_unavailable", "The site backend is unavailable");
   }
@@ -63,6 +74,12 @@ const proxy: APIRoute = async ({ params, request }) => {
     headers: responseHeaders,
   });
 };
+
+function isAllowedPath(path: string): boolean {
+  if (/^rewards\/courses\/[1-9]\d{0,9}\/progress$/.test(path)) return true;
+  if (allowedPaths.has(path)) return true;
+  return /^rewards\/coupons(?:\/affiliate-status|\/history|\/[^/]{1,200}(?:\/(?:code|branches))?)?$/.test(path);
+}
 
 export const GET = proxy;
 export const POST = proxy;

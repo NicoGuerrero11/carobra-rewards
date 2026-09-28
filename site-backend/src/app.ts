@@ -3,10 +3,13 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { RewardsApiClient, SiteApiError, type FetchImplementation } from "./api-client.js";
 import type { SiteBackendConfig } from "./config.js";
+import type { CoursesApplication } from './rewards/courses/application.js';
+import { CourseError } from './rewards/courses/types.js';
 import type {
   CustomerProfile,
   LoginRequest,
   RegisterRequest,
+  RewardsIdentityEvidence,
   SiteErrorEnvelope,
   SiteRegisterRequest,
 } from "./contracts.js";
@@ -34,15 +37,30 @@ import type {
   UpdatePreferencesInput,
 } from "./rewards/v2/customer-portal.js";
 import type { RewardsCustomerPortalHttpResponse } from "./rewards/v2/customer-portal-contract.js";
+import type { BondaAffiliateProvisioningHttpApplication } from "./rewards/bonda/affiliate-provisioning.js";
+import {
+  BondaCouponApplicationError,
+  type BondaCouponHttpApplication,
+} from "./rewards/bonda/catalog-application.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
-const CUSTOMER_CONTEXT_CACHE_TTL_MS = 30_000;
+// A customer commonly spends more than 30 seconds scanning the catalog before
+// opening a benefit. Keep the already validated, read-only context for the
+// length of that browsing session so every navigation does not repeat both
+// upstream identity requests. Explicit logout and customer mutations still
+// invalidate the entry immediately.
+const CUSTOMER_CONTEXT_CACHE_TTL_MS = 5 * 60_000;
 const CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES = 500;
 
 interface CustomerContextPayload {
   customer: CustomerProfile;
   validation: { status: string };
   portal: RewardsCustomerPortalHttpResponse | null;
+}
+
+interface CachedCustomerContext {
+  payload: CustomerContextPayload;
+  evidence: RewardsIdentityEvidence;
 }
 
 export function createSiteBackendServer(
@@ -52,6 +70,9 @@ export function createSiteBackendServer(
   referralApplication?: ReferralHttpApplication,
   rewardsV2JourneyApplication?: RewardsV2JourneyHttpApplication,
   rewardsCustomerPortalApplication?: RewardsCustomerPortalApplication,
+  bondaAffiliateProvisioningApplication?: BondaAffiliateProvisioningHttpApplication,
+  bondaCouponApplication?: BondaCouponHttpApplication,
+  coursesApplication?: CoursesApplication,
 ): Server {
   const client = new RewardsApiClient(config, fetchImplementation);
   const rewardsV2TestScenarios = new RewardsV2TestScenarioApplication();
@@ -66,8 +87,11 @@ export function createSiteBackendServer(
       referralApplication,
       rewardsV2JourneyApplication,
       rewardsCustomerPortalApplication,
+      bondaAffiliateProvisioningApplication,
+      bondaCouponApplication,
       rewardsV2TestScenarios,
       customerContextCache,
+      coursesApplication,
     );
   });
 }
@@ -81,12 +105,16 @@ async function routeRequest(
   referralApplication: ReferralHttpApplication | undefined,
   rewardsV2JourneyApplication: RewardsV2JourneyHttpApplication | undefined,
   rewardsCustomerPortalApplication: RewardsCustomerPortalApplication | undefined,
+  bondaAffiliateProvisioningApplication: BondaAffiliateProvisioningHttpApplication | undefined,
+  bondaCouponApplication: BondaCouponHttpApplication | undefined,
   rewardsV2TestScenarios: RewardsV2TestScenarioApplication,
   customerContextCache: CustomerContextCache,
+  coursesApplication: CoursesApplication | undefined,
 ): Promise<void> {
   try {
     const method = request.method ?? "GET";
-    const path = new URL(request.url ?? "/", "http://site-backend.local").pathname;
+    const requestUrl = new URL(request.url ?? "/", "http://site-backend.local");
+    const path = requestUrl.pathname;
     const cookie = request.headers.cookie;
 
     if (method === "POST" && path === "/api/v1/auth/register") {
@@ -101,6 +129,12 @@ async function routeRequest(
       }
       if (body.referral_token && referralApplication) {
         await captureReferralSafely(referralApplication, body.referral_token, result.data.customer.id);
+      }
+      if (bondaAffiliateProvisioningApplication) {
+        await bondaAffiliateProvisioningApplication.afterRegistration({
+          customerId: asCustomerId(result.data.customer.id),
+          rewardsId: result.data.customer.rewards_id,
+        });
       }
       return sendApiResult(
         response,
@@ -129,7 +163,7 @@ async function routeRequest(
     if (method === "GET" && path === "/api/v1/rewards/customer-context") {
       const cached = customerContextCache.get(cookie);
       if (cached) {
-        sendJson(response, 200, cached);
+        sendJson(response, 200, cached.payload);
         return;
       }
       const context = await client.getAuthenticatedCustomerContext(cookie);
@@ -143,7 +177,7 @@ async function routeRequest(
         validation: { status: context.data.validation.status },
         portal: customerPortal,
       };
-      customerContextCache.set(cookie, payload);
+      customerContextCache.set(cookie, { payload, evidence: context.data.evidence });
       return sendApiResult(response, {
         status: 200,
         data: payload,
@@ -259,6 +293,96 @@ async function routeRequest(
       sendJson(response, 200, { updated });
       return;
     }
+    const progressMatch = path.match(/^\/api\/v1\/rewards\/courses\/([1-9]\d{0,9})\/progress$/);
+    if ((method === 'GET' || method === 'POST') && progressMatch) {
+      response.setHeader('cache-control','private, no-store');
+      if (method === 'POST' && (request.headers['x-carobra-action'] !== 'course-progress'
+        || !request.headers['content-type']?.startsWith('application/json'))) throw new CourseError(403,'invalid_progress_request');
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (!coursesApplication) throw new CourseError(503,'courses_unavailable');
+      const customerId = asCustomerId(evidence.data.customer_id);
+      const courseId = Number(progressMatch[1]);
+      sendJson(response,200,method === 'GET'
+        ? await coursesApplication.getProgress(customerId,courseId)
+        : await coursesApplication.saveProgress(customerId,courseId,await readJsonBody<unknown>(request)));
+      return;
+    }
+    if (method === 'GET' && (path === '/api/v1/rewards/courses' || path.startsWith('/api/v1/rewards/courses/'))) {
+      response.setHeader('cache-control', 'private, no-store');
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (!coursesApplication) throw new CourseError(503, 'courses_unavailable');
+      const customerId = asCustomerId(evidence.data.customer_id);
+      if (path === '/api/v1/rewards/courses') {
+        sendJson(response, 200, await coursesApplication.list(customerId));
+      } else {
+        const match = path.match(/^\/api\/v1\/rewards\/courses\/([1-9]\d{0,9})$/);
+        if (!match) throw new CourseError(404, 'course_not_found');
+        sendJson(response, 200, await coursesApplication.detail(customerId, Number(match[1])));
+      }
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/coupons") {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getCatalog(
+        bondaIdentity(evidence),
+        integerQuery(requestUrl, "page", 1),
+        integerQuery(requestUrl, "page_size", 20),
+        requestUrl.searchParams.get("preview") === "true",
+      ));
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/coupons/affiliate-status") {
+      if (!bondaAffiliateProvisioningApplication) {
+        throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+      }
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      sendJson(response, 200, await bondaAffiliateProvisioningApplication.ensureForBenefits(
+        bondaIdentity(evidence.data),
+      ));
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/rewards/coupons/history") {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getHistory(bondaIdentity(evidence)));
+      return;
+    }
+    const codeRequestMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/code$/);
+    if (method === "POST" && codeRequestMatch) {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const body = await readJsonBody<{ request_id: string }>(request);
+      if (!body.request_id?.trim() || body.request_id.length > 200) {
+        throw new InvalidRequestError("request_id is required");
+      }
+      sendJson(response, 200, await coupons.requestCode(
+        bondaIdentity(evidence.data),
+        decodePathSegment(codeRequestMatch[1]!),
+        body.request_id,
+      ));
+      return;
+    }
+    const couponBranchesMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/branches$/);
+    if (method === "GET" && couponBranchesMatch) {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getBranches(
+        bondaIdentity(evidence),
+        decodePathSegment(couponBranchesMatch[1]!),
+      ));
+      return;
+    }
+    const couponDetailMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)$/);
+    if (method === "GET" && couponDetailMatch) {
+      const coupons = requireBondaCouponApplication(bondaCouponApplication);
+      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      sendJson(response, 200, await coupons.getDetail(
+        bondaIdentity(evidence),
+        decodePathSegment(couponDetailMatch[1]!),
+      ));
+      return;
+    }
     if (method === "GET" && path === "/api/v1/rewards/referrals") {
       const referrals = requireReferralApplication(referralApplication);
       const evidence = await client.getRewardsIdentityEvidence(cookie);
@@ -316,6 +440,10 @@ async function routeRequest(
 
     sendJson(response, 404, { error: { code: "not_found", message: "Route not found" } });
   } catch (error: unknown) {
+    if (error instanceof CourseError) {
+      sendJson(response, error.status, {error: {code: error.code, message: 'Course content is unavailable'}});
+      return;
+    }
     if (error instanceof InvalidRequestError) {
       sendJson(response, 400, { error: { code: "invalid_request", message: error.message } });
       return;
@@ -325,6 +453,12 @@ async function routeRequest(
         error: { code: error.code, message: error.message },
       };
       sendJson(response, error.status, payload);
+      return;
+    }
+    if (error instanceof BondaCouponApplicationError) {
+      sendJson(response, error.status, {
+        error: { code: error.code, message: error.message },
+      });
       return;
     }
     if (error instanceof RewardsError) {
@@ -344,9 +478,9 @@ async function routeRequest(
 }
 
 class CustomerContextCache {
-  private readonly entries = new Map<string, { expiresAt: number; payload: CustomerContextPayload }>();
+  private readonly entries = new Map<string, { expiresAt: number; context: CachedCustomerContext }>();
 
-  get(cookie: string | undefined): CustomerContextPayload | undefined {
+  get(cookie: string | undefined): CachedCustomerContext | undefined {
     const key = contextCacheKey(cookie);
     if (!key) return undefined;
     const entry = this.entries.get(key);
@@ -355,14 +489,14 @@ class CustomerContextCache {
       this.entries.delete(key);
       return undefined;
     }
-    return entry.payload;
+    return entry.context;
   }
 
-  set(cookie: string | undefined, payload: CustomerContextPayload): void {
+  set(cookie: string | undefined, context: CachedCustomerContext): void {
     const key = contextCacheKey(cookie);
     if (!key) return;
     this.entries.delete(key);
-    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, payload });
+    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, context });
     while (this.entries.size > CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES) {
       const oldestKey = this.entries.keys().next().value as string | undefined;
       if (!oldestKey) break;
@@ -374,6 +508,16 @@ class CustomerContextCache {
     const key = contextCacheKey(cookie);
     if (key) this.entries.delete(key);
   }
+}
+
+async function readCachedRewardsEvidence(
+  client: RewardsApiClient,
+  cache: CustomerContextCache,
+  cookie: string | undefined,
+): Promise<RewardsIdentityEvidence> {
+  const cached = cache.get(cookie);
+  if (cached) return cached.evidence;
+  return (await client.getRewardsIdentityEvidence(cookie)).data;
 }
 
 function contextCacheKey(cookie: string | undefined): string | undefined {
@@ -399,9 +543,16 @@ async function loadCustomerPortalSafely(
       evidence.validation_status,
     );
   } catch (error: unknown) {
+    const databaseError = error && typeof error === "object"
+      ? error as { code?: unknown; constraint?: unknown }
+      : null;
     console.error(JSON.stringify({
       event: "rewards_customer_context_unavailable",
       error_name: error instanceof Error ? error.name : "UnknownError",
+      error_code: typeof databaseError?.code === "string" ? databaseError.code : undefined,
+      error_constraint: typeof databaseError?.constraint === "string"
+        ? databaseError.constraint
+        : undefined,
     }));
     return null;
   }
@@ -461,6 +612,7 @@ function toApiRegisterRequest(body: SiteRegisterRequest): RegisterRequest {
     city: body.city,
     terms_accepted: body.terms_accepted,
     terms_version: body.terms_version,
+    ...(body.birth_date !== undefined ? { birth_date: body.birth_date } : {}),
   };
 }
 
@@ -483,6 +635,39 @@ function requireCustomerPortalApplication(
 ): RewardsCustomerPortalApplication {
   if (!application) throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
   return application;
+}
+
+function requireBondaCouponApplication(
+  application: BondaCouponHttpApplication | undefined,
+): BondaCouponHttpApplication {
+  if (!application) throw new SiteApiError(503, "api_unavailable", "Rewards is unavailable");
+  return application;
+}
+
+function bondaIdentity(evidence: RewardsIdentityEvidence) {
+  return {
+    customerId: asCustomerId(evidence.customer_id),
+    rewardsId: evidence.rewards_id,
+  };
+}
+
+function integerQuery(url: URL, key: string, fallback: number): number {
+  const value = url.searchParams.get(key);
+  if (value === null) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new InvalidRequestError(`${key} must be an integer`);
+  return parsed;
+}
+
+function decodePathSegment(value: string): string {
+  try {
+    const decoded = decodeURIComponent(value).trim();
+    if (!decoded || decoded.length > 200) throw new InvalidRequestError("Coupon identifier is invalid");
+    return decoded;
+  } catch (error) {
+    if (error instanceof InvalidRequestError) throw error;
+    throw new InvalidRequestError("Coupon identifier is invalid");
+  }
 }
 
 async function synchronizeJourneyEvidence(

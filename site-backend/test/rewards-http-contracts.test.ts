@@ -361,6 +361,7 @@ class StubJourneyApplication implements RewardsV2JourneyHttpApplication {
     }],
     modules: {
       benefits_enabled: false,
+      coupons_enabled: false,
       expiry_policy_approved: false,
       ave_enabled: false,
       referrals_enabled: false,

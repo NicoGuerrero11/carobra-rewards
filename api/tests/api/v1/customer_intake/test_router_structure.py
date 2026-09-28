@@ -44,7 +44,7 @@ class StubService:
         return SimulatedCustomerIntakeResult(
             intake_request_id="intake-1",
             customer_id="customer-1",
-            rewards_id="RWD-1",
+            rewards_id="456789012",
             status=SimulatedCustomerIntakeStatus.ACCEPTED,
             replayed=False,
         )
@@ -70,7 +70,7 @@ def test_customer_intake_route_uses_existing_endpoint_path() -> None:
     assert response.json() == {
         "intake_request_id": "intake-1",
         "customer_id": "customer-1",
-        "rewards_id": "RWD-1",
+        "rewards_id": "456789012",
         "status": "accepted",
         "replayed": False,
     }

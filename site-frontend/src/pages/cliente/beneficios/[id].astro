@@ -1,0 +1,436 @@
+---
+import ClientShellLayout from "../../../layouts/ClientShellLayout.astro";
+import BenefitRichText from "../../../components/BenefitRichText.astro";
+import "leaflet/dist/leaflet.css";
+import { getSiteBackendBaseUrl } from "../../../lib/api";
+import {
+  carobraCouponCategory,
+  couponChannelLabel,
+  type BondaCouponCatalog,
+  type BondaCouponDetailResponse,
+} from "../../../lib/bonda-coupon-contract";
+
+const couponId = Astro.params.id ?? "";
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let detail: BondaCouponDetailResponse = {
+  access_state: "COUPON_UNAVAILABLE",
+  affiliate_state: "DISABLED",
+  item: null,
+};
+let catalog: BondaCouponCatalog | null = null;
+
+try {
+  const [detailResponse, catalogResponse] = await Promise.all([
+    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons/${encodeURIComponent(couponId)}`, { headers: { cookie } }),
+    fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons?page_size=50`, { headers: { cookie } }),
+  ]);
+  if (detailResponse.status === 401 || catalogResponse.status === 401) {
+    return Astro.redirect("/login?error=unauthenticated");
+  }
+  if (detailResponse.ok) detail = await detailResponse.json() as BondaCouponDetailResponse;
+  if (catalogResponse.ok) catalog = await catalogResponse.json() as BondaCouponCatalog;
+} catch {
+  detail = { access_state: "PARTNER_UNAVAILABLE", affiliate_state: "DISABLED", item: null };
+}
+
+const item = detail.item;
+const detailImageUrl = item?.heroImageUrl ?? item?.bannerImageUrl ?? item?.imageUrl;
+const canRequestCode = detail.affiliate_state === "ACTIVE";
+const displayCategory = carobraCouponCategory(item?.category ?? null);
+const related = (catalog?.items ?? [])
+  .filter((candidate) => candidate.id !== couponId)
+  .sort((left, right) => {
+    const leftMatch = carobraCouponCategory(left.category) === displayCategory ? 0 : 1;
+    const rightMatch = carobraCouponCategory(right.category) === displayCategory ? 0 : 1;
+    return leftMatch - rightMatch || left.displayOrder - right.displayOrder;
+  })
+  .slice(0, 4);
+const expiration = item?.expirationAt
+  ? new Date(item.expirationAt).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  : "Consulta los términos";
+const unavailableCopy = detail.access_state === "PARTNER_UNAVAILABLE"
+  ? ["No pudimos cargar este beneficio", "Bonda no respondió en este momento. Intenta nuevamente en unos minutos."]
+  : ["Este beneficio ya no está disponible", "Puede haber cambiado, vencido o no corresponder a tu cuenta."];
+---
+
+<ClientShellLayout title={`${item?.name ?? "Beneficio"} | Carobra Rewards`} description="Detalle de beneficio Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Beneficios">
+  <main class="coupon-detail-page">
+    <a class="back-link" href="/cliente/beneficios"><span aria-hidden="true">←</span> Volver a beneficios</a>
+
+    {item ? (
+      <>
+        <section class="coupon-detail" aria-labelledby="coupon-title">
+          <div class="coupon-detail__main">
+            <div class="coupon-detail__visual">
+              {detailImageUrl
+                ? <img src={detailImageUrl} alt="" referrerpolicy="no-referrer" fetchpriority="high" decoding="async" />
+                : <span aria-hidden="true">{item.name.slice(0, 1).toUpperCase()}</span>}
+            </div>
+            <div class="coupon-detail__copy">
+              <p class="eyebrow">{displayCategory}</p>
+              <h1 id="coupon-title">{item.name}</h1>
+              {item.discount && <strong class="discount">{item.discount}</strong>}
+              <BenefitRichText
+                class="description"
+                text={item.description || item.shortDescription || "Consulta las condiciones para disfrutar este beneficio."}
+              />
+
+              <dl class="coupon-facts">
+                <div><dt>Vigencia</dt><dd>{expiration}</dd></div>
+                <div><dt>Disponible en</dt><dd>{item.channels.map(couponChannelLabel).join(" · ") || "Consulta las condiciones"}</dd></div>
+              </dl>
+
+              <section class="instructions" aria-labelledby="instructions-title">
+                <h2 id="instructions-title">Cómo usarlo</h2>
+                <BenefitRichText text={item.usageInstructions || "Solicita tu beneficio y sigue las instrucciones que recibirás con el código."} />
+              </section>
+
+              {item.channels.includes("ONSITE") && (
+                <section class="detail-section branches">
+                  <button class="branches-trigger" id="branches-trigger" type="button" aria-haspopup="dialog" aria-controls="branches-dialog">
+                    <span>Sucursales disponibles</span>
+                    <span class="branches-trigger__meta"><span id="branches-trigger-count" hidden></span><span aria-hidden="true">→</span></span>
+                  </button>
+                  <dialog class="branches-dialog" id="branches-dialog" data-coupon-id={couponId} aria-labelledby="branches-dialog-title">
+                    <div class="branches-dialog__panel">
+                      <header>
+                        <div><p class="eyebrow">Dónde usarlo</p><h2 id="branches-dialog-title">Sucursales habilitadas</h2></div>
+                        <button class="branches-dialog__close" type="button" aria-label="Cerrar sucursales"><span aria-hidden="true">×</span></button>
+                      </header>
+                      <div class="branches-dialog__body">
+                        <div class="branches-map-shell">
+                          <div id="branches-map" aria-label="Mapa de sucursales habilitadas" hidden></div>
+                          <p id="branches-map-empty">Cargando ubicaciones…</p>
+                        </div>
+                        <div class="branches-list-wrap">
+                          <p id="branches-list-status" role="status">Consultando sucursales habilitadas…</p>
+                          <ul class="branches-list" id="branches-list"></ul>
+                        </div>
+                      </div>
+                    </div>
+                  </dialog>
+                </section>
+              )}
+
+              <details class="detail-section">
+                <summary>Términos y condiciones</summary>
+                <BenefitRichText text={item.legalTerms || "Bonda no publicó términos adicionales para este beneficio."} />
+              </details>
+
+              {item.brandDescription && (
+                <details class="detail-section">
+                  <summary>Sobre {item.name}</summary>
+                  <BenefitRichText text={item.brandDescription} />
+                </details>
+              )}
+            </div>
+          </div>
+
+          <aside class="coupon-action" aria-labelledby="action-title">
+            <p class="eyebrow">Beneficio sin puntos</p>
+            <h2 id="action-title">¿Quieres usarlo?</h2>
+            <p>{canRequestCode ? "Generar el código no descuenta puntos de tu saldo." : "Puedes revisar toda la información mientras terminamos de activar la emisión de códigos para tu cuenta."}</p>
+            {canRequestCode ? <button id="request-start" type="button">Quiero este beneficio</button> : <p class="coupon-action__pending" role="status">Código temporalmente no disponible</p>}
+            <div id="request-confirmation" hidden>
+              <p>Solicitaremos un código único a Bonda. Revisa las condiciones antes de continuar.</p>
+              <div><button id="request-confirm" type="button">Confirmar solicitud</button><button id="request-cancel" type="button">Cancelar</button></div>
+            </div>
+            <div id="request-result" role="status" aria-live="polite" hidden>
+              <p id="request-message"></p>
+              <div id="coupon-code-wrap" hidden><code id="coupon-code"></code><button id="copy-code" type="button">Copiar código</button></div>
+            </div>
+            <a class="history-link" href="/cliente/beneficios#historial">Ver mis cupones recientes <span aria-hidden="true">→</span></a>
+          </aside>
+        </section>
+
+        {related.length > 0 && (
+          <section class="related" aria-labelledby="related-title">
+            <p class="eyebrow">También disponible para ti</p><h2 id="related-title">Descubre más beneficios</h2>
+            <div class="related__grid">
+              {related.map((candidate) => {
+                const candidateImageUrl = candidate.heroImageUrl ?? candidate.imageUrl;
+                return (
+                  <article class="related-card">
+                    <a
+                      class="related-card__link"
+                      href={`/cliente/beneficios/${encodeURIComponent(candidate.id)}`}
+                      aria-label={`${candidate.name}: ${candidate.discount || "Beneficio"}. Ver beneficio`}
+                    >
+                      <div class="related-card__visual">
+                        {candidateImageUrl && (
+                          <img src={candidateImageUrl} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                        )}
+                        <span class="related-card__logo" aria-hidden="true">
+                          {candidate.logoImageUrl
+                            ? <img src={candidate.logoImageUrl} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                            : <strong>{candidate.name.slice(0, 1).toUpperCase()}</strong>}
+                        </span>
+                      </div>
+                      <div class="related-card__body">
+                        <span class="related-card__category">{carobraCouponCategory(candidate.category)}</span>
+                        <strong class="related-card__discount">{candidate.discount || "Beneficio"}</strong>
+                        <p>{candidate.shortDescription || "Consulta las condiciones y la forma de uso."}</p>
+                        <div class="related-card__channels">
+                          {candidate.channels.slice(0, 2).map((channel) => <span>{couponChannelLabel(channel)}</span>)}
+                        </div>
+                        <span class="related-card__open">Ver beneficio <span aria-hidden="true">→</span></span>
+                      </div>
+                    </a>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </>
+    ) : (
+      <section class="unavailable" role="status"><span aria-hidden="true">!</span><div><h1>{unavailableCopy[0]}</h1><p>{unavailableCopy[1]}</p><a href="/cliente/beneficios">Ver beneficios disponibles</a></div></section>
+    )}
+  </main>
+
+  {item && canRequestCode && <script is:inline define:vars={{ couponId }}>
+    const requestStart = document.querySelector("#request-start");
+    const confirmation = document.querySelector("#request-confirmation");
+    const requestResult = document.querySelector("#request-result");
+    const codeWrap = document.querySelector("#coupon-code-wrap");
+    const codeElement = document.querySelector("#coupon-code");
+    const message = document.querySelector("#request-message");
+    const confirmButton = document.querySelector("#request-confirm");
+
+    requestStart?.addEventListener("click", () => { requestStart.hidden = true; confirmation.hidden = false; });
+    document.querySelector("#request-cancel")?.addEventListener("click", () => { confirmation.hidden = true; requestStart.hidden = false; });
+    confirmButton?.addEventListener("click", async () => {
+      confirmButton.disabled = true;
+      requestResult.hidden = false;
+      codeWrap.hidden = true;
+      message.textContent = "Solicitando tu beneficio…";
+      try {
+        const response = await fetch(`/api/v1/rewards/coupons/${encodeURIComponent(couponId)}/code`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ request_id: crypto.randomUUID() }),
+        });
+        if (!response.ok) throw new Error();
+        const result = await response.json();
+        const statuses = {
+          ISSUED: "Tu beneficio está listo.",
+          LIMIT_REACHED: "Ya alcanzaste el límite temporal de este beneficio.",
+          INVENTORY_UNAVAILABLE: "Este beneficio no tiene códigos disponibles por ahora.",
+          VERIFICATION_REQUIRED: "Estamos verificando si tu código fue generado.",
+          UNAVAILABLE: "No pudimos solicitar el beneficio. Intenta más tarde.",
+        };
+        message.textContent = result.instructions || statuses[result.status] || statuses.UNAVAILABLE;
+        if (result.status === "ISSUED" && result.code) {
+          codeElement.textContent = result.code;
+          codeWrap.hidden = false;
+        }
+      } catch {
+        message.textContent = "No pudimos solicitar el beneficio. Intenta más tarde.";
+      } finally {
+        confirmButton.disabled = false;
+        confirmation.hidden = true;
+      }
+    });
+    document.querySelector("#copy-code")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      try {
+        await navigator.clipboard.writeText(codeElement?.textContent || "");
+        button.textContent = "Copiado";
+      } catch {
+        button.textContent = "Copia el código manualmente";
+      }
+    });
+  </script>}
+
+  <script>
+    type Branch = {
+      id: string;
+      name: string;
+      address: string;
+      city: string | null;
+      state: string | null;
+      latitude: number | null;
+      longitude: number | null;
+    };
+
+    const dialog = document.querySelector<HTMLDialogElement>("#branches-dialog");
+    const trigger = document.querySelector<HTMLButtonElement>("#branches-trigger");
+    const closeButton = dialog?.querySelector<HTMLButtonElement>(".branches-dialog__close");
+    const mapElement = dialog?.querySelector<HTMLElement>("#branches-map");
+    const emptyMapMessage = dialog?.querySelector<HTMLElement>("#branches-map-empty");
+    const listElement = dialog?.querySelector<HTMLUListElement>("#branches-list");
+    const listStatus = dialog?.querySelector<HTMLElement>("#branches-list-status");
+    const triggerCount = document.querySelector<HTMLElement>("#branches-trigger-count");
+    let branches: Branch[] = [];
+    let branchButtons: HTMLButtonElement[] = [];
+    let branchesPromise: Promise<Branch[]> | null = null;
+    let leaflet: typeof import("leaflet") | null = null;
+    let map: import("leaflet").Map | null = null;
+    const markerByIndex = new Map<number, import("leaflet").CircleMarker>();
+
+    function markerStyle(selected = false): import("leaflet").CircleMarkerOptions {
+      return {
+        radius: selected ? 9 : 7,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: selected ? "#00395f" : "#007aa8",
+        fillOpacity: 1,
+      };
+    }
+
+    function selectBranch(index: number, focusMap = true): void {
+      branchButtons.forEach((button) => {
+        const selected = Number(button.dataset.branchIndex) === index;
+        button.classList.toggle("is-selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      markerByIndex.forEach((marker, markerIndex) => marker.setStyle(markerStyle(markerIndex === index)));
+      const marker = markerByIndex.get(index);
+      const branch = branches[index];
+      if (focusMap && marker && map && branch?.latitude !== null && branch?.longitude !== null) {
+        map.flyTo([branch.latitude, branch.longitude], Math.max(map.getZoom(), 14), { duration: .45 });
+        marker.openPopup();
+      }
+    }
+
+    function renderBranches(items: Branch[]): void {
+      if (!listElement || !listStatus || !emptyMapMessage) return;
+      listElement.replaceChildren();
+      if (items.length === 0) {
+        listStatus.textContent = "No hay direcciones publicadas para este beneficio.";
+        emptyMapMessage.textContent = "Bonda no publicó sucursales para este beneficio.";
+        if (mapElement) mapElement.hidden = true;
+        return;
+      }
+      listStatus.textContent = `${items.length} ${items.length === 1 ? "ubicación disponible" : "ubicaciones disponibles"}`;
+      if (triggerCount) {
+        triggerCount.textContent = String(items.length);
+        triggerCount.hidden = false;
+      }
+      items.forEach((branch, index) => {
+        const listItem = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.branchIndex = String(index);
+        const name = document.createElement("strong");
+        name.textContent = branch.name;
+        button.append(name);
+        if (branch.address) {
+          const address = document.createElement("span");
+          address.textContent = branch.address;
+          button.append(address);
+        }
+        const location = [branch.city, branch.state].filter(Boolean).join(", ");
+        if (location) {
+          const small = document.createElement("small");
+          small.textContent = location;
+          button.append(small);
+        }
+        button.addEventListener("click", () => selectBranch(index));
+        listItem.append(button);
+        listElement.append(listItem);
+      });
+      branchButtons = Array.from(listElement.querySelectorAll("button"));
+    }
+
+    async function loadBranches(): Promise<Branch[]> {
+      if (branchesPromise) return branchesPromise;
+      const couponId = dialog?.dataset.couponId ?? "";
+      branchesPromise = fetch(`/api/v1/rewards/coupons/${encodeURIComponent(couponId)}/branches`, {
+        headers: { accept: "application/json" },
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("branches_unavailable");
+          const payload = await response.json() as { items?: Branch[] };
+          branches = Array.isArray(payload.items) ? payload.items : [];
+          renderBranches(branches);
+          return branches;
+        })
+        .catch(() => {
+          branches = [];
+          if (listStatus) listStatus.textContent = "No pudimos cargar las sucursales. Intenta nuevamente más tarde.";
+          if (emptyMapMessage) emptyMapMessage.textContent = "Las ubicaciones no están disponibles en este momento.";
+          if (mapElement) mapElement.hidden = true;
+          return branches;
+        });
+      return branchesPromise;
+    }
+
+    async function initializeMap(): Promise<void> {
+      if (map || !mapElement || branches.length === 0) return;
+      const plottedBranches = branches
+        .map((branch, index) => ({ branch, index }))
+        .filter(({ branch }) => Number.isFinite(branch.latitude) && Number.isFinite(branch.longitude));
+      if (plottedBranches.length === 0) {
+        mapElement.hidden = true;
+        if (emptyMapMessage) {
+          emptyMapMessage.hidden = false;
+          emptyMapMessage.textContent = "Bonda no publicó coordenadas para estas sucursales. Puedes consultar todas las direcciones en la lista.";
+        }
+        return;
+      }
+      leaflet ??= (await import("leaflet")).default;
+      const L = leaflet;
+      mapElement.hidden = false;
+      if (emptyMapMessage) emptyMapMessage.hidden = true;
+      map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: false, minZoom: 3 });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+      const bounds: import("leaflet").LatLngExpression[] = [];
+      plottedBranches.forEach(({ branch, index }) => {
+        const point: import("leaflet").LatLngExpression = [branch.latitude as number, branch.longitude as number];
+        bounds.push(point);
+        const marker = L.circleMarker(point, markerStyle()).addTo(map as import("leaflet").Map);
+        const popupLabel = document.createElement("strong");
+        popupLabel.textContent = branch.name;
+        marker.bindPopup(popupLabel);
+        marker.on("click", () => {
+          selectBranch(index, false);
+          branchButtons[index]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+        markerByIndex.set(index, marker);
+      });
+      map.fitBounds(L.latLngBounds(bounds), { padding: [24, 24], maxZoom: 13 });
+    }
+
+    trigger?.addEventListener("click", async () => {
+      dialog?.showModal();
+      await loadBranches();
+      await initializeMap();
+      window.setTimeout(() => map?.invalidateSize(), 0);
+    });
+    closeButton?.addEventListener("click", () => dialog?.close());
+    dialog?.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dialog.close();
+      }
+    });
+    dialog?.addEventListener("close", () => trigger?.focus());
+
+    const prefetchBranches = () => { void loadBranches(); };
+    if (trigger) {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(prefetchBranches, { timeout: 2_000 });
+      } else {
+        setTimeout(prefetchBranches, 750);
+      }
+    }
+  </script>
+
+  <style>
+    .coupon-detail-page{width:min(70rem,calc(100% - 2.2rem));margin:0 auto;padding:1.35rem 0 4rem;color:#173f68}.back-link{display:inline-flex;gap:.45rem;align-items:center;margin-bottom:.85rem;color:#176f9e;font-size:.78rem;font-weight:850}.coupon-detail{display:grid;grid-template-columns:minmax(0,1fr) 18rem;gap:1rem;align-items:start}.coupon-detail__main,.coupon-action,.related,.unavailable{border:1px solid #e2e9ed;border-radius:1.05rem;background:#fff;box-shadow:0 12px 28px rgba(39,52,91,.06)}.coupon-detail__main{padding:.95rem;overflow:hidden}.coupon-detail__visual{height:clamp(14rem,29vw,20rem);display:grid;place-items:center;overflow:hidden;border-radius:.78rem;background:#eaf4f8}.coupon-detail__visual img{width:100%;height:100%;object-fit:cover;image-rendering:auto}.coupon-detail__visual>span{width:6rem;height:6rem;display:grid;place-items:center;border-radius:1rem;color:#004b87;background:#fff;font-size:2.5rem;font-weight:900}.coupon-detail__copy{position:relative;padding:1rem .15rem .25rem;background:#fff}.eyebrow{margin:0;color:#007aa8;font-size:.64rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}.coupon-detail h1{margin:.28rem 0 .55rem;color:#041c2c;font-size:clamp(2rem,4vw,3rem);line-height:1.02;letter-spacing:-.04em}.discount{display:inline-block;padding:.38rem .58rem;border-radius:.45rem;color:#004b87;background:#dff5fd;font-size:.84rem}.description{max-width:46rem;margin:.9rem 0;color:#526c80;font-size:.9rem;line-height:1.58;white-space:pre-line}.coupon-facts{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin:1rem 0}.coupon-facts div{padding:.8rem;border-radius:.65rem;background:#f2f8fc}.coupon-facts dt{font-size:.6rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.coupon-facts dd{margin:.25rem 0 0;font-size:.84rem}.instructions{margin:1rem 0;padding:1rem;border-left:3px solid #00a3e0;background:#edf8fc}.instructions h2{margin:0 0 .4rem;color:#173f68;font-size:1rem}.instructions p,.detail-section p{margin:0;color:#526c80;font-size:.88rem;line-height:1.58;white-space:pre-line}.detail-section{padding:.9rem 0;border-top:1px solid #dbe5ea}.detail-section summary{display:flex;justify-content:space-between;font-size:.9rem;font-weight:850;cursor:pointer}.detail-section summary span{padding:.12rem .42rem;border-radius:1rem;background:#dff5fd;font-size:.64rem}.branches-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;padding:.15rem 0;border:0;color:#173f68;background:transparent;font:inherit;font-size:.9rem;font-weight:850;text-align:left;cursor:pointer}.branches-trigger:focus-visible{outline:3px solid rgba(0,163,224,.3);outline-offset:5px}.branches-trigger__meta{display:flex;align-items:center;gap:.7rem}.branches-trigger__meta>span:first-child{padding:.12rem .42rem;border-radius:1rem;background:#dff5fd;font-size:.64rem}.branches-trigger__meta>span:last-child{color:#007aa8;font-size:1.05rem}.branches-dialog{width:min(47rem,calc(100% - 2rem));max-width:none;padding:0;border:0;border-radius:1.05rem;color:#173f68;background:#fff;box-shadow:0 24px 70px rgba(4,28,44,.28);overflow:hidden}.branches-dialog::backdrop{background:rgba(4,28,44,.66);backdrop-filter:blur(2px)}.branches-dialog__panel>header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.15rem;border-bottom:1px solid #dbe5ea}.branches-dialog__panel>header h2{margin:.15rem 0 0;color:#041c2c;font-size:1.15rem}.branches-dialog__close{width:2.1rem;height:2.1rem;display:grid;place-items:center;border:1px solid #d8e3e9;border-radius:50%;color:#315a73;background:#fff;font-size:1.45rem;line-height:1;cursor:pointer}.branches-dialog__close:hover,.branches-dialog__close:focus-visible{border-color:#00a3e0;color:#004b87;background:#edf8fc}.branches-dialog__body{height:min(21rem,calc(100dvh - 8rem));display:grid;grid-template-columns:minmax(0,1.18fr) minmax(15rem,.82fr);gap:.75rem;padding:.75rem}.branches-map-shell{position:relative;min-height:15rem;overflow:hidden;border-radius:.75rem;background:#eaf4f8}.branches-map-shell #branches-map{width:100%;height:100%;min-height:15rem}.branches-map-shell #branches-map[hidden],.branches-map-shell>p[hidden]{display:none}.branches-map-shell>p{height:100%;display:grid;place-items:center;margin:0;padding:2rem;color:#526c80;font-size:.84rem;line-height:1.55;text-align:center}.branches-list-wrap{min-height:0;display:flex;flex-direction:column}.branches-list-wrap>p{margin:.1rem .2rem .55rem;color:#607990;font-size:.72rem}.branches-list{min-height:0;margin:0;padding:0 .25rem 0 0;list-style:none;overflow-y:auto;overscroll-behavior:contain}.branches-list li+li{margin-top:.48rem}.branches-list button{width:100%;display:grid;gap:.2rem;padding:.7rem;border:1px solid #dce6ec;border-radius:.65rem;color:#173f68;background:#fff;font:inherit;font-size:.76rem;line-height:1.35;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}.branches-list button span,.branches-list button small{color:#607990}.branches-list button:hover,.branches-list button:focus-visible,.branches-list button.is-selected{border-color:#00a3e0;background:#f0faff;box-shadow:0 0 0 2px rgba(0,163,224,.1)}.branches-dialog :global(.leaflet-container){font-family:inherit}.branches-dialog :global(.leaflet-control-attribution){font-size:.55rem}.branches-dialog :global(.leaflet-popup-content){margin:.65rem .75rem;color:#173f68;font-family:inherit;font-size:.75rem}.coupon-action{position:sticky;top:1rem;padding:1.2rem}.coupon-action h2{margin:.35rem 0;font-size:1.45rem}.coupon-action>p:not(.eyebrow),.coupon-action>div>p{color:#607990;font-size:.86rem;line-height:1.5}.coupon-action button{padding:.72rem .9rem;border:0;border-radius:.55rem;color:#fff;background:#004b87;font-weight:850;cursor:pointer}.coupon-action>button{width:100%;margin-top:.7rem}.coupon-action button:disabled{opacity:.6}.coupon-action>div{margin-top:.75rem;padding:.85rem;border-radius:.7rem;background:#f2f8fc}.coupon-action>div>div{display:flex;flex-wrap:wrap;gap:.5rem}.coupon-action>div button+button{color:#516b7e;background:#fff}.coupon-action code{padding:.5rem;border-radius:.4rem;background:#fff;font-weight:900}.coupon-action [hidden]{display:none}.history-link{display:flex;justify-content:space-between;margin-top:.9rem;padding-top:.9rem;border-top:1px solid #dbe5ea;color:#176f9e;font-size:.75rem;font-weight:850}.coupon-action__pending{margin:.75rem 0 0;padding:.7rem;border-radius:.55rem;color:#536878;background:#edf2f4;font-size:.75rem;font-weight:850;text-align:center}.related{margin-top:1rem;padding:1.5rem}.related h2{margin:.25rem 0 1rem;font-size:1.45rem}.related__grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}.related-card{min-width:0;overflow:hidden;border:1px solid #dce6ec;border-radius:.8rem;background:#fff;box-shadow:0 6px 16px rgba(29,55,86,.06);transition:border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}.related-card:hover{border-color:#91cbdc;box-shadow:0 10px 22px rgba(29,55,86,.12);transform:translateY(-2px)}.related-card:focus-within{outline:3px solid rgba(0,163,224,.28);outline-offset:2px}.related-card__link{height:100%;display:flex;flex-direction:column;color:inherit;text-decoration:none}.related-card__visual{position:relative;height:7.35rem;display:grid;place-items:center;margin-bottom:1.35rem;background:linear-gradient(145deg,#e8f3f8,#f5f9fb)}.related-card__visual>img{width:100%;height:100%;object-fit:cover}.related-card__logo{position:absolute;left:.8rem;bottom:-1.35rem;width:4.1rem;height:4.1rem;display:grid;place-items:center;overflow:hidden;border:4px solid #fff;border-radius:.8rem;color:#004b87;background:#fff;box-shadow:0 5px 13px rgba(23,63,104,.15)}.related-card__logo img{width:100%;height:100%;padding:.3rem;object-fit:contain}.related-card__logo strong{font-size:1.45rem;font-weight:900}.related-card__body{min-height:12.1rem;display:flex;flex:1;flex-direction:column;padding:.95rem .85rem .85rem}.related-card__category,.related-card__channels span{width:max-content;max-width:100%;padding:.24rem .38rem;border-radius:999px;color:#39809c;background:#edf7fa;font-size:.57rem;font-weight:850}.related-card__discount{display:block;margin:.7rem 0 .42rem;color:#041c2c;font-size:1.5rem;line-height:1.05;letter-spacing:-.025em}.related-card__body>p{display:-webkit-box;min-height:2.8em;margin:0;overflow:hidden;color:#607990;font-size:.75rem;line-height:1.4;-webkit-box-orient:vertical;-webkit-line-clamp:2}.related-card__channels{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.6rem}.related-card__open{width:100%;display:flex;justify-content:space-between;margin-top:auto;padding:.65rem 0 0;border-top:1px solid #e5ecef;color:#176f9e;font-size:.72rem;font-weight:900}.unavailable{display:flex;align-items:center;gap:1rem;padding:2rem}.unavailable>span{width:3rem;height:3rem;display:grid;place-items:center;border-radius:50%;background:#fde7df;font-weight:900}.unavailable h1{margin:0}.unavailable p{color:#607990}.unavailable a{color:#176f9e;font-weight:850}@media(max-width:850px){.coupon-detail{grid-template-columns:1fr}.coupon-action{position:static}.related__grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:600px){.coupon-detail-page{width:min(100% - 1.1rem,70rem);padding-top:1rem}.coupon-facts,.related__grid{grid-template-columns:1fr}.coupon-detail__main{padding:.65rem}.coupon-detail__copy{padding:1rem .35rem .3rem}.coupon-detail__visual{height:13rem}.coupon-detail h1{font-size:2rem}.branches-dialog{width:calc(100% - 1rem);max-height:calc(100dvh - 1rem)}.branches-dialog__body{height:auto;max-height:calc(100dvh - 5rem);grid-template-columns:1fr;overflow-y:auto}.branches-map-shell,.branches-map-shell #branches-map{height:12rem;min-height:12rem}.branches-list{max-height:14rem}.branches-dialog__panel>header{padding:.85rem}}
+    .coupon-detail__copy :global(.description){max-width:46rem;margin:.9rem 0}
+    .instructions :global(.benefit-rich-text){font-size:.86rem}
+    .detail-section :global(.benefit-rich-text){margin-top:.75rem;font-size:.84rem}
+    .branches-list :global(li+li){margin-top:.48rem}
+    .branches-list :global(button){width:100%;display:grid;gap:.2rem;padding:.7rem;border:1px solid #dce6ec;border-radius:.65rem;color:#173f68;background:#fff;font:inherit;font-size:.76rem;line-height:1.35;text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+    .branches-list :global(button span),.branches-list :global(button small){color:#607990}
+    .branches-list :global(button:hover),.branches-list :global(button:focus-visible),.branches-list :global(button.is-selected){border-color:#00a3e0;background:#f0faff;box-shadow:0 0 0 2px rgba(0,163,224,.1)}
+  </style>
+</ClientShellLayout>

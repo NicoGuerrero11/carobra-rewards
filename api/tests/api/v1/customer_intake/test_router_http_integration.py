@@ -31,7 +31,7 @@ from carobra_rewards.modules.customer_intake.infrastructure.persistence.reposito
     SqlAlchemyCustomerIntakeUnitOfWork,
 )
 from carobra_rewards.modules.customer_intake.infrastructure.rewards_id_generator import (
-    TokenHexRewardsIdGenerator,
+    NumericRewardsIdGenerator,
 )
 from carobra_rewards.modules.customer_intake.ports.rewards_id_generator import (
     RewardsIdGenerator,
@@ -80,7 +80,7 @@ def _build_app(
     mvp_start_date: date | None = date(2026, 7, 1),
 ) -> FastAPI:
     app = create_application()
-    generator = rewards_id_generator or TokenHexRewardsIdGenerator()
+    generator = rewards_id_generator or NumericRewardsIdGenerator()
 
     def override_service() -> ProcessSimulatedCustomerIntake:
         return ProcessSimulatedCustomerIntake(
@@ -101,7 +101,7 @@ async def _seed_existing_customer(
 ) -> Customer:
     now = datetime.now(UTC)
     customer = Customer.create(
-        rewards_id="RWD-existing",
+        rewards_id="456789014",
         curp=curp,
         nss=nss,
         name="Existing Customer",
@@ -319,7 +319,7 @@ async def test_http_flow_replays_duplicate_request_as_idempotent_duplicate(
     postgres_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     app = _build_app(
-        postgres_session_factory, rewards_id_generator=FixedRewardsIdGenerator("RWD-fixed")
+        postgres_session_factory, rewards_id_generator=FixedRewardsIdGenerator("456789015")
     )
     transport = ASGITransport(app=app)
     payload = _payload(external_request_id="external-fixed")

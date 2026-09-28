@@ -1,0 +1,35 @@
+---
+import {courseDuration, type CoursePreview} from '../lib/courses';
+import {homeCourseLink} from '../lib/customer-home';
+interface Props {course: CoursePreview}
+const {course} = Astro.props;
+const isArticle = course.content_type === 'text';
+const isCourse = course.space === 'cursos';
+const continuing = course.progress?.started && !course.progress.completed;
+const action = isArticle ? 'Leer artículo' : isCourse ? continuing ? 'Continuar curso' : course.progress?.completed ? 'Volver a ver' : 'Ver curso' : 'Ver video';
+---
+<article class="home-learning-card" data-content-type={course.content_type} data-continuing={continuing ? 'true' : undefined}>
+  <a href={homeCourseLink(course)} aria-label={`${action}: ${course.title}`}>
+    <div class="home-learning-card__image">
+      {course.image_url ? <img src={course.image_url} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" width="240" height="180" /> : <span aria-hidden="true">{isArticle ? 'Aa' : '▶'}</span>}
+      <span class="home-learning-card__type">{isArticle ? 'Lectura' : '▶'}</span>
+    </div>
+    <div class="home-learning-card__copy">
+      <span class="home-learning-card__category">{course.category}</span>
+      <h3>{course.title}</h3>
+      <p>{isArticle ? 'Artículo · A tu ritmo' : course.progress?.completed ? '✓ Completado' : continuing ? `${course.progress!.completed_chapters} de ${course.progress!.total_chapters} capítulos completados` : courseDuration(course.duration_seconds)}</p>
+      <strong>{action} <span aria-hidden="true">→</span></strong>
+    </div>
+  </a>
+</article>
+<style>
+  .home-learning-card{min-width:0;border:1px solid var(--carobra-border);border-radius:var(--carobra-radius-md);background:white;overflow:hidden}
+  .home-learning-card a{display:grid;grid-template-columns:7rem minmax(0,1fr);gap:1rem;padding:.7rem;color:var(--carobra-ink);height:100%;text-decoration:none}
+  .home-learning-card:hover{border-color:var(--carobra-blue);box-shadow:var(--carobra-shadow-sm)}
+  .home-learning-card__image{position:relative;align-self:start;aspect-ratio:1;background:var(--carobra-surface-blue);overflow:hidden;border-radius:.6rem;display:grid;place-items:center;color:var(--carobra-blue)}
+  .home-learning-card__image img{width:100%;height:100%;object-fit:cover}.home-learning-card__type{position:absolute;left:.4rem;bottom:.4rem;padding:.2rem .4rem;background:white;border-radius:.3rem;font-size:.6rem;font-weight:750}
+  .home-learning-card__copy{display:flex;flex-direction:column;align-items:start;padding:.2rem 0;min-width:0;overflow-wrap:anywhere}
+  .home-learning-card__category{color:var(--carobra-blue);font-size:.64rem;font-weight:700}.home-learning-card h3{margin:.25rem 0;font-size:.9rem;font-weight:700;line-height:1.4}
+  .home-learning-card p{font-size:.7rem;line-height:1.5;color:var(--carobra-ink-muted);margin:.1rem 0 .5rem}.home-learning-card strong{margin-top:auto;font-size:.72rem;color:var(--carobra-blue);font-weight:750}
+  @media(max-width:420px){.home-learning-card a{grid-template-columns:5rem minmax(0,1fr);gap:.65rem}.home-learning-card h3{font-size:.82rem}}
+</style>

@@ -53,6 +53,25 @@ El login emite una cookie HTTP-only. La API guarda únicamente el hash del token
 de sesión y el hash de la contraseña; nunca devuelve ni persiste contraseñas en
 texto plano o su confirmación.
 
+### Fecha de nacimiento en el registro
+
+`POST /api/v1/auth/register` acepta `birth_date` opcional, como fecha `YYYY-MM-DD`
+(o `null`). Omitirla mantiene el comportamiento anterior. Se aceptan fechas reales
+desde `1900-01-01` hasta el día actual en `America/Mexico_City`; no se aceptan
+timestamps, fechas futuras ni valores numéricos. Un valor inválido devuelve
+`422 invalid_birth_date` sin reflejar el dato enviado. Registro, login y `/me`
+devuelven el valor en el perfil del propio cliente.
+
+Se guarda en `customers.birth_date` como `DATE` nullable. Es un dato declarado por
+el cliente: no escribe en `verified_birth_dates`, no genera puntos de cumpleaños
+y no se incorpora a evidencia de SISCA, Bonda o decisiones de nivel.
+
+Antes de iniciar esta versión de la API, aplicar la migración
+`20260928_customer_birth_date` sobre `20260910_numeric_rewards_ids`, con autorización
+del responsable de la base. Sólo agrega la columna, sin default ni backfill.
+Para revertir código puede conservarse la columna; ejecutar su downgrade eliminaría
+las fechas ya recopiladas y requiere aprobación independiente.
+
 ## Integración SISCA UAT
 
 La API incluye un adaptador HTTP para SISCA. Para un ambiente UAT, configura

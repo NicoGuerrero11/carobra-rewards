@@ -38,6 +38,7 @@ export interface CreateCatalogVersionCommand extends CatalogAuditCommand {
   inventoryMode: InventoryMode;
   fulfillmentMode: string;
   partnerDependency: string | null;
+  partnerItemReference?: string | null;
   effectiveFrom: Date;
   effectiveTo: Date | null;
   disabledReason: string | null;
@@ -146,6 +147,7 @@ interface CatalogRow extends QueryResultRow {
   inventory_mode: InventoryMode;
   fulfillment_mode: string;
   partner_dependency: string | null;
+  partner_item_reference: string | null;
   effective_from: Date;
   effective_to: Date | null;
   disabled_reason: string | null;
@@ -212,16 +214,16 @@ export class PostgresCatalogAdministration implements CatalogAdministrationPort 
         INSERT INTO catalog_items (
           id, code, version, name, description, mode, enabled, point_price,
           eligibility_rule, inventory_mode, fulfillment_mode, partner_dependency,
-          effective_from, effective_to, disabled_reason, created_at, updated_at
+          partner_item_reference, effective_from, effective_to, disabled_reason, created_at, updated_at
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12,
-          $13, $14, $15, $16, $16
+          $13, $14, $15, $16, $17, $17
         )
       `, [catalogItemId, command.code, version, command.name, command.description,
         command.mode, command.enabled, command.pointPrice?.toString() ?? null,
         JSON.stringify(command.eligibilityRule), command.inventoryMode, command.fulfillmentMode,
-        command.partnerDependency, command.effectiveFrom, command.effectiveTo,
-        command.disabledReason, command.createdAt]);
+        command.partnerDependency, command.partnerItemReference ?? null, command.effectiveFrom,
+        command.effectiveTo, command.disabledReason, command.createdAt]);
       await client.query(`
         INSERT INTO catalog_inventory (
           id, catalog_item_id, total_capacity, reserved_quantity, fulfilled_quantity,
@@ -390,6 +392,7 @@ function asPolicy(command: CreateCatalogVersionCommand, version: number): Catalo
     inventoryMode: command.inventoryMode,
     fulfillmentMode: command.fulfillmentMode,
     partnerDependency: command.partnerDependency,
+    partnerItemReference: command.partnerItemReference ?? null,
     effectiveFrom: command.effectiveFrom,
     effectiveTo: command.effectiveTo,
     disabledReason: command.disabledReason,
@@ -408,6 +411,8 @@ function versionState(
     enabled: command.enabled,
     pointPrice: command.pointPrice?.toString() ?? null,
     inventoryMode: command.inventoryMode,
+    partnerDependency: command.partnerDependency,
+    partnerItemReference: command.partnerItemReference ?? null,
     totalCapacity: command.totalCapacity,
     effectiveFrom: command.effectiveFrom.toISOString(),
     effectiveTo: command.effectiveTo?.toISOString() ?? null,
@@ -422,6 +427,8 @@ function snapshot(row: CatalogRow): Readonly<Record<string, unknown>> {
     enabled: row.enabled,
     pointPrice: row.point_price,
     inventoryMode: row.inventory_mode,
+    partnerDependency: row.partner_dependency,
+    partnerItemReference: row.partner_item_reference,
     totalCapacity: row.total_capacity,
     reservedQuantity: row.reserved_quantity,
     fulfilledQuantity: row.fulfilled_quantity,

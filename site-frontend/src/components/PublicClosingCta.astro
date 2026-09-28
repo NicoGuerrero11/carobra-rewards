@@ -1,0 +1,36 @@
+<section id="confianza" class="closing-invitation" aria-labelledby="closing-invitation-title">
+  <div class="shell closing-invitation__inner">
+    <h2 id="closing-invitation-title">Tu siguiente paso empieza aquí.</h2>
+    <p class="closing-invitation__intro">
+      Descubre los beneficios, cursos y bienestar disponibles para tu nivel en Carobra Rewards.
+    </p>
+    <div class="closing-invitation__actions">
+      <a href="/registro" class="closing-invitation__join">
+        Únete a Rewards <span aria-hidden="true">→</span>
+      </a>
+      <p class="closing-invitation__signin">
+        <span>¿Ya tienes cuenta?</span>
+        <a href="/login">Inicia sesión</a>
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .closing-invitation { padding: 3.2rem 0; scroll-margin-top: 6rem; background: #08355c; background-image: linear-gradient(110deg, #08355c, #064677); color: #fff; overflow-wrap: anywhere; }
+  .closing-invitation__inner { text-align: center; }
+  .closing-invitation h2 { margin: 0; color: #fff; font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 700; line-height: 1.25; letter-spacing: -.035em; text-wrap: balance; }
+  .closing-invitation__intro { max-width: 59ch; margin: .85rem auto 0; color: #d3e5f1; font-size: .9rem; line-height: 1.75; text-wrap: pretty; }
+  .closing-invitation__actions { margin-top: 1.5rem; }
+  .closing-invitation__join { display: inline-flex; align-items: center; justify-content: center; gap: .9rem; min-height: 48px; max-width: 100%; padding: .8rem 1.4rem; border: 1px solid #fff; border-radius: .65rem; background: #fff; color: var(--public-blue, #004b87); box-shadow: 0 5px 16px rgb(4 28 44 / 12%); font-size: .85rem; font-weight: 750; line-height: 1.5; text-decoration: none; }
+  .closing-invitation__join span { flex-shrink: 0; font-size: 1.1rem; line-height: 1; }
+  .closing-invitation__join:hover { background: #eaf5fb; border-color: #eaf5fb; }
+  .closing-invitation__signin { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; column-gap: .4rem; margin: .65rem 0 0; color: #d3e5f1; font-size: .78rem; line-height: 1.6; }
+  .closing-invitation__signin a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; max-width: 100%; padding: .3rem .15rem; border-radius: .2rem; color: #fff; font-weight: 700; text-decoration: underline; text-decoration-color: #8db4cf; text-underline-offset: .25em; }
+  .closing-invitation__signin a:hover { text-decoration-color: #fff; }
+  .closing-invitation a:focus-visible { outline: 2px solid #fff; outline-offset: 5px; }
+  @media (max-width: 700px) {
+    .closing-invitation { padding: 2.4rem 0; }
+    .closing-invitation__intro { max-width: 34ch; font-size: .86rem; }
+  }
+</style>

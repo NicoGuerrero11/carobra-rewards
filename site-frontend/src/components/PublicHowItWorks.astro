@@ -1,0 +1,67 @@
+---
+const steps = [
+  {
+    number: '01',
+    title: 'Crea tu cuenta',
+    description: 'Regístrate y comienza tu experiencia en Carobra Rewards.',
+  },
+  {
+    number: '02',
+    title: 'Confirmamos tus productos',
+    description: 'Validamos tu relación con Carobra para asignarte el nivel correspondiente.',
+  },
+  {
+    number: '03',
+    title: 'Descubre lo que tienes disponible',
+    description: 'Consulta tus puntos y explora los beneficios, cursos y bienestar de tu cuenta.',
+  },
+];
+---
+
+<section id="experiencia" class="how-it-works" aria-labelledby="how-it-works-title">
+  <div class="shell">
+    <header class="how-it-works__heading">
+      <p class="how-it-works__eyebrow">Cómo funciona</p>
+      <h2 id="how-it-works-title">Empieza en <span>tres pasos.</span></h2>
+      <p class="how-it-works__intro">Así comienza tu experiencia en Carobra Rewards.</p>
+    </header>
+    <ol class="how-it-works__steps" role="list" aria-label="Pasos para comenzar en Rewards">
+      {steps.map(step => (
+        <li class="how-it-works__step">
+          <span class="how-it-works__number" aria-hidden="true">{step.number}</span>
+          <div class="how-it-works__copy">
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .how-it-works { padding: 3.2rem 0; scroll-margin-top: 6rem; color: var(--public-navy, #041c2c); background: #fff; border-bottom: 1px solid #e4ecf1; }
+  .how-it-works__heading { text-align: center; margin-bottom: 2.3rem; }
+  .how-it-works__eyebrow { margin: 0 0 .65rem; font-size: .65rem; letter-spacing: .12em; line-height: 1.5; font-weight: 800; text-transform: uppercase; color: var(--public-blue, #004b87); }
+  .how-it-works__heading h2 { margin: 0; font-size: clamp(1.5rem, 2.5vw, 2rem); line-height: 1.25; letter-spacing: -.035em; font-weight: 700; text-wrap: balance; }
+  .how-it-works__heading h2 span { color: #386487; }
+  .how-it-works__intro { margin: .75rem auto 0; color: #536878; font-size: .86rem; line-height: 1.65; text-wrap: pretty; }
+  .how-it-works__steps { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; margin: 0; padding: 0; list-style: none; }
+  .how-it-works__steps::before { content: ''; position: absolute; top: 26px; left: calc(100% / 6); right: calc(100% / 6); height: 1px; background: #d1e2ed; }
+  .how-it-works__step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1rem; text-align: center; min-width: 0; }
+  .how-it-works__number { display: grid; place-items: center; flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%; color: #fff; background: var(--public-blue, #004b87); box-shadow: 0 0 0 8px #fff; font-size: .87rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .how-it-works__copy { min-width: 0; max-width: 30ch; overflow-wrap: anywhere; }
+  .how-it-works__copy h3 { display: flex; align-items: center; justify-content: center; min-height: 2.8em; margin: 0 0 .55rem; font-size: 1rem; line-height: 1.4; letter-spacing: -.02em; font-weight: 700; text-wrap: balance; }
+  .how-it-works__copy p { margin: 0; color: #536878; font-size: .83rem; line-height: 1.75; text-wrap: pretty; }
+  @media(max-width: 700px) {
+    .how-it-works { padding: 2.4rem 0; }
+    .how-it-works__heading { margin-bottom: 1.8rem; }
+    .how-it-works__steps { grid-template-columns: 1fr; gap: 1.75rem; max-width: 30rem; margin-inline: auto; }
+    .how-it-works__steps::before { display: none; }
+    .how-it-works__step { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: start; gap: 1rem; text-align: left; }
+    .how-it-works__step:not(:last-child)::after { content: ''; position: absolute; left: 21.5px; top: 52px; width: 1px; height: calc(100% + 1.75rem - 60px); background: #d1e2ed; }
+    .how-it-works__number { width: 44px; height: 44px; font-size: .8rem; }
+    .how-it-works__copy { max-width: none; padding-top: .15rem; }
+    .how-it-works__copy h3 { display: block; min-height: 0; margin-bottom: .45rem; font-size: .96rem; text-wrap: pretty; }
+  }
+</style>

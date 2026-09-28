@@ -21,6 +21,11 @@ import { rewardsV2Foundation } from "./migrations/018-rewards-v2-foundation.js";
 import { rewardsV2LiveJourney } from "./migrations/019-rewards-v2-live-journey.js";
 import { rewardsCustomerPortal } from "./migrations/020-rewards-customer-portal.js";
 import { rewardsV2Canonical } from "./migrations/021-rewards-v2-canonical.js";
+import { bondaCoupons } from "./migrations/022-bonda-coupons.js";
+import { bondaCouponCandidates } from "./migrations/023-bonda-coupon-candidates.js";
+import { bondaApprovedCoupons } from "./migrations/024-bonda-approved-coupons.js";
+import { bondaPresentationCatalogReconciliation } from "./migrations/025-bonda-presentation-catalog-reconciliation.js";
+import { courseVideoProgress } from "./migrations/026-course-video-progress.js";
 
 export interface Migration {
   id: string;
@@ -50,6 +55,11 @@ export const migrations: readonly Migration[] = [
   rewardsV2LiveJourney,
   rewardsCustomerPortal,
   rewardsV2Canonical,
+  bondaCoupons,
+  bondaCouponCandidates,
+  bondaApprovedCoupons,
+  bondaPresentationCatalogReconciliation,
+  courseVideoProgress,
 ];
 
 export async function migrate(client: PoolClient): Promise<void> {

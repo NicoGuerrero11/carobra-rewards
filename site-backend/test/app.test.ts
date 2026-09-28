@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import test from "node:test";
 
 import { createSiteBackendServer } from "../src/app.js";
+import { CoursesApplication } from "../src/rewards/courses/application.js";
 import type { SiteBackendConfig } from "../src/config.js";
 import type {
   CaptureReferralRegistrationCommand,
@@ -11,6 +12,20 @@ import type {
   ReferralHttpApplication,
 } from "../src/rewards/referrals/http-application.js";
 import type { CustomerId } from "../src/rewards/shared/identifiers.js";
+import type {
+  BondaAffiliateProvisioningHttpApplication,
+  BondaRegistrationIdentity,
+} from "../src/rewards/bonda/affiliate-provisioning.js";
+import type {
+  BondaCouponCustomerIdentity,
+  BondaCouponHttpApplication,
+} from "../src/rewards/bonda/catalog-application.js";
+import type {
+  BondaCouponCatalogHttpResponse,
+  BondaCouponCodeHttpResponse,
+  BondaCouponDetailHttpResponse,
+  BondaReceivedCouponsHttpResponse,
+} from "../src/rewards/bonda/contracts.js";
 
 const runningServers = new Set<Server>();
 
@@ -95,6 +110,124 @@ test("captures a referral token after registration without forwarding it to Fast
   assert.equal(referrals.capture?.referredCustomerId, profile.id);
 });
 
+test("forwards the optional birth date without conversion and preserves the profile value", async (t) => {
+  const payload = { ...registrationPayload, birth_date: "1992-02-29" };
+  const upstream = await startServer(async (request, response) => {
+    assert.deepEqual(await readJson(request), payload);
+    json(response, 201, { customer: { ...profile, birth_date: payload.birth_date }, validation_status: "PENDING" });
+  });
+  const bff = await startBff(t, upstream.url);
+  const response = await fetch(`${bff.url}/api/v1/auth/register`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await response.json() as { customer: { birth_date: string } }).customer.birth_date, payload.birth_date);
+});
+
+test("successful registration schedules Rewards-ID-only Bonda provisioning", async (t) => {
+  const upstream = await startServer((_request, response) => {
+    json(response, 201, {
+      customer: profile,
+      validation_id: "00000000-0000-0000-0000-000000000302",
+      validation_status: "PENDING",
+      registered_at: "2026-09-10T12:00:00.000Z",
+    });
+  });
+  const affiliate = new CapturingBondaAffiliateApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, undefined, affiliate);
+
+  const response = await fetch(`${bff.url}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(registrationPayload),
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(affiliate.registration, {
+    customerId: profile.id,
+    rewardsId: profile.rewards_id,
+  });
+});
+
+test("authenticated coupon routes bind customer and Rewards ID from API evidence", async (t) => {
+  const upstream = await startServer((request, response) => {
+    if (request.url === "/api/v1/me") return json(response, 200, profile);
+    if (request.url === "/api/v1/me/validation-status") {
+      return json(response, 200, {
+        validation_id: "00000000-0000-0000-0000-000000000302",
+        customer_id: profile.id,
+        status: "PENDING",
+        registered_at: "2026-09-10T12:00:00.000Z",
+        validated_at: null,
+        product_evidence: null,
+      });
+    }
+    return json(response, 404, {});
+  });
+  const coupons = new CapturingBondaCouponApplication();
+  const bff = await startBff(t, upstream.url, undefined, 1_000, undefined, undefined, coupons);
+
+  const response = await fetch(`${bff.url}/api/v1/rewards/coupons?page=2&page_size=5`, {
+    headers: { cookie: "carobra_session=api-secret" },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(coupons.catalogRequest, {
+    identity: { customerId: profile.id, rewardsId: profile.rewards_id },
+    page: 2,
+    pageSize: 5,
+    previewOnly: false,
+  });
+  const preview = await fetch(`${bff.url}/api/v1/rewards/coupons?page_size=4&preview=true&customer_id=other`, {
+    headers: { cookie: "carobra_session=api-secret" },
+  });
+  assert.equal(preview.status, 200);
+  assert.deepEqual(coupons.catalogRequest, {
+    identity: { customerId: profile.id, rewardsId: profile.rewards_id },
+    page: 1,
+    pageSize: 4,
+    previewOnly: true,
+  });
+});
+
+test("course routes require a valid session, bind its customer and preserve safe failures", async (t) => {
+  let reads = 0;
+  const upstream = await startServer((request, response) => {
+    if (request.headers.cookie !== 'carobra_session=valid') return apiError(response, 401, 'unauthenticated', 'Authentication is required');
+    if (request.url === '/api/v1/me') return json(response, 200, profile);
+    if (request.url === '/api/v1/me/validation-status') return json(response, 200, {
+      validation_id:'00000000-0000-0000-0000-000000000302', customer_id:profile.id,
+      status:'PENDING', registered_at:'2026-09-10T12:00:00.000Z', validated_at:null, product_evidence:null,
+    });
+    return json(response, 404, {});
+  });
+  const courses = new CoursesApplication({get:async id=>{
+    reads++; assert.equal(id, profile.id); return {state:'INVITED',currentLevel:null};
+  }},{getChapter:async()=>{throw Error('must not read media');}},true);
+  const bff = await startBff(t, upstream.url, undefined, 1000, undefined, undefined, undefined, courses);
+  for (const path of ['/api/v1/rewards/courses','/api/v1/rewards/courses/1256','/api/v1/rewards/courses/1256/progress']) {
+    const anonymous = await fetch(`${bff.url}${path}`);
+    assert.equal(anonymous.status,401);
+  }
+  assert.equal(reads,0);
+  const headers = {cookie:'carobra_session=valid'};
+  const catalog = await fetch(`${bff.url}/api/v1/rewards/courses?customer_id=other`,{headers});
+  assert.equal(catalog.status,200); assert.match(catalog.headers.get('cache-control') ?? '',/no-store/);
+  assert.doesNotMatch(await catalog.text(),/embed_url|player.vimeo.com/);
+  const locked = await fetch(`${bff.url}/api/v1/rewards/courses/1256`,{headers});
+  assert.equal(locked.status,403);
+  const invalid = await fetch(`${bff.url}/api/v1/rewards/courses/not-an-id`,{headers});
+  assert.equal(invalid.status,404);
+  const progressHeaders={...headers,'content-type':'application/json','x-carobra-action':'course-progress'};
+  const body=JSON.stringify({chapter_id:1256,ranges:[],manual:true});
+  const anonymousWrite=await fetch(`${bff.url}/api/v1/rewards/courses/1256/progress`,{method:'POST',headers:{'content-type':'application/json','x-carobra-action':'course-progress'},body});
+  assert.equal(anonymousWrite.status,401);
+  const unsafe=await fetch(`${bff.url}/api/v1/rewards/courses/1256/progress`,{method:'POST',headers,body});
+  assert.equal(unsafe.status,403);
+  const deniedWrite=await fetch(`${bff.url}/api/v1/rewards/courses/1256/progress`,{method:'POST',headers:progressHeaders,body});
+  assert.equal(deniedWrite.status,403);
+});
+
 test("returns authenticated referral progress without another customer's identity", async (t) => {
   const upstream = await startServer((request, response) => {
     if (request.url === "/api/v1/me") return json(response, 200, profile);
@@ -171,7 +304,7 @@ for (const [code, status] of [["duplicate_email", 409], ["duplicate_curp", 409]]
   });
 }
 
-for (const code of ["password_mismatch", "terms_not_accepted"] as const) {
+for (const code of ["password_mismatch", "terms_not_accepted", "invalid_birth_date"] as const) {
   test(`maps ${code} from registration`, async (t) => {
     const upstream = await startServer((_request, response) => {
       apiError(response, 422, code, "Registration rejected");
@@ -305,6 +438,9 @@ async function startBff(
   cookieOverrides?: Partial<SiteBackendConfig["sessionCookie"]>,
   timeout = 1_000,
   referralApplication?: ReferralHttpApplication,
+  bondaAffiliateApplication?: BondaAffiliateProvisioningHttpApplication,
+  bondaCouponApplication?: BondaCouponHttpApplication,
+  coursesApplication?: CoursesApplication,
 ): Promise<RunningServer> {
   const config: SiteBackendConfig = {
     apiBaseUrl,
@@ -320,10 +456,72 @@ async function startBff(
     },
   };
   const running = await listen(
-    createSiteBackendServer(config, undefined, undefined, referralApplication),
+    createSiteBackendServer(
+      config,
+      undefined,
+      undefined,
+      referralApplication,
+      undefined,
+      undefined,
+      bondaAffiliateApplication,
+      bondaCouponApplication,
+      coursesApplication,
+    ),
   );
   t.after(() => close(running.server));
   return running;
+}
+
+class CapturingBondaAffiliateApplication implements BondaAffiliateProvisioningHttpApplication {
+  registration: BondaRegistrationIdentity | null = null;
+
+  async afterRegistration(identity: BondaRegistrationIdentity) {
+    this.registration = identity;
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+
+  async ensureForBenefits(_identity: BondaRegistrationIdentity) {
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+
+  async status(_customerId: CustomerId) {
+    return { state: "ACTIVE" as const, can_request_codes: true, retry_scheduled: false };
+  }
+}
+
+class CapturingBondaCouponApplication implements BondaCouponHttpApplication {
+  catalogRequest: { identity: BondaCouponCustomerIdentity; page: number; pageSize: number; previewOnly: boolean } | null = null;
+
+  async getCatalog(identity: BondaCouponCustomerIdentity, page = 1, pageSize = 20, previewOnly = false): Promise<BondaCouponCatalogHttpResponse> {
+    this.catalogRequest = { identity, page, pageSize, previewOnly };
+    return {
+      current_level: null,
+      access_state: "NO_LEVEL",
+      affiliate_state: "DISABLED",
+      items: [],
+      refreshed_at: null,
+      page,
+      page_size: pageSize,
+      total: 0,
+      next_page: null,
+    };
+  }
+
+  async getDetail(): Promise<BondaCouponDetailHttpResponse> {
+    throw new Error("not used");
+  }
+
+  async getBranches() {
+    return { items: [] };
+  }
+
+  async requestCode(): Promise<BondaCouponCodeHttpResponse> {
+    throw new Error("not used");
+  }
+
+  async getHistory(): Promise<BondaReceivedCouponsHttpResponse> {
+    return { items: [] };
+  }
 }
 
 class CapturingReferralApplication implements ReferralHttpApplication {
