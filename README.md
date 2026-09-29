@@ -1,135 +1,115 @@
 # Carobra Rewards
 
-Repositorio único del MVP de registro de clientes. Las tres aplicaciones viven
-en carpetas independientes y FastAPI conserva la propiedad de autenticación,
-clientes, consentimientos, sesiones y validaciones SISCA.
+[![CI de la API](https://github.com/NicoGuerrero11/carobra-rewards/actions/workflows/ci.yml/badge.svg)](https://github.com/NicoGuerrero11/carobra-rewards/actions/workflows/ci.yml)
 
-```text
-carobra-rewards/
-├── api/             # FastAPI, dominio, PostgreSQL, Alembic y pruebas Python
-├── site-backend/    # BFF TypeScript/Node para el contrato web y las cookies
-├── site-frontend/   # Sitio Astro para registro, login y estado del cliente
-├── docs/            # Documentación compartida
-└── openspec/        # Especificaciones y cambios
-```
+Plataforma de lealtad para clientes de Carobra: reúne el registro, la validación
+de productos, los puntos y el acceso a beneficios en un mismo portal.
 
-## Requisitos
+[Uso](#uso) · [Desarrollo local](docs/development.md) ·
+[Documentación](#documentación) · [Contribuir](#contribuir)
 
-- Python 3.13 y `uv`
-- Node.js 20 y npm
-- PostgreSQL/Neon para migraciones y pruebas de integración de la API
+## Funcionalidades destacadas
 
-No uses la base de producción ni datos personales reales en desarrollo o
-pruebas. `TEST_DATABASE_URL` debe apuntar a una base distinta de `DATABASE_URL`;
-las pruebas de integración recrean su esquema.
+- **Una cuenta para el cliente:** registro, inicio de sesión, Rewards ID,
+  perfil y seguimiento de la validación SISCA.
+- **Puntos y niveles:** consulta del saldo, nivel e historial de movimientos,
+  con reglas de negocio administradas por el servidor.
+- **Beneficios por nivel:** catálogo y detalle de cupones mediante la
+  integración con Bonda.
+- **Cursos y bienestar:** contenido por nivel y seguimiento del avance de
+  videos, conservado entre sesiones.
+- **Portal adaptable:** experiencia para escritorio y móvil, con actividad,
+  notificaciones y ayuda.
 
-## Configuración
+## Acerca del proyecto
 
-Cada aplicación carga su propio archivo de entorno:
+Carobra Rewards acompaña al cliente desde su registro como Invitado hasta la
+validación de sus productos y el acceso a los beneficios que le corresponden.
+Los puntos y el nivel se calculan con reglas distintas; el saldo por sí solo
+no determina el nivel.
 
-```bash
-cp api/.env.example api/.env
-cp site-backend/.env.example site-backend/.env
-cp site-frontend/.env.example site-frontend/.env
-```
+El repositorio contiene el sitio web, la API de identidad y el servicio de
+Rewards. FastAPI gestiona clientes, consentimientos, autenticación y validaciones
+SISCA. El backend en Node.js gestiona puntos, niveles, actividad e integraciones
+de beneficios. Astro presenta la experiencia web y comunica el navegador con
+estos servicios mediante rutas del mismo origen.
 
-El archivo raíz `.env.example` reúne las variables como referencia, pero los
-comandos deben ejecutarse desde la carpeta de cada aplicación.
+La disponibilidad de Bonda depende de las credenciales y de la configuración
+del entorno. Las plantillas locales mantienen sus integraciones deshabilitadas;
+consultar el catálogo no habilita la emisión de cupones ni el alta de afiliados.
+La [guía de publicación](docs/production-site-release.md) explica la activación
+de cada función.
 
-El nombre de cookie debe coincidir entre
-`api/AUTH_SESSION_COOKIE_NAME` y
-`site-backend/SESSION_COOKIE_NAME`. En HTTP local ambos servicios usan
-`*_COOKIE_SECURE=false` y `SameSite=lax`. En producción HTTPS usa cookies
-`Secure`; `SameSite=none` requiere `Secure=true` en el BFF.
+## Uso
 
-FastAPI acepta credenciales CORS únicamente desde la lista explícita
-`CORS_ALLOWED_ORIGINS`; el valor `*` está rechazado. El sitio normal no depende
-de CORS porque el navegador llama rutas same-origin de Astro y Astro las
-reenvía al BFF.
+Con el entorno local iniciado, abre [Carobra Rewards](http://127.0.0.1:4321):
 
-## Desarrollo local
+1. Explora la página de inicio y entra a **Registro** para crear una cuenta de
+   prueba, o a **Iniciar sesión** si ya tienes una.
+2. Consulta tu resumen de Rewards y el estado de validación de tus productos.
+3. Explora los beneficios y cursos disponibles para tu nivel.
+4. Revisa tu actividad, notificaciones y perfil desde el portal.
 
-Primero instala dependencias:
+Para preparar ese entorno, sigue la [guía de desarrollo local](docs/development.md).
+Incluye instalación, configuración, migraciones, arranque y verificaciones.
 
-```bash
-cd api
-uv python install 3.13
-uv sync --dev
+## Requisitos e instalación
 
-cd ../site-backend
-npm install
+El proyecto se ejecuta desde este repositorio y requiere:
 
-cd ../site-frontend
-npm install
-```
-
-Después inicia cada servicio en una terminal distinta y en este orden:
+- **Python 3.13** y **uv** para la API.
+- **Node.js 20** y **npm** para los servicios web.
+- **PostgreSQL**, local o en Neon, para los datos de clientes y Rewards.
 
 ```bash
-cd api
-uv run uvicorn carobra_rewards.main:app --reload --host 127.0.0.1 --port 8000
+git clone https://github.com/NicoGuerrero11/carobra-rewards.git
+cd carobra-rewards
 ```
 
-```bash
-cd site-backend
-export REWARDS_V2_LIVE_FLOW_ENABLED=true
-npm run build
-npm start
-```
+Continúa con la [instalación de dependencias](docs/development.md#instalar-dependencias).
+Usa una base de desarrollo y datos de prueba; las pruebas de integración
+requieren otra base independiente y pueden recrear su esquema.
 
-```bash
-cd site-frontend
-npm run dev -- --host 127.0.0.1 --port 4321
-```
+## Estructura
 
-URLs locales:
-
-| Aplicación | URL | Uso |
+| Directorio | Responsabilidad | Tecnología |
 | --- | --- | --- |
-| Site frontend | `http://127.0.0.1:4321` | Registro, login y dashboard |
-| Site backend | `http://127.0.0.1:3001` | BFF; no es una UI |
-| API | `http://127.0.0.1:8000` | API de negocio |
-| OpenAPI | `http://127.0.0.1:8000/docs` | Contrato HTTP en desarrollo |
+| [`api/`](api/) | Identidad, sesiones, clientes, consentimientos y SISCA | Python, FastAPI, SQLAlchemy, Alembic |
+| [`site-backend/`](site-backend/) | Contrato web, puntos, niveles, actividad y Bonda | TypeScript, Node.js, PostgreSQL |
+| [`site-frontend/`](site-frontend/) | Sitio público y portal de clientes | Astro SSR, TypeScript, Tailwind CSS |
+| [`docs/`](docs/) | Guías técnicas, contratos y operación | Markdown |
+| [`openspec/`](openspec/) | Especificaciones y propuestas de cambios | OpenSpec |
 
-El navegador llama rutas `/api/v1` del mismo origen del frontend. Una ruta SSR
-de Astro las envía al BFF tanto en desarrollo como en producción, y el BFF
-llama a FastAPI mediante `API_BASE_URL`.
+## Documentación
 
-## Migraciones y verificaciones
+| Para… | Consulta |
+| --- | --- |
+| Instalar, ejecutar y probar el proyecto | [Desarrollo local](docs/development.md) |
+| Trabajar con autenticación y SISCA | [API](api/README.md) |
+| Consultar rutas y respuestas de Rewards | [Contratos HTTP](docs/rewards-http-contracts.md) |
+| Entender el comportamiento esperado | [Especificaciones](openspec/specs/) |
+| Configurar cupones y cursos | [Cupones Bonda](docs/bonda-coupons-runbook.md) y [catálogo de cursos](docs/bonda-courses-reconciliation.md) |
+| Consultar el seguimiento de videos | [Avance de cursos](docs/course-video-progress.md) |
+| Operar reglas, tareas y conciliaciones | [Operación de Rewards](docs/rewards-operations-runbook.md) |
+| Publicar una actualización | [Guía de producción](docs/production-site-release.md) |
 
-```bash
-cd api
-uv run alembic upgrade head
-uv run ruff format --check .
-uv run ruff check .
-uv run pyright
-uv run pytest
-```
+## Contribuir
 
-```bash
-cd site-backend
-npm run check
-npm test
-npm run build
-```
+Reporta errores o propone mejoras en los
+[issues del repositorio](https://github.com/NicoGuerrero11/carobra-rewards/issues).
+Incluye los pasos para reproducir el problema y el resultado esperado, sin
+credenciales ni datos personales.
 
-```bash
-cd site-frontend
-npm run check
-npm run build
-npm run test:e2e
-```
+Antes de abrir un pull request, revisa las especificaciones del área afectada,
+ejecuta las [verificaciones correspondientes](docs/development.md#verificaciones)
+y actualiza la documentación cuando cambie el comportamiento.
 
-Playwright levanta un BFF simulado y el frontend automáticamente. La suite corre
-el flujo de registro/login/estado tanto en viewport de escritorio como móvil.
-Con los tres servicios reales levantados contra una base segura también puedes
-ejecutar `SITE_URL=http://127.0.0.1:4321 npm run test:smoke:live` desde
-`site-frontend/`.
+El proyecto se mantiene en
+[NicoGuerrero11/carobra-rewards](https://github.com/NicoGuerrero11/carobra-rewards),
+con el trabajo de sus
+[colaboradores](https://github.com/NicoGuerrero11/carobra-rewards/graphs/contributors).
 
-Consulta [api/README.md](api/README.md),
-[site-backend/README.md](site-backend/README.md) y
-[site-frontend/README.md](site-frontend/README.md) para el detalle de cada
-aplicación.
+## Licencia
 
-Para publicar el rediseño y conservar la integración Bonda, seguir la
-[guía de actualización de producción](docs/production-site-release.md).
+El repositorio no incluye actualmente un archivo de licencia. Consulta con
+sus responsables las condiciones de uso y distribución.

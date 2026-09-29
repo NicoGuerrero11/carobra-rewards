@@ -28,6 +28,7 @@ node_modules
 docs/
 !docs/
 docs/*
+!docs/development.md
 !docs/customer-intake-demo-walkthrough.md
 !docs/rewards-mvp-exploration.md
 !docs/rewards-http-contracts.md
