@@ -112,7 +112,7 @@ test('example support is explicitly non-operational and separate from product in
 test('compact branded typography and open answers stay readable at 320px', async ({ page, context }, info) => {
   await cookies(context);
   await page.goto('/cliente/ayuda');
-  const titleSize = await page.locator('h1').evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+  const titleSize = await page.getByRole('heading', { name: '¿En qué podemos ayudarte?', exact: true }).evaluate(el => parseFloat(getComputedStyle(el).fontSize));
   expect(titleSize).toBeLessThanOrEqual(38);
   const start = await page.evaluate(() => ({ title: document.querySelector('h1')!.getBoundingClientRect().top, header: document.querySelector('.client-shell__topnav')!.getBoundingClientRect().bottom }));
   expect(start.title).toBeGreaterThanOrEqual(start.header);

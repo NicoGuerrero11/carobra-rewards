@@ -7,7 +7,8 @@ repositorio, salvo que el bloque indique entrar a una carpeta.
 ## Requisitos
 
 - Python 3.13 y `uv`.
-- Node.js 20 y npm, de acuerdo con el runtime declarado por el frontend.
+- Node.js 24 y pnpm 10.33.4 para el frontend; npm y el runtime habitual del BFF
+  para `site-backend`, cuya configuración no cambia.
 - Una base PostgreSQL de desarrollo, local o en Neon.
 - Otra base PostgreSQL, independiente y destructible, si ejecutarás pruebas
   de integración.
@@ -28,9 +29,18 @@ npm ci
 cd ..
 
 cd site-frontend
-npm ci
+nvm install
+nvm use
+node scripts/install-clean.mjs
 cd ..
 ```
+
+El frontend fija Node 24 en `.nvmrc` y pnpm en `packageManager`; `.npmrc`
+rechaza un runtime incompatible. Si usas otro gestor de Node, selecciona 24.x
+y usa pnpm 10.33.4. Corepack debe estar disponible; no uses el pnpm global de
+otra versión. El único lockfile del frontend es `pnpm-lock.yaml`. La instalación limpia
+elimina sólo `site-frontend/node_modules` y usa Corepack con el lockfile
+congelado; evita que paquetes npm antiguos interfieran con el empaquetado.
 
 ## Configurar el entorno
 
@@ -129,7 +139,7 @@ npm start
 
 ```bash
 cd site-frontend
-npm run dev -- --host 127.0.0.1 --port 4321
+corepack pnpm run dev --host 127.0.0.1 --port 4321
 ```
 
 | Servicio | URL | Uso |
@@ -185,11 +195,14 @@ pruebas. Nunca apuntes esta variable a la base de uso normal.
 
 ```bash
 cd site-frontend
-npm run check
-npm run test:contracts
-npm run build
-npx playwright install chromium
-npm run test:e2e
+nvm use
+corepack pnpm run check
+corepack pnpm run test:contracts
+corepack pnpm run test:runtime
+corepack pnpm run build
+corepack pnpm run test:ssr
+corepack pnpm exec playwright install chromium
+corepack pnpm run test:e2e
 cd ..
 ```
 
@@ -202,10 +215,13 @@ ejecutar esta prueba del flujo completo:
 
 ```bash
 cd site-frontend
-SITE_URL=http://127.0.0.1:4321 npm run test:smoke:live
+SITE_URL=http://127.0.0.1:4321 corepack pnpm run test:smoke:live
 cd ..
 ```
 
 Este comando crea dos clientes de prueba y comprueba registro, login, estado y
 cierre de sesión. El workflow actual de [CI](../.github/workflows/ci.yml) ejecuta
-las verificaciones de la API; las verificaciones web se ejecutan por separado.
+las verificaciones de la API y un job independiente del frontend con Node 24,
+instalación congelada, contratos, guard del runtime, build y Playwright con mocks.
+El build falla si Node real no es 24 o si alguna función Node generada no declara
+`nodejs24.x`. Véase el [registro de migración](frontend-node24-migration.md).

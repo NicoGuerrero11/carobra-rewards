@@ -9,9 +9,11 @@ the browser does not need the FastAPI URL.
 ## Setup and development
 
 ```bash
+nvm install
+nvm use
 cp .env.example .env
-npm install
-npm run dev -- --host 127.0.0.1 --port 4321
+node scripts/install-clean.mjs
+corepack pnpm run dev --host 127.0.0.1 --port 4321
 ```
 
 - Site: `http://127.0.0.1:4321`
@@ -23,12 +25,22 @@ Start FastAPI and `site-backend` before exercising the real local flow. The
 session secret remains in the HTTP-only cookie and is not read by frontend
 JavaScript.
 
+Use Node 24 and pnpm 10.33.4 via Corepack (or the same exact pnpm version).
+`pnpm-lock.yaml` is the only frontend lockfile. The build verifies the actual
+Node version and every generated Vercel Node function (`nodejs24.x`).
+See the [migration record](../docs/frontend-node24-migration.md) for deployment
+checks and rollback requirements.
+
 ## Checks and browser tests
 
 ```bash
-npm run check
-npm run build
-npm run test:e2e
+corepack pnpm run check
+corepack pnpm run test:contracts
+corepack pnpm run test:runtime
+corepack pnpm run build
+corepack pnpm run test:ssr
+corepack pnpm exec playwright install chromium
+corepack pnpm run test:e2e
 ```
 
 The Playwright suite starts its own deterministic BFF double and Astro server.
@@ -39,7 +51,7 @@ With the three real local services already running, execute an end-to-end smoke
 against the configured database with:
 
 ```bash
-SITE_URL=http://127.0.0.1:4321 npm run test:smoke:live
+SITE_URL=http://127.0.0.1:4321 corepack pnpm run test:smoke:live
 ```
 
 The live smoke creates two disposable customers, verifies registration, login,

@@ -31,7 +31,8 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: "npm run dev -- --host 127.0.0.1 --port 4322",
+      // Keep Astro in the foreground so Playwright owns the server lifecycle.
+      command: "pnpm run dev --ignore-lock --host 127.0.0.1 --port 4322",
       url: "http://127.0.0.1:4322/login",
       timeout: 120_000,
       reuseExistingServer: false,
