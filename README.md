@@ -58,7 +58,8 @@ Incluye instalación, configuración, migraciones, arranque y verificaciones.
 El proyecto se ejecuta desde este repositorio y requiere:
 
 - **Python 3.13** y **uv** para la API.
-- **Node.js 20** y **npm** para los servicios web.
+- **Node.js 24** y **pnpm 10.33.4** para `site-frontend` (Astro/Vercel).
+- **npm** y el runtime propio de `site-backend` para el BFF; no cambia en esta migración.
 - **PostgreSQL**, local o en Neon, para los datos de clientes y Rewards.
 
 ```bash
@@ -91,6 +92,7 @@ requieren otra base independiente y pueden recrear su esquema.
 | Configurar cupones y cursos | [Cupones Bonda](docs/bonda-coupons-runbook.md) y [catálogo de cursos](docs/bonda-courses-reconciliation.md) |
 | Consultar el seguimiento de videos | [Avance de cursos](docs/course-video-progress.md) |
 | Operar reglas, tareas y conciliaciones | [Operación de Rewards](docs/rewards-operations-runbook.md) |
+| Revisar runtime y validación del frontend | [Migración a Node 24](docs/frontend-node24-migration.md) |
 | Publicar una actualización | [Guía de producción](docs/production-site-release.md) |
 
 ## Contribuir

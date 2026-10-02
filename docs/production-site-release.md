@@ -67,12 +67,20 @@ contenido; no autoriza altas de afiliados ni emisión de cupones.
    por nivel, detalle de beneficios, cursos/bienestar y formulario de registro.
    Usar cuentas autorizadas y no emitir cupones para comprobar la conexión.
 
-El frontend declara Node 20. Compilar con esa versión; el adaptador instalado
-elige incorrectamente Node 18 al compilar localmente con Node 26. No subir una
-compilación local realizada con ese fallback; usar el build del proveedor con
-el runtime compatible y verificar el resultado del despliegue.
+El frontend requiere Node 24 y pnpm 10.33.4. Instalar con
+`node scripts/install-clean.mjs` y compilar con `corepack pnpm run build`: el comando
+verifica Node real y todos los runtimes de `.vercel/output/functions`. Estos
+comandos están fijados en `site-frontend/vercel.json` para usar el pnpm exacto
+de `packageManager`, incluso si el proveedor ofrece otro pnpm global. No usar
+`astro build` directamente, pues omitiría el guard del proyecto. Antes de
+publicar, confirmar en Vercel `Root Directory: site-frontend`, rama, comandos,
+y runtime efectivo de una preview aislada. Estos ajustes remotos aún no se
+verificaron ni modificaron. Consultar [evidencia y pendientes](frontend-node24-migration.md).
 
-## Verificación del 28 de septiembre de 2026
+## Verificación histórica del 28 de septiembre de 2026
+
+Los siguientes resultados corresponden a la entrega anterior con Node 20; no
+constituyen evidencia de la migración actual.
 
 - Las credenciales locales respondieron HTTP 200 en afiliado, cupones, cursos
   y bienestar; el diagnóstico devolvió `ready: true`.
@@ -114,3 +122,7 @@ Ante un fallo del catálogo, apagar `BONDA_CATALOG_ENABLED` y
 escritura apagadas. Revertir el despliegue de aplicación si es necesario;
 conservar las tablas y el historial. No ejecutar downgrades destructivos como
 parte de una reversión rutinaria.
+
+Para revertir la publicación del frontend, identificar previamente un despliegue
+funcional existente y verificar su disponibilidad. No reconstruir Node 20 como
+mecanismo de rollback: Vercel retiró nuevos despliegues con ese runtime.

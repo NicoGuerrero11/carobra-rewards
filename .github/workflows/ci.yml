@@ -39,3 +39,30 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site-frontend
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+      SITE_BACKEND_BASE_URL: http://127.0.0.1:3002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: site-frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: site-frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: site-frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:runtime
+      - run: pnpm run check
+      - run: pnpm run test:contracts
+      - run: pnpm run build
+      - run: pnpm run test:ssr
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e

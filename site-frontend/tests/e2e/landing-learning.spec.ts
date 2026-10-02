@@ -13,7 +13,7 @@ test('learning is an independent truthful preview with no public playback or API
   });
   await page.goto('/#aprendizaje');
   const section = page.locator('#aprendizaje');
-  expect(await section.evaluate(el => el.previousElementSibling?.id)).toBe('catalogo');
+  await expect(section.locator('xpath=preceding-sibling::section[1]')).toHaveAttribute('id', 'catalogo');
   await expect(section.getByRole('tab', {name: 'Cursos', exact: true})).toHaveAttribute('aria-selected', 'true');
   const courses = section.getByRole('tabpanel', {name: 'Cursos', exact: true});
   await expect(courses.getByRole('listitem')).toHaveCount(6);

@@ -12,8 +12,8 @@ test('value section replaces old cards with truthful levels and one registration
   await page.goto('/#beneficios');
   const section = page.getByRole('region', {name: 'Tu confianza te lleva más lejos.'});
   await expect(section).toHaveAttribute('id', 'beneficios');
-  expect(await section.evaluate(el => el.previousElementSibling?.id)).toBe('aprendizaje');
-  expect(await section.evaluate(el => el.nextElementSibling?.id)).toBe('experiencia');
+  await expect(section.locator('xpath=preceding-sibling::section[1]')).toHaveAttribute('id', 'aprendizaje');
+  await expect(section.locator('xpath=following-sibling::section[1]')).toHaveAttribute('id', 'experiencia');
   await expect(section.getByRole('list', {name: 'Niveles del programa'}).getByRole('listitem')).toHaveText(levels);
   for (const title of ['Tu relación cuenta.', 'Más posibilidades según tu nivel.', 'Tu progreso, a la vista.']) {
     await expect(section.getByRole('heading', {name: title, exact: true})).toBeVisible();
