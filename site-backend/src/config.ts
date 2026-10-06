@@ -1,6 +1,15 @@
 export type CookieSameSite = "lax" | "strict" | "none";
 
+/** Reserved until Bonda confirms access and the user authorizes integration. */
+export interface BondaGiftCardAccessConfig {
+  readonly status: "PENDING_BONDA_FEEDBACK";
+  readonly enabled: false;
+  readonly loginMethod: null;
+  readonly identifierField: null;
+}
+
 export interface BondaConfig {
+  giftCardAccess?: BondaGiftCardAccessConfig;
   baseUrl: string;
   allowedHosts: readonly string[];
   allowedImageHosts: readonly string[];
@@ -174,6 +183,12 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   }
 
   const config: BondaConfig = {
+    giftCardAccess: {
+      status: "PENDING_BONDA_FEEDBACK",
+      enabled: false,
+      loginMethod: null,
+      identifierField: null,
+    },
     baseUrl,
     allowedHosts,
     allowedImageHosts: parseHostList(
