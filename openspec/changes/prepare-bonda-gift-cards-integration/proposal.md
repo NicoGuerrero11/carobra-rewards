@@ -6,6 +6,7 @@ Carobra necesita reservar la configuración de acceso a gift cards mientras Bond
 
 - Añadir un campo interno de configuración de acceso a gift cards, pendiente y deshabilitado.
 - Registrar CURP como identificador de acceso elegido por el usuario. Mantener pendientes el mecanismo de autenticación y su mapeo en Bonda; correo será actualizable y Rewards ID conservará su función de identificador interno.
+- Documentar dos etapas futuras: vínculo de afiliación mediante Rewards ID por Nómina y envío de CURP/correo solo desde Oro, incluyendo Platino y Titanio. Registrar GOLD como nivel mínimo sin implementar ni ejecutar ningún envío en esta fase.
 - Documentar las preguntas que Bonda debe responder antes de retomar la integración.
 - Trabajar en `codex/bonda-gift-cards-preparation`, creada desde la rama de trabajo actual `codex/frontend-node24`, sin modificar main.
 

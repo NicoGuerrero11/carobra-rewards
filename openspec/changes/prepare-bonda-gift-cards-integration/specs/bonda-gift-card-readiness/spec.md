@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Gift-card access configuration must remain inert pending partner feedback
-The site backend SHALL reserve an internal giftCardAccess configuration containing status PENDING_BONDA_FEEDBACK, enabled false, loginMethod null and identifierField curp. The selected identifier SHALL refer to the Carobra profile field and MUST NOT imply a confirmed Bonda payload mapping or authentication mechanism. This change MUST NOT add an environment switch or runtime flow that enables gift-card access.
+The site backend SHALL reserve an internal giftCardAccess configuration containing status PENDING_BONDA_FEEDBACK, enabled false, loginMethod null, identifierField curp and minimumLevel GOLD. The selected identifier SHALL refer to the Carobra profile field and MUST NOT imply a confirmed Bonda payload mapping or authentication mechanism. This change MUST NOT add an environment switch or runtime flow that enables gift-card access.
 
 #### Scenario: Configuration loads without an access agreement
 - **WHEN** the site backend loads its configuration
@@ -17,3 +17,18 @@ This change MUST NOT add or execute network calls, affiliate writes, point opera
 #### Scenario: Bonda feedback becomes available
 - **WHEN** the provider supplies an access contract without a subsequent user instruction to connect
 - **THEN** gift-card access remains disabled
+
+### Requirement: Readiness documentation must distinguish base affiliation from level-gated profile data
+The preparation contract SHALL record Rewards ID as the future base affiliation link through the payroll API and CURP/email as additional data restricted to Gold, Platinum and Titanium customers. It SHALL record GOLD as the minimum level and MUST NOT treat an affiliation, active product or positive balance as sufficient gift-card eligibility. This planning rule MUST NOT activate any synchronization in this change or prescribe replacing the existing affiliate code with CURP.
+
+#### Scenario: Minimum level is configured
+- **WHEN** the site backend loads the preparation configuration
+- **THEN** it records GOLD as the gift-card threshold while access remains disabled and no additional customer data is sent
+
+#### Scenario: Below-threshold customers are described
+- **WHEN** the planned data flow is reviewed for Invitado, Bronze or Silver
+- **THEN** it excludes gift-card CURP/email provisioning for those levels even if a base affiliation exists
+
+#### Scenario: Base affiliation is described
+- **WHEN** the team reviews the planned Rewards ID link
+- **THEN** the contract distinguishes that link from the later level-gated CURP/email update on the same affiliate and preserves the ban on current external calls

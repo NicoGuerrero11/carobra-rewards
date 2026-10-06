@@ -16,7 +16,18 @@ La instrucción del 2026-10-06 reemplaza el alcance previo de preparación ampli
 
 Añadir `giftCardAccess` a `BondaConfig` con `status: "PENDING_BONDA_FEEDBACK"`, `enabled: false`, `loginMethod: null` e `identifierField: "curp"`. identifierField identifica el campo del perfil Carobra elegido para login, no un nombre confirmado del payload Bonda. loginMethod permanece pendiente porque aún falta acordar contraseña, activación y recuperación. Los valores de este contrato son literales; no se añade una variable de entorno que permita habilitarlo. El campo será opcional en configuraciones construidas manualmente para conservar compatibilidad; `loadConfig` lo devolverá siempre. Si falta, ningún futuro consumidor debe interpretar disponibilidad.
 
-Mantener Rewards ID como vínculo interno estable. La API documenta `code` como identificador de ingreso, por lo que la elección de CURP se traduce en `code = CURP`; el correo va en `email`. Esto define el mapeo propuesto, sin modificar todavía el adaptador existente ni la configuración del micrositio. Falta conocer el campo personalizado para Rewards ID si Bonda debe almacenarlo y cómo migrar afiliados creados con otro code sin duplicarlos. Prever correcciones excepcionales de CURP manteniendo la misma cuenta e historial; no implementar ese flujo en esta fase.
+Mantener Rewards ID como vínculo de afiliación por la API de Nómina. El adaptador actual usa Rewards ID en `code`; la aclaración del usuario conserva ese vínculo y no autoriza reemplazarlo por CURP. Retirar la propuesta anterior de `code = CURP` como decisión cerrada. La API describe code como identificador de ingreso, por lo que todavía debe resolverse cómo Bonda permite CURP como acceso manteniendo Rewards ID como referencia estable, sin inventar campos ni duplicar afiliados. Prever correcciones excepcionales de CURP manteniendo la misma cuenta e historial; no implementar ese flujo en esta fase.
+
+### Datos adicionales condicionados por nivel
+
+El modelo de producto acordado distingue dos etapas futuras:
+
+1. Vínculo base: Rewards ID por la API de Nómina; ese vínculo por sí solo no implica gift cards habilitadas ni requiere enviar CURP/correo para esta capacidad.
+2. Activación de gift cards: cuando el nivel canónico Carobra cumpla el umbral aprobado, preparar la actualización del mismo afiliado con CURP y correo y el flujo de acceso que Bonda confirme.
+
+No enviar los datos adicionales de todos los clientes ni interpretar registro, producto activo o saldo positivo como sustitutos del nivel requerido. El usuario confirmó Oro como umbral mínimo: configurar `minimumLevel: "GOLD"` y contemplar Oro, Platino y Titanio; Invitado, Bronce y Plata no habilitan ese envío. Este valor solo registra la política en configuración inactiva y no sustituye una futura validación de elegibilidad en backend. Evitar repetir activaciones al reevaluar el mismo nivel. Los cambios de correo posteriores corresponden solo a perfiles cuyo envío ya se habilitó. La política ante descenso de nivel sigue pendiente: no eliminar afiliados, saldo o historial automáticamente ni asumir que ocultar el botón impide un acceso directo a Bonda.
+
+Estas son decisiones para el diseño futuro. El alcance actual sigue siendo solo configuración inactiva y documentación: no activar ni ejecutar siquiera el vínculo base de Nómina hasta la indicación del usuario.
 
 No incluir URL de login, payload, credenciales ni campos con datos del cliente. No consumir la configuración desde rutas, workers o frontend en este cambio. El nombre del campo solo reserva un lugar para el acuerdo futuro, sin afirmar soporte del proveedor.
 
@@ -53,7 +64,7 @@ No preguntar al proveedor por los endpoints o por si se puede actualizar email: 
 
 Preguntas para enviar manualmente a Bonda; este cambio no las envía:
 
-1. Usaremos CURP en `code` para ingresar. ¿Pueden configurar el formulario con etiqueta CURP y confirmar el slug personalizado de Rewards ID? ¿Cómo se migran las cuentas existentes creadas con otro code sin duplicar cuenta o billetera?
+1. Mantendremos el vínculo por Rewards ID mediante Nómina y enviaremos CURP/correo únicamente al habilitar gift cards por nivel. Dado que la documentación describe `code` como identificador de ingreso, ¿cómo permite la configuración del micrositio acceder con CURP conservando ese vínculo y la misma cuenta? Se necesitan los campos configurados, no una segunda afiliación.
 2. ¿Cómo es el primer acceso: invitación, creación de contraseña o activación? ¿Qué pasos debe realizar el cliente y qué comunicación envía Bonda?
 3. ¿Para consultar saldo y canjear deberá ingresar otra vez su contraseña? ¿Cómo funciona la recuperación si la olvida?
 4. Después de actualizar `email` mediante el PATCH documentado, ¿Bonda exige verificar el nuevo correo y cómo afecta la recuperación de contraseña? Si se necesita corregir una CURP usada como code, ¿cómo conservamos cuenta, saldo e historial?
@@ -61,3 +72,5 @@ Preguntas para enviar manualmente a Bonda; este cambio no las envía:
 6. Como opción adicional, ¿existe SSO o enlace temporal de acceso? Si existe, ¿habilita también saldo y canje, o solo entrada al catálogo?
 
 Resultado esperado: un ejemplo completo del alta y del primer acceso con CURP, con los nombres de campos y el recorrido del cliente. La selección local de CURP no confirma su configuración externa ni permite prescindir de contraseña u otro factor de autenticación.
+
+Decisión confirmada de Carobra: gift cards desde Oro. Sigue pendiente el tratamiento de un descenso posterior de nivel. No atribuir estas políticas a la API de Nómina ni inferirlas del catálogo de cupones.

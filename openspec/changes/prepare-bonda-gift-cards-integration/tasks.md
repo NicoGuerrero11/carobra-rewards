@@ -9,3 +9,5 @@
 - [x] 2.2 Comprobar tipos y pruebas de configuración existentes de forma local y revisar el diff; no ejecutar conexiones, servidores o jobs Bonda.
 
 Verificación: compilación TypeScript correcta; cinco pruebas existentes de configuración Bonda aprobadas; validación OpenSpec estricta y diff sin errores de espacios. No se ejecutaron conexiones a Bonda.
+
+Aclaración posterior: vínculo por Rewards ID mediante Nómina; CURP/correo solo desde Oro, incluyendo Platino y Titanio. Se registró minimumLevel GOLD en la configuración inactiva y se retiró la suposición de reemplazar `code` por CURP. No se implementó sincronización ni ejecución de elegibilidad.

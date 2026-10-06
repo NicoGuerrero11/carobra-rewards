@@ -7,6 +7,8 @@ export interface BondaGiftCardAccessConfig {
   readonly loginMethod: null;
   /** Carobra profile field selected for login; Bonda mapping is unconfirmed. */
   readonly identifierField: "curp";
+  /** Gift cards start at Gold; this records policy without enabling access. */
+  readonly minimumLevel: "GOLD";
 }
 
 export interface BondaConfig {
@@ -189,6 +191,7 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
       enabled: false,
       loginMethod: null,
       identifierField: "curp",
+      minimumLevel: "GOLD",
     },
     baseUrl,
     allowedHosts,
