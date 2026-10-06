@@ -5,7 +5,8 @@ export interface BondaGiftCardAccessConfig {
   readonly status: "PENDING_BONDA_FEEDBACK";
   readonly enabled: false;
   readonly loginMethod: null;
-  readonly identifierField: null;
+  /** Carobra profile field selected for login; Bonda mapping is unconfirmed. */
+  readonly identifierField: "curp";
 }
 
 export interface BondaConfig {
@@ -187,7 +188,7 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
       status: "PENDING_BONDA_FEEDBACK",
       enabled: false,
       loginMethod: null,
-      identifierField: null,
+      identifierField: "curp",
     },
     baseUrl,
     allowedHosts,
