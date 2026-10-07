@@ -1,0 +1,52 @@
+---
+import { planSteps, type PlanKind } from '../../lib/skandia-questionnaire';
+interface Props { kind: PlanKind }
+const { kind } = Astro.props;
+const steps = planSteps[kind];
+---
+<dialog class="sk-dialog" data-plan={kind} aria-labelledby={`${kind}-title`}>
+  <div class="sk-dialog__header">
+    <div><p class="sk-eyebrow">Skandia · {kind === 'ahorro' ? 'Ahorro' : 'Retiro'}</p><h2 id={`${kind}-title`}>Dale forma a tu plan</h2></div>
+    <button type="button" class="sk-close" data-close aria-label="Cerrar cuestionario">✕</button>
+  </div>
+  <p class="sk-demo-note">Simulación · Solo datos ficticios. No se envía información.</p>
+  <ol class="sk-progress" aria-label="Pasos del cuestionario">{steps.map((step, index) => <li data-progress={index}><span>{index + 1}</span><span>{step.title}</span></li>)}</ol>
+  <form method="dialog" novalidate>
+    {steps.map((step, index) => (
+      <section data-step={index} hidden={index !== 0} aria-labelledby={`${kind}-step-${index}`}>
+        <p class="sk-step-count">Paso {index + 1} de {steps.length}</p>
+        <h3 id={`${kind}-step-${index}`} tabindex="-1">{step.title}</h3><p class="sk-step-description">{step.description}</p>
+        {step.questions.map(question => (
+          <div class="sk-field">
+            <label for={`${kind}-${question.id}`}>{question.label}{question.optional && <span> · Opcional</span>}</label>
+            {question.type === 'select' ? <select id={`${kind}-${question.id}`} name={question.id} required={!question.optional} aria-describedby={question.hint ? `${kind}-${question.id}-hint` : undefined}>
+              <option value="">Selecciona una opción</option>{question.options?.map(option => <option value={option}>{option}</option>)}
+            </select> : <input id={`${kind}-${question.id}`} name={question.id} type="number" inputmode={question.integer ? 'numeric' : 'decimal'} min={question.integer ? '1' : '0.01'} step={question.integer ? '1' : '0.01'} required={!question.optional} aria-describedby={question.hint ? `${kind}-${question.id}-hint` : undefined} />}
+            {question.hint && <p id={`${kind}-${question.id}-hint`} class="sk-hint">{question.hint}</p>}
+          </div>
+        ))}
+        {step.title === 'Tu contexto' || step.title === 'Lo que buscas' ? <p class="sk-hint sk-soft-note">Los ingresos y bonos opcionales se omiten en esta prueba para no recoger información financiera personal.</p> : null}
+        {step.contact && <>
+          <div class="sk-contact"><span>Identidad ficticia</span><strong>Alex Ejemplo</strong><span>alex@example.test</span><p>Este contacto no se puede editar en la vista de prueba.</p></div>
+          <label class="sk-consent"><input type="checkbox" name="consent" required /><span>Acepto continuar esta simulación con datos ficticios. Esta casilla no autoriza contacto comercial ni contratación.</span></label>
+        </>}
+      </section>
+    ))}
+    <section data-summary hidden aria-labelledby={`${kind}-summary-title`}>
+      <p class="sk-step-count">Antes de terminar</p><h3 id={`${kind}-summary-title`} tabindex="-1">Así se ve tu plan</h3>
+      <p class="sk-step-description">Puedes volver y ajustar tus respuestas.</p>
+      <div class="sk-total"><span data-total-label></span><strong data-total></strong><p data-total-detail></p></div>
+      <p class="sk-hint">Solo suma de aportaciones: no incluye rendimientos, inflación, comisiones, impuestos ni garantías. No es una cotización.</p>
+      <dl class="sk-summary-list" data-answers></dl>
+      <p class="sk-soft-note">Al confirmar verás un resultado de prueba. No se crea ninguna solicitud real, no se envía a un asesor y no se otorgan puntos.</p>
+    </section>
+    <p class="sk-form-error" role="alert" data-error hidden></p>
+    <footer class="sk-dialog__footer"><button type="button" class="sk-button sk-button--quiet" data-back>Atrás</button><button type="submit" class="sk-button" data-next>Continuar <span aria-hidden="true">→</span></button></footer>
+    <p class="sk-session-note">Se conserva al cerrar, solo en esta página. Al recargar se borra. <button type="button" data-discard>Descartar y salir</button></p>
+  </form>
+  <section class="sk-success" data-success hidden aria-labelledby={`${kind}-success-title`}>
+    <span class="sk-success-mark" aria-hidden="true">✓</span><p class="sk-eyebrow">Recorrido completado</p><h3 id={`${kind}-success-title`} tabindex="-1">Simulación completada</h3>
+    <p>No se ha enviado ninguna solicitud.</p><p>Tu ejercicio no crea un contrato, no genera puntos ni cambia tu nivel. Las respuestas se eliminan al salir de esta confirmación.</p>
+    <button type="button" class="sk-button" data-finish>Volver a Skandia</button>
+  </section>
+</dialog>

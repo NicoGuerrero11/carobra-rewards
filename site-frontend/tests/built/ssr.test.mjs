@@ -56,6 +56,17 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     assert.equal(protectedPage.headers.get("location"), "/login");
     await protectedPage.text();
   });
+  await t.test("Skandia local preview is unavailable in builds and product remains authenticated", async () => {
+    const count = requests.length;
+    const preview = await request("/preview/skandia");
+    assert.equal(preview.status, 404);
+    await preview.text();
+    const product = await request("/cliente/productos/skandia?plan=ahorro");
+    assert.equal(product.status, 302);
+    assert.equal(product.headers.get("location"), "/login?next=%2Fcliente%2Fproductos%2Fskandia%3Fplan%3Dahorro");
+    await product.text();
+    assert.equal(requests.length, count);
+  });
   await t.test("forwards JSON bodies and preserves multiple Set-Cookie headers", async () => {
     const body = JSON.stringify({ email: "fixture@example.test", password: "test-only" });
     const response = await request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4323" }, body });

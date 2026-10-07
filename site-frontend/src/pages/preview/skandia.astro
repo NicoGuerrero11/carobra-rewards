@@ -1,0 +1,9 @@
+---
+// Isolated local review: no session, backend calls, analytics or Rewards effects.
+import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
+import SkandiaProduct from '../../components/skandia/SkandiaProduct.astro';
+if (!import.meta.env.DEV) return new Response('Not found', { status: 404 });
+---
+<ClientShellLayout title="Vista local Skandia | Carobra Rewards" currentPath="/cliente/productos/skandia" sectionLabel="Productos">
+  <SkandiaProduct />
+</ClientShellLayout>

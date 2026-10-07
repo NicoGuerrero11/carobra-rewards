@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 
 import { getSiteBackendBaseUrl } from "./lib/api";
+import { skandiaDestination } from "./lib/skandia-navigation";
 import type { RewardsCustomerPortal } from "./lib/rewards-customer-portal-contract";
 
 const authPages = new Set(["/login", "/registro"]);
@@ -17,6 +18,7 @@ const customerEntryPaths = new Set([
   "/cliente/gift-cards",
   "/cliente/ganar-puntos",
   "/cliente/productos",
+  "/cliente/productos/skandia",
   "/cliente/activities",
   "/cliente/notificaciones",
   "/cliente/perfil",
@@ -173,12 +175,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const authContextDuration = performance.now() - authContextStartedAt;
 
   if (isAuthPage && user) {
-    return context.redirect("/cliente");
+    return context.redirect(skandiaDestination(context.url.searchParams.get('next')) ?? "/cliente");
   }
   if (!isProtected) {
     return next();
   }
   if (!user) {
+    if (pathname === '/cliente/productos/skandia') {
+      const plan = context.url.searchParams.get('plan');
+      const destination = pathname + (plan === 'ahorro' || plan === 'retiro' ? `?plan=${plan}` : '');
+      return context.redirect(`/login?next=${encodeURIComponent(destination)}`);
+    }
     return context.redirect("/login");
   }
 
