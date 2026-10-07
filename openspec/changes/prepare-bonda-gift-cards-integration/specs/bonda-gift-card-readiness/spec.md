@@ -8,7 +8,7 @@ The site backend SHALL reserve an internal giftCardAccess configuration containi
 - **THEN** gift-card access is pending and disabled, with Rewards ID selected locally and no inferred login method or external field mapping
 
 ### Requirement: Preparation must not connect to Bonda
-This change MUST NOT add or execute network calls, affiliate writes, point operations, identity exports, or connected tests. Existing unrelated integrations SHALL remain unchanged. Future integration work SHALL require Bonda feedback and a subsequent user instruction.
+This change MUST NOT execute real network calls, affiliate writes, point operations, identity exports, or connected tests. The subsequently authorized profile preparation MAY add inert HTTP methods and a synchronization application verified only through synthetic transports and stores. Existing unrelated integrations SHALL remain unchanged. Future integration work SHALL require Bonda feedback and a subsequent user instruction.
 
 #### Scenario: Preparation is verified
 - **WHEN** configuration and type checks run locally
@@ -47,3 +47,22 @@ The customer site SHALL show a nested Benefits section and reuse it on the exist
 #### Scenario: Identity or portal data is missing
 - **WHEN** identity is missing, legacy or malformed, or the portal is unavailable
 - **THEN** no ID is generated or changed and no external access is enabled
+
+### Requirement: Prepared affiliate profile synchronization must fail closed
+The prepared application SHALL keep Rewards ID as code and CURP as a textual profile field. It MUST require an explicit agreement for CURP text and PATCH fields, canonical ACTIVE status and Gold or above, and confirmed affiliate lifecycle before dispatch. The default contract SHALL remain pending. No production consumer or storage adapter SHALL be installed in this local preparation.
+
+#### Scenario: Runtime has not confirmed custom fields
+- **WHEN** the default profile contract is used
+- **THEN** no profile operation or persistence call occurs
+
+#### Scenario: Synthetic confirmed profile is synchronized
+- **WHEN** a synthetic test supplies an explicit confirmed contract and eligible customer
+- **THEN** create sends code and approved top-level fields, and later PATCH sends only changed fields without changing code
+
+#### Scenario: Mutation outcome is uncertain
+- **WHEN** dispatch may have occurred but acknowledgement is missing or invalid
+- **THEN** the checkpoint requires verification and repeating the request does not resend it
+
+#### Scenario: Customer level decreases
+- **WHEN** a previously synchronized customer is below Gold
+- **THEN** no DELETE, segmentation change or gift-card permission is inferred or dispatched

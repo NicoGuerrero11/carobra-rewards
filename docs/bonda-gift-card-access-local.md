@@ -19,19 +19,19 @@ El correo indica que `code` es obligatorio para alta API; `apellido`, `contrasen
 
 El panel de Referencias describe un importador de archivos: `id-rewards` principal y campos `curp`, `email`, `nombre`, `apellido`. No prueba que esos nombres correspondan al payload HTTP. La indicación de CURP como entero es inconsistente; no se aplica. La instrucción posterior del usuario confirma que CURP debe conservarse en la ficha y contemplarse al vincular el afiliado. No se añade todavía a un payload HTTP sin contrato, ni se envían contraseñas.
 
-## Sincronización existente (inspección de código)
+## Sincronización base (previa a la ampliación local de ficha)
 
 - `site-backend/src/app.ts`: después de registro exitoso invoca `afterRegistration` si la aplicación está instalada. El login delega al servicio de autenticación; no sincroniza perfil. La ruta GET `coupons/affiliate-status` llama `ensureForBenefits`, por lo que tampoco es una consulta segura para pruebas reales.
 - `rewards/bonda/catalog-application.ts`: catálogo de cupones verifica reglas efectivas y estado/nivel canónico; la consulta normal puede reparar afiliación. La vista previa de Inicio usa afiliado técnico y evita aprovisionar al cliente.
 - `affiliate-provisioning.ts`: con bandera apagada no escribe; con bandera activa guarda pendiente, reclama trabajo, consulta existencia y crea si falta. Un registro local ACTIVE evita otra alta. Fallos de credenciales/respuesta inválida exigen acción; errores transitorios reintentan con backoff. Un fallo local después del alta se repara consultando existencia.
-- `http-gateway.ts`: alta `POST /api/v2/microsite/{micrositeId}/affiliates` con `{code: rewardsId, send_welcome_email: false}`. Consulta por code. Reconoce el error documentado de code duplicado. No implementa PATCH de perfil ni contraseña, correo, CURP o segmentación.
+- `http-gateway.ts`: alta `POST /api/v2/microsite/{micrositeId}/affiliates` con `{code: rewardsId, send_welcome_email: false}`. Consulta por code. Reconoce el error documentado de code duplicado. La ruta base no envía perfil; los métodos nuevos de ficha están separados y bloqueados por defecto, según la ampliación descrita abajo.
 - `persistence.ts`: unicidad por cliente, conflicto si cambia rewards_id, claims atómicos con reserva de cinco minutos y `FOR UPDATE SKIP LOCKED` para lotes. Eso controla altas/reintentos locales; no es evidencia de activación de gift cards ni confirmación de titularidad externa.
 
 ## CURP: conservación y contrato pendiente
 
 Verificado por código, sin consultar clientes: `api/src/carobra_rewards/modules/customer_intake/infrastructure/persistence/models.py` define `customers.curp` como `String(18)`, obligatorio y único. El dominio, comandos, repositorios y registro BFF conservan CURP como string; la normalización existente solo elimina espacios externos y pasa a mayúsculas. No se modifica ese almacenamiento ni se elimina CURP de la ficha. UUID y Rewards ID siguen separados.
 
-La ficha futura del afiliado debe contemplar CURP según la aclaración del usuario. Para implementarla hace falta un ejemplo o esquema de alta y PATCH de Nómina para este micrositio que defina **la ubicación del campo personalizado en JSON, su clave exacta y tipo textual**, más las reglas de actualización. El panel del importador no define esa estructura HTTP. No se propone `code=CURP`, `id-rewards` como propiedad API ni un contenedor inventado. La política vigente conserva envío adicional desde Oro, pendiente de controles efectivos y de confirmar ese contrato.
+La ficha futura del afiliado debe contemplar CURP según la aclaración del usuario. La revisión posterior de la documentación pública confirmó el uso de slugs de Referencias como propiedades del alta. Ya no falta ubicar curp para POST; falta confirmar su tipo textual ante la contradicción del panel y su aceptación en PATCH. Ver ampliación posterior. No se propone `code=CURP`, `id-rewards` como propiedad API ni un contenedor inventado. La política vigente conserva envío adicional desde Oro, pendiente de controles efectivos y de confirmar ese contrato.
 
 ## Ampliación necesaria antes de conectar
 
@@ -65,3 +65,20 @@ Suite aislada (requiere puertos 3006/4326 libres): `node node_modules/@playwrigh
 - Brave nativo de la Mac, ventana privada: login sintético, Inicio, sección de Beneficios, confirmación de copia repetida y portapapeles real con 123456789. Chrome no estaba expuesto como navegador de automatización. No se abrió el micrositio ni endpoints reales.
 - Capturas locales de QA en tmp/gift-card-access-qa: benefits-gift-cards desktop/móvil y gift-cards-320. Son datos sintéticos y no se incluyen en el commit.
 - OpenSpec validado en modo estricto y git diff --check sin errores. Sin pruebas de servicios reales, migraciones, puntos, afiliados reales o verificación de producción.
+
+## Ampliación local posterior: ficha del afiliado
+
+Fuente pública revisada el 2026-10-07: [Bonda Nóminas V1](https://documenter.getpostman.com/view/1928874/TVetZjgf), colección pública enlazada por esa página. Alta POST exige code y admite los slugs de Referencias como propiedades del cuerpo; los ejemplos colocan email y nombre al mismo nivel. Por ello la captura permite identificar curp para el alta, sin inventar un contenedor. El tipo entero mostrado contradice CURP textual. PATCH solo debe llevar cambios y remite al ejecutivo para confirmar campos admitidos. Falta confirmar curp textual y la lista de PATCH. La eliminación afecta al afiliado completo: comienza reversible y termina permanente; POST puede restaurarlo dentro de esa ventana y GET no muestra los eliminados. No se documenta una autorización específica de gift cards ni una política de descenso por nivel. Estos hallazgos reemplazan la duda anterior sobre ubicación de curp en POST, sin autorizar llamadas reales.
+
+Implementación preparada, sin consumidores productivos:
+
+- `affiliate-profile.ts`: aplicación con puerto de almacenamiento y contrato explícito. Solo clientes ACTIVE con journey canónico ACTIVE desde GOLD pueden compartir la ficha. El contrato pendiente bloquea antes de cualquier acceso a persistencia/transporte. No se confía en nivel de un request: la futura integración debe cargarlo del servidor.
+- `BondaHttpGateway`: métodos separados para alta con ficha y PATCH, bloqueados por contrato pendiente de forma predeterminada. Lista cerrada de email/nombre/apellido/curp; no code editable, id-rewards, contraseña, segmentación o propiedades arbitrarias. CURP permanece string de 18 caracteres; Rewards ID es numérico de nueve dígitos. Alta no envía bienvenida; PATCH solo envía campos cambiados. Redirecciones HTTP rechazadas para no reenviar datos a otro destino.
+- Estado del afiliado debe estar confirmado; un GET 404 aislado no autoriza alta porque podría restaurar una baja. No se añade automatización de DELETE ni cambios de segmentación.
+- La aplicación reclama exclusión por cliente, registra intención antes de enviar y compara HMAC por campo contra la última confirmación. Checkpoints no contienen nombre, correo, CURP ni payload crudo. El secreto de revisión se inyecta; no se creó ni configuró ninguno para producción.
+- Repetición idéntica no envía otra operación; cambio de ficha produce PATCH mínimo en el mismo code. Identidad diferente queda en conflicto. Duplicado, timeout, HTTP 200 con error, JSON inválido, miembro inesperado o fallo de persistencia tras envío quedan en VERIFICATION_REQUIRED sin reenvío automático. Credenciales rechazadas detienen los reintentos. Ningún resultado equivale a acceso a gift cards.
+- Descenso de nivel no borra ni modifica automáticamente al afiliado; devuelve NOT_ELIGIBLE y deja la política externa pendiente.
+
+Límites concretos: las pruebas usan contrato **hipotético confirmado** y store en memoria declarado dentro del test. No se instaló store productivo, nueva tabla, migración, ruta, worker, bandera de entorno o lector automático de datos reales. Para activación todavía se necesitan confirmaciones Bonda, almacenamiento duradero con claims/leases entre procesos, procedimiento de conciliación y conexión a eventos autorizados con lectura de ficha/nivel canónicos. No se debe presentar el prototipo probado como sincronización operativa de producción.
+
+Validación posterior: TypeScript backend y 35 pruebas (15 nuevas de ficha + 20 de regresión) aprobadas con fetch simulado, incluyendo estados por nivel, datos inválidos, alta/actualización, corrección de CURP, duplicados, concurrencia, cambio mínimo, fallos ambiguos y privacidad de resultados/checkpoints. La UI no cambió; no se repitió la suite visual ya aprobada.

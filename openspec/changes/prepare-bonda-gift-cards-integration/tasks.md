@@ -18,3 +18,9 @@ Aclaración posterior: vínculo por Rewards ID mediante Nómina; CURP/correo sol
 - [x] 3.2 Mostrar Número de socio Rewards en Inicio, Mi cuenta y sección de Bonda; copiar sin espacios con confirmación accesible y fallback.
 - [x] 3.3 Sustituir el estado genérico de gift cards por sección desde Oro, catálogo completo y conversión informativa 3 puntos = $1 MXN; mantener acceso externo deshabilitado.
 - [x] 3.4 Verificar tipos, contratos y navegación/copia/estados en Chromium de Mac, desktop y móvil, con mocks.
+
+## 4. Sincronización local de ficha (ampliación posterior)
+
+- [x] 4.1 Revisar colección pública Nóminas V1 y corregir el diagnóstico sobre slugs de Referencias; conservar pendientes tipo CURP/PATCH y permiso gift cards.
+- [x] 4.2 Preparar aplicación y métodos HTTP separados con contrato pendiente por defecto, elegibilidad canónica desde Oro, cambios mínimos, exclusión e intención previa; sin consumidores de runtime ni migraciones.
+- [x] 4.3 Probar con transporte y store simulados alta, PATCH, CURP textual, identidad estable, concurrencia, repetición, ambigüedad, fallos y descenso; documentar límites antes de producción.

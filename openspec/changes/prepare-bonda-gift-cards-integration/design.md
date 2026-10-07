@@ -1,3 +1,7 @@
+## Ampliación posterior autorizada — sincronización local de ficha
+
+La revisión de Nóminas V1 confirmó POST con code y slugs de Referencias en el cuerpo, y PATCH de campos modificados. La captura identifica curp, pero falta resolver su tipo textual (panel dice entero) y confirmar campos PATCH. Se preparan métodos HTTP y aplicación de sincronización con mocks, contrato bloqueado por defecto y sin rutas/jobs/activación productiva. CURP se conserva como texto; no cambia code ni se usa id-rewards en HTTP. La aplicación usa estado/nivel canónicos desde Oro, claims y checkpoints sin datos personales crudos, comparación HMAC por campo y verificación obligatoria ante resultado ambiguo. Persistencia duradera, conciliación e integración de eventos quedan pendientes antes de activación; el store en memoria solo vive en pruebas. No se presume que GET 404 autorice alta: POST puede restaurar afiliados eliminados. No se automatizan bajas, segmentación ni permisos gift cards. Fuente y evidencia: docs/bonda-gift-card-access-local.md.
+
 ## Alcance vigente — 2026-10-07
 
 La nueva instrucción autoriza una sección local revisable y pruebas con datos sintéticos sobre esta rama. Sustituye la elección previa de CURP por `rewards_id`, presentado como «Número de socio Rewards»: nueve dígitos en grupos de tres, copia canónica sin espacios. No altera identidades ni ejecuta migraciones. La preparación histórica inferior documenta decisiones anteriores; donde difiera prevalece este alcance.
