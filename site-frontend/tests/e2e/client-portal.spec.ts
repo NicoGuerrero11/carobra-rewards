@@ -40,8 +40,8 @@ test("pending customer can navigate the complete provider-neutral portal safely"
   await expect(page.getByRole("heading", { name: "Cursos y bienestar" })).toBeVisible();
 
   await page.goto("/cliente/gift-cards");
-  await expect(page.getByRole("heading", { name: "Tu próximo destino: Oro" })).toBeVisible();
-  await expect(page.getByText("Acceso en preparación", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gift Cards", exact: true })).toBeVisible();
+  await expect(page.locator("#gift-cards")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Volver a Beneficios/ })).toBeVisible();
 });
 
@@ -135,7 +135,8 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   await expect(page.locator("#activities-list")).toHaveCount(0);
 
   await page.goto("/cliente/gift-cards");
-  await expect(page.getByText("Acceso en preparación", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gift Cards", exact: true })).toBeVisible();
+  await expect(page.locator("#gift-cards")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /canjear|redimir/i })).toHaveCount(0);
 });
 
