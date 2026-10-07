@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
-  testDir: './tests/e2e', testMatch: ['bonda-points.spec.ts','gift-card-access.spec.ts','customer-home.spec.ts','customer-activity.spec.ts'], timeout: 30000,
+  testDir: './tests/e2e', testMatch: ['bonda-points.spec.ts','gift-card-access.spec.ts','customer-home.spec.ts','customer-activity.spec.ts','rewards-eligibility.spec.ts'], timeout: 30000,
   reporter: [['list']], use: { baseURL: 'http://127.0.0.1:4327', trace: 'retain-on-failure' },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], channel: 'chromium' } },

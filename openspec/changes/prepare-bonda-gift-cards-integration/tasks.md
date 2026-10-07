@@ -34,4 +34,4 @@
 - [x] 5.3 Conectar lectura de saldo con caché/estados honestos en Inicio, Actividad y Gift Cards.
 - [x] 5.4 Probar persistencia, duplicados, requisitos, incertidumbre, revisión y UI desktop/móvil con mocks.
 - [x] 5.5 Documentar límites de sandbox, cashback, compras, caducidad externa y discrepancia de avisos.
-- [ ] 5.6 Publicar en misma rama/PR y verificar CI final, sin merge ni despliegue manual.
+- [x] 5.6 Publicar en misma rama/PR y verificar CI final, sin merge ni despliegue manual.
