@@ -1,3 +1,5 @@
+import { PostgresBondaAffiliateEligibility } from "../bonda/affiliate-eligibility.js";
+import { BondaAffiliateEventWorker } from "../bonda/affiliate-event-worker.js";
 import { createBondaAffiliateProfileRuntime } from "../bonda/affiliate-profile-worker.js";
 import type { Pool } from "pg";
 import type { BondaConfig } from "../../config.js";
@@ -134,6 +136,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   affiliateProvisioning: BondaAffiliateProvisioningApplication;
   coupons: BondaCouponApplication;
   affiliateProfiles: ReturnType<typeof createBondaAffiliateProfileRuntime>;
+  affiliateEvents: BondaAffiliateEventWorker;
   warmCatalog(): Promise<void>;
 } {
   const clock = new SystemClock();
@@ -145,6 +148,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
     new PostgresBondaAffiliateProvisioning(database),
     gateway,
     clock,
+    new PostgresBondaAffiliateEligibility(database),
   );
   const catalog = new BondaCatalogCache(
     gateway,
@@ -156,6 +160,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   const rules = new PostgresRewardsV2RuleLookup(database);
   return {
     affiliateProfiles: createBondaAffiliateProfileRuntime(database, config),
+    affiliateEvents: new BondaAffiliateEventWorker(database, affiliateProvisioning, config.affiliateProvisioningEnabled && !config.localPreviewEnabled),
     affiliateProvisioning,
     coupons: new BondaCouponApplication(
       gateway,

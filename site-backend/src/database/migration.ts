@@ -29,6 +29,8 @@ import { courseVideoProgress } from "./migrations/026-course-video-progress.js";
 
 import { bondaAffiliateProfileSync } from "./migrations/027-bonda-affiliate-profile-sync.js";
 
+import { bondaAffiliationEvents } from "./migrations/028-bonda-affiliation-events.js";
+
 export interface Migration {
   id: string;
   up: string;
@@ -63,6 +65,7 @@ export const migrations: readonly Migration[] = [
   bondaPresentationCatalogReconciliation,
   courseVideoProgress,
   bondaAffiliateProfileSync,
+  bondaAffiliationEvents,
 ];
 
 export async function migrate(client: PoolClient): Promise<void> {

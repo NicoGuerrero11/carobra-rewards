@@ -19,3 +19,10 @@
 - [x] 3.3 Conectar runtime deshabilitado y CLI acotada con dry-run predeterminado.
 - [x] 3.4 Probar SQL aislado, reinicio, lease vencido, eventos concurrentes, conciliación y catch-up.
 - [x] 3.5 Compilar, validar OpenSpec y documentar evidencia/límites sin migraciones reales ni llamadas Bonda.
+
+## 4. Primera afiliación desde Bronce
+
+- [x] 4.1 Aplicar estado/nivel canónico Bronce+ a registro, consulta de estado, reintentos y backfill.
+- [x] 4.2 Preparar migración 028/eventos apagados para ascensos por cualquier producto; preservar afiliaciones al descenso.
+- [x] 4.3 Verificar Invitado, todos los niveles, Afore/PPR sintéticos, duplicados, fallos, recuperación y enriquecimiento Oro+.
+- [x] 4.4 Documentar exclusión de cuentas productivas, checks y activación pendiente.

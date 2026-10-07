@@ -12,7 +12,7 @@ Fecha: 2026-10-07. Rama: `codex/bonda-gift-cards-preparation`, base `339f718`. E
 
 ## Flujo en dos etapas autorizado
 
-1. El aprovisionamiento base existente conserva POST `{code: rewardsId, send_welcome_email: false}`. No manda CURP, nombre, apellido ni correo. Sus controles/flags y reconciliación existentes se preservan.
+1. La primera afiliación requiere cliente ACTIVE y journey canónico ACTIVE en Bronce o superior, con Rewards ID coincidente. El registro por sí solo ya no afilia a un Invitado. POST conserva `{code: rewardsId, send_welcome_email: false}`; no manda CURP, nombre, apellido ni correo. Se preservan flags y recuperación existentes.
 2. Al alcanzar Oro o superior, el enriquecimiento preparado carga ficha y nivel actuales del servidor, exige afiliación base ACTIVE coincidente y envía PATCH mínimo para email/nombre/apellido/curp. Antes de Oro los campos permanecen en Carobra. El usuario confirmó este disparador automático; está preparado pero **no activado**.
 3. Cambios posteriores se comparan mediante HMAC por campo. Repetir un evento confirmado no repite la operación. El worker nunca crea afiliados ni interpreta una fila faltante/GET 404 como permiso para crearlos. La aplicación conserva un método de alta con ficha aislado para contratos/pruebas, sin consumidor en este flujo.
 
@@ -58,3 +58,18 @@ Verificaciones previas: build frontend Node 24, ocho contratos, 58 regresiones d
 Backend completo: **300 aprobadas, 7 omitidas** por requerir base externa. Persistencia tiene ocho pruebas con PostgreSQL WASM PGlite aislado: migración up/down, rollback de evento, reinicio desde disco, claims entre stores independientes, fencing de lease vencido, conciliación idempotente, nuevas generaciones durante envío, descenso/retorno y catch-up. No había daemon Docker/PostgreSQL nativo disponible; no se afirma validación multiproceso contra PostgreSQL nativo. Tras el ajuste de enlace, 29 pruebas backend específicas, ocho contratos frontend y ocho pruebas Chromium desktop/móvil aprobaron; build frontend y OpenSpec estricto también.
 
 Sin migraciones reales, endpoints de clientes/Bonda, exportación de identidades, puntos, credenciales, push, PR o deploy. `GET portal` puede sincronizar en un entorno real; todas las navegaciones de esta tarea usan backend sintético. Archivos QA locales en `tmp/gift-card-access-qa`; no se incluyen en commit.
+
+
+## Ajuste posterior: primera afiliación desde Bronce
+
+El usuario confirmó que sus cinco cuentas por nivel están en **producción**. No se inspeccionaron, modificaron ni copiaron a fixtures. No hay cuentas externas nuevas ni autorización de pruebas reales.
+
+`PostgresBondaAffiliateEligibility` lee estado del cliente, journey, nivel y Rewards ID de la base canónica. `BondaAffiliateProvisioningApplication` aplica esa condición común al registro, acceso de beneficios/affiliate-status y reintentos; sin fuente canónica falla cerrado. Se revalida después del claim y antes de POST si hubo consulta externa previa. El backfill filtra Bronce+ en SQL y también pasa por la misma guarda, por lo que una selección obsoleta no la salta. Una afiliación ACTIVE existente se conserva al descenso y no se vuelve a consultar/crear por repetición. No se añaden revocaciones ni restricciones externas por nivel.
+
+La migración **028**, preparada y registrada pero no ejecutada en datos reales, crea captura de eventos de nivel/estado y una cola generacional sin perfil crudo. Captura predeterminada false. El worker acotado usa el aprovisionamiento base con claim existente; eventos recibidos durante un envío permanecen pendientes. No depende de SISCA: cualquier camino que actualice el journey canónico puede dispararlo, incluido otro producto activo. No se cambiaron reglas de niveles/puntos ni se creó un scheduler.
+
+Modo nuevo en CLI existente: `npm run bonda:affiliates -- --mode events` informa cero operaciones sin `--apply` (como los otros modos, el CLI construye el pool configurado; no ejecutarlo contra producción). Con `--apply` aún exige bandera base y captura SQL habilitadas. No se ejecutó este modo contra una base configurada. Un ascenso en entorno activado permite afiliar mediante eventos; visitas y backfill siguen como recuperación, con el mismo umbral.
+
+Validación del ajuste: TypeScript compiló; **309 pruebas aprobadas, 7 omitidas** por requerir PostgreSQL externo. Nueve nuevas pruebas: tres unitarias de guardas/reintentos/concurrencia y seis PGlite de SQL/eventos/backfill/transiciones/recuperación. Incluyen todos los niveles, estados no elegibles, identidad incoherente, rollback, afiliación única, enriquecimiento Oro+, descenso/retorno y pérdida de confirmación. Los escenarios Afore/PPR usan hechos sintéticos y el motor de nivel real, luego escriben la proyección canónica aislada; no prueban la comunicación con SISCA ni el pipeline de otro proveedor. El gateway HTTP conserva pruebas del payload mínimo. No se repitió navegador porque esta ampliación no cambia UI; sigue válida la QA visual anterior.
+
+Antes de prueba conectada: entorno aislado acordado con Bonda, identidades sintéticas aceptadas, contrato PATCH/CURP textual y activación operativa específica. Un PR o las cuentas reales por nivel no reemplazan ese aislamiento. No se creó PR ni se hizo push/deploy.

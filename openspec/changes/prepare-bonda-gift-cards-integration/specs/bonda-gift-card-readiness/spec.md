@@ -23,7 +23,7 @@ The site SHALL display existing nine-digit rewards_id as Número de socio Reward
 - **THEN** the same canonical value is copied without spaces or API writes
 
 ### Requirement: Affiliation and enrichment must be separate
-The base affiliation SHALL continue sending only code and its existing welcome flag. The prepared enrichment worker SHALL load canonical customer/profile/level data and require ACTIVE Gold or above and a matching confirmed existing affiliation before PATCH. Optional profile data SHALL remain in Carobra before Gold. Public navigation SHALL NOT depend on enrichment completion or coupon permission.
+The base affiliation SHALL require canonical ACTIVE customer/journey status and Bronze or above before first dispatch, and SHALL send only code and its existing welcome flag. Registration alone MUST NOT affiliate an invited customer. The prepared enrichment worker SHALL load canonical customer/profile/level data and require ACTIVE Gold or above and a matching confirmed existing affiliation before PATCH. Optional profile data SHALL remain in Carobra before Gold. Public navigation SHALL NOT depend on enrichment completion or coupon permission.
 
 #### Scenario: Customer reaches Gold
 - **WHEN** activated processing receives a relevant event for a confirmed existing affiliate at Gold
@@ -54,3 +54,22 @@ The store SHALL persist field HMAC checkpoints, a pre-dispatch intent and leased
 #### Scenario: Process restarts
 - **WHEN** a new store opens the same isolated database
 - **THEN** the pending intent persists and prevents automatic duplicate dispatch
+
+### Requirement: Every first-affiliation entrypoint must enforce Bronze
+Registration, status/benefits access, retries, backfill and level-event processing SHALL share the canonical eligibility guard. No caller-supplied level SHALL authorize dispatch. The prepared event migration SHALL capture level/status changes transactionally with capture disabled by default. Existing ACTIVE affiliations SHALL survive downgrades without recreation or revocation.
+
+#### Scenario: Invited customer reaches an entrypoint
+- **WHEN** registration, affiliate-status, retry or backfill considers an invited customer without Bronze
+- **THEN** no initial affiliate GET/POST is dispatched
+
+#### Scenario: First product establishes Bronze
+- **WHEN** Afore or another product produces an ACTIVE Bronze canonical journey and the authorized event processor is activated
+- **THEN** one minimal affiliation is ensured, while profile enrichment remains gated to Gold
+
+#### Scenario: Existing affiliate returns after downgrade
+- **WHEN** an already ACTIVE affiliate drops below Bronze and later returns
+- **THEN** no deletion, recreation or duplicate POST is performed
+
+#### Scenario: Outcome is ambiguous
+- **WHEN** minimal affiliation succeeds remotely but its acknowledgement is lost
+- **THEN** a later eligible retry checks existence and converges without another POST when the affiliate is found

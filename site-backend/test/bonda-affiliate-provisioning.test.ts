@@ -113,6 +113,7 @@ function createApplication(store: MemoryAffiliateStore, gateway: FakeBondaGatewa
     store,
     gateway,
     new FixedClock(now),
+    { read: async () => ({ rewardsId: "RWD-TEST", eligible: true }) },
   );
 }
 
@@ -194,3 +195,40 @@ class MemoryAffiliateStore implements BondaAffiliateProvisioningStore {
     return record;
   }
 }
+
+
+test("registration and benefits status cannot affiliate without canonical Bronze, including spoofed identity", async () => {
+  for (const canonical of [null, { rewardsId: "RWD-TEST", eligible: false }, { rewardsId: "DIFFERENT", eligible: true }]) {
+    const store = new MemoryAffiliateStore(); const gateway = new FakeBondaGateway();
+    gateway.affiliateExists = async () => { throw Error("must not contact partner"); };
+    const app = new BondaAffiliateProvisioningApplication(true, store, gateway, new FixedClock(now), { read: async () => canonical });
+    assert.equal((await app.afterRegistration({ customerId, rewardsId: "RWD-TEST" })).state, "DISABLED");
+    assert.equal((await app.ensureForBenefits({ customerId, rewardsId: "RWD-TEST" })).state, "DISABLED");
+    assert.equal(store.records.size, 0); assert.equal(gateway.affiliateCodes.size, 0);
+  }
+});
+
+test("pending retries recheck Bronze; returning eligibility resumes without duplicate creation", async () => {
+  const store = new MemoryAffiliateStore(); const gateway = new FakeBondaGateway();
+  let eligible = false; let creates = 0;
+  const originalCreate = gateway.createAffiliate.bind(gateway);
+  gateway.createAffiliate = async code => { creates++; return originalCreate(code); };
+  const app = new BondaAffiliateProvisioningApplication(true, store, gateway, new FixedClock(now), { read: async () => ({ rewardsId: "RWD-TEST", eligible }) });
+  await store.ensurePending(customerId, "RWD-TEST");
+  await app.retryDue(); assert.equal(creates, 0);
+  eligible = true; store.records.get(customerId)!.nextAttemptAt = null;
+  await Promise.all([app.ensureForBenefits({ customerId, rewardsId: "RWD-TEST" }), app.ensureForBenefits({ customerId, rewardsId: "RWD-TEST" })]);
+  assert.equal(creates, 1);
+  eligible = false;
+  assert.equal((await app.ensureForBenefits({ customerId, rewardsId: "RWD-TEST" })).state, "ACTIVE");
+  eligible = true; await app.afterRegistration({ customerId, rewardsId: "RWD-TEST" }); await app.retryDue();
+  assert.equal(creates, 1); assert.equal(store.records.get(customerId)?.state, "ACTIVE");
+});
+
+test("downgrade during partner lookup prevents first creation", async () => {
+  const store = new MemoryAffiliateStore(); const gateway = new FakeBondaGateway(); let eligible = true;
+  gateway.affiliateExists = async () => { eligible = false; return false; };
+  const app = new BondaAffiliateProvisioningApplication(true, store, gateway, new FixedClock(now), { read: async () => ({ rewardsId: "RWD-TEST", eligible }) });
+  assert.equal((await app.afterRegistration({ customerId, rewardsId: "RWD-TEST" })).state, "DISABLED");
+  assert.equal(gateway.affiliateCodes.size, 0);
+});
