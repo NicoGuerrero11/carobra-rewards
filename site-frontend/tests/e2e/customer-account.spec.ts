@@ -40,11 +40,11 @@ test('explicit save sends only existing fields and persists selected values afte
   await page.getByRole('switch', { name: 'Actividad de Rewards' }).uncheck();
   await page.getByRole('switch', { name: 'Cursos y contenidos' }).check();
   await page.getByRole('switch', { name: 'Actualizaciones de productos' }).uncheck();
-  await expect(page.getByRole('status')).toHaveText('Tienes cambios sin guardar.');
+  await expect(page.locator('#preferences-feedback')).toHaveText('Tienes cambios sin guardar.');
   const saved = page.waitForRequest(request => request.url().endsWith(preferencesPath) && request.method() === 'PATCH');
   await page.getByRole('button', { name: 'Guardar preferencias' }).click();
   expect((await saved).postDataJSON()).toEqual({ activity_updates: false, learning_updates: true, product_updates: false });
-  await expect(page.getByRole('status')).toHaveText('Preferencias guardadas.');
+  await expect(page.locator('#preferences-feedback')).toHaveText('Preferencias guardadas.');
   await page.reload();
   await expect(page.getByRole('switch', { name: 'Actividad de Rewards' })).not.toBeChecked();
   await expect(page.getByRole('switch', { name: 'Cursos y contenidos' })).toBeChecked();
@@ -66,11 +66,11 @@ test('pending save disables controls, rejects duplicates and waits for acknowled
   try {
     await expect(page.getByRole('button', { name: 'Guardando…', exact: true })).toBeDisabled();
     for (const control of await page.getByRole('switch').all()) await expect(control).toBeDisabled();
-    await expect(page.getByRole('status')).toHaveText('Guardando tus preferencias…');
+    await expect(page.locator('#preferences-feedback')).toHaveText('Guardando tus preferencias…');
     await page.locator('#preferences-form').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     expect(writes).toBe(1);
   } finally { release(); }
-  await expect(page.getByRole('status')).toHaveText('Preferencias guardadas.');
+  await expect(page.locator('#preferences-feedback')).toHaveText('Preferencias guardadas.');
   await expect(page.getByRole('button', { name: 'Guardar preferencias' })).toBeEnabled();
 });
 
@@ -90,7 +90,7 @@ for (const failure of ['service', 'network', 'timeout']) {
     const learning = page.getByRole('switch', { name: 'Cursos y contenidos' });
     await learning.check();
     await page.getByRole('button', { name: 'Guardar preferencias' }).click();
-    await expect(page.getByRole('status')).toHaveText('No pudimos guardar tus preferencias. Intenta de nuevo.');
+    await expect(page.locator('#preferences-feedback')).toHaveText('No pudimos guardar tus preferencias. Intenta de nuevo.');
     await expect(learning).toBeChecked();
     await expect(learning).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Guardar preferencias' })).toBeEnabled();
@@ -98,7 +98,7 @@ for (const failure of ['service', 'network', 'timeout']) {
     // Restore the timeout before retrying through the isolated backend.
     if (failure === 'timeout') await page.evaluate(() => { AbortSignal.timeout = () => new AbortController().signal; });
     await page.getByRole('button', { name: 'Guardar preferencias' }).click();
-    await expect(page.getByRole('status')).toHaveText('Preferencias guardadas.');
+    await expect(page.locator('#preferences-feedback')).toHaveText('Preferencias guardadas.');
   });
 }
 
@@ -117,7 +117,7 @@ test('keyboard switches have visible focus and submit without changing the contr
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Guardar preferencias' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('status')).toHaveText('Preferencias guardadas.');
+  await expect(page.locator('#preferences-feedback')).toHaveText('Preferencias guardadas.');
 });
 
 test('unavailable preferences do not invent settings while identity and help remain usable', async ({ page, context }, info) => {
@@ -125,7 +125,7 @@ test('unavailable preferences do not invent settings while identity and help rem
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/cliente/perfil');
-  await expect(page.getByRole('status')).toContainText('No pudimos cargar tus preferencias');
+  await expect(page.locator('.customer-account__notice[role=status]')).toContainText('No pudimos cargar tus preferencias');
   await expect(page.getByRole('switch')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Guardar preferencias' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Datos personales' })).toContainText('eligible@example.com');

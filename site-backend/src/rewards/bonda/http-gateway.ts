@@ -15,15 +15,21 @@ import {
   optionalString,
 } from "./normalization.js";
 
+import {
+  assertAffiliateProfileContract, assertAffiliateProfileFields, pendingAffiliateProfileContract,
+  type AffiliateProfileContract, type AffiliateProfileFields, type AffiliateProfileChanges, type BondaAffiliateProfileGateway,
+} from "./affiliate-profile.js";
+
 type FetchImplementation = typeof fetch;
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_CATALOG_PAGES = 100;
 
-export class BondaHttpGateway implements BondaGateway {
+export class BondaHttpGateway implements BondaGateway, BondaAffiliateProfileGateway {
   constructor(
     private readonly config: BondaConfig,
     private readonly fetchImplementation: FetchImplementation = fetch,
+    private readonly profileContract: AffiliateProfileContract = pendingAffiliateProfileContract,
   ) {}
 
   async createAffiliate(rewardsId: string): Promise<BondaAffiliateResult> {
@@ -46,6 +52,35 @@ export class BondaHttpGateway implements BondaGateway {
       return { state: "ALREADY_EXISTS", externalMemberId: null };
     }
     throw classifyPartnerPayload(root);
+  }
+
+  async createAffiliateProfile(rewardsId: string, fields: AffiliateProfileFields): Promise<"CREATED" | "ALREADY_EXISTS"> {
+    assertAffiliateProfileFields(fields, true);
+    assertAffiliateProfileContract(this.profileContract, fields, "CREATE");
+    if (!/^[1-9][0-9]{8}$/.test(rewardsId)) throw invalidResponse("Affiliate identity is invalid");
+    const { micrositeId, token } = this.requireAffiliateConfiguration();
+    const root = asRecord(await this.requestJson("POST", `/api/v2/microsite/${encodeURIComponent(micrositeId)}/affiliates`, {
+      headers: { "content-type": "application/json", token },
+      body: JSON.stringify({ code: rewardsId, ...fields, send_welcome_email: false }),
+      redirect: "error",
+    }, true));
+    if (isAlreadyUsed(root)) return "ALREADY_EXISTS";
+    assertAffiliateProfileAcknowledged(root, rewardsId);
+    return "CREATED";
+  }
+
+  async updateAffiliateProfile(rewardsId: string, changes: AffiliateProfileChanges): Promise<void> {
+    assertAffiliateProfileFields(changes);
+    assertAffiliateProfileContract(this.profileContract, changes, "UPDATE");
+    if (!/^[1-9][0-9]{8}$/.test(rewardsId)) throw invalidResponse("Affiliate identity is invalid");
+    const { micrositeId, token } = this.requireAffiliateConfiguration();
+    if (!Object.keys(changes).length) return;
+    const root = asRecord(await this.requestJson("PATCH", `/api/v2/microsite/${encodeURIComponent(micrositeId)}/affiliates/${encodeURIComponent(rewardsId)}`, {
+      headers: { "content-type": "application/json", token },
+      body: JSON.stringify(changes),
+      redirect: "error",
+    }, true));
+    assertAffiliateProfileAcknowledged(root, rewardsId);
   }
 
   async affiliateExists(rewardsId: string): Promise<boolean> {
@@ -209,7 +244,7 @@ export class BondaHttpGateway implements BondaGateway {
   }
 
   private async requestJson(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PATCH",
     path: string,
     init: Omit<RequestInit, "method" | "signal"> = {},
     dispatchedMutation = false,
@@ -346,5 +381,12 @@ async function readBoundedJson(response: Response): Promise<unknown> {
     return JSON.parse(text) as unknown;
   } catch {
     throw invalidResponse("Bonda returned invalid JSON");
+  }
+}
+
+function assertAffiliateProfileAcknowledged(root: Record<string, unknown>, rewardsId: string): void {
+  const member = optionalRecord(optionalRecord(root.data)?.member);
+  if (root.success !== true || root.error || member?.code !== rewardsId) {
+    throw invalidResponse("Affiliate profile update requires verification");
   }
 }

@@ -1,4 +1,5 @@
 ---
+import GiftCardAccess from "../../components/GiftCardAccess.astro";
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import CouponCard from "../../components/CouponCard.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
@@ -74,6 +75,7 @@ function emptyCatalog(
     next_page: null,
   };
 }
+Astro.response.headers.set("Cache-Control", "private, no-store");
 ---
 
 <ClientShellLayout title="Beneficios | Carobra Rewards" description="Cupones y descuentos disponibles para tu nivel Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Beneficios">
@@ -112,6 +114,7 @@ function emptyCatalog(
         )}
       </>
     )}
+    <GiftCardAccess journey={portal?.journey} rewardsId={Astro.locals.user?.rewardsId} />
   </main>
 
   <script>

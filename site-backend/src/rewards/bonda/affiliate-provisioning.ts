@@ -1,3 +1,4 @@
+import { deniedAffiliateEligibility, type BondaAffiliateEligibility } from "./affiliate-eligibility.js";
 import type { Clock } from "../shared/clock.js";
 import type { CustomerId } from "../shared/identifiers.js";
 import type { BondaAffiliateStatusHttpResponse } from "./contracts.js";
@@ -26,19 +27,14 @@ implements BondaAffiliateProvisioningHttpApplication {
     private readonly store: BondaAffiliateProvisioningStore,
     private readonly gateway: BondaGateway,
     private readonly clock: Clock,
+    private readonly eligibility: BondaAffiliateEligibility = deniedAffiliateEligibility,
   ) {}
 
   async afterRegistration(
     identity: BondaRegistrationIdentity,
   ): Promise<BondaAffiliateStatusHttpResponse> {
-    if (!this.enabled) return disabledStatus();
-    try {
-      await this.store.ensurePending(identity.customerId, identity.rewardsId, this.clock.now());
-      return await this.attemptCustomer(identity.customerId);
-    } catch {
-      // Registration is already committed in FastAPI. Lazy repair/backfill owns recovery.
-      return pendingStatus(false);
-    }
+    // Registration alone is not an affiliation trigger. Canonical Bronze+ is required.
+    return this.ensureForBenefits(identity);
   }
 
   async ensureForBenefits(
@@ -46,17 +42,23 @@ implements BondaAffiliateProvisioningHttpApplication {
   ): Promise<BondaAffiliateStatusHttpResponse> {
     if (!this.enabled) return disabledStatus();
     try {
-      const record = await this.store.ensurePending(
-        identity.customerId,
-        identity.rewardsId,
-        this.clock.now(),
-      );
-      if (record.state === "ACTIVE") return activeStatus();
-      if (record.state === "ACTION_REQUIRED") return actionRequiredStatus();
+      const existing = await this.store.find(identity.customerId);
+      if (existing && existing.rewardsId !== identity.rewardsId) return actionRequiredStatus();
+      // A downgrade never revokes, recreates or updates an already confirmed affiliate.
+      if (existing?.state === "ACTIVE") return activeStatus();
+      if (!await this.canInitiallyAffiliate(identity)) return disabledStatus();
+      if (existing?.state === "ACTION_REQUIRED") return actionRequiredStatus();
+      await this.store.ensurePending(identity.customerId, identity.rewardsId, this.clock.now());
       return await this.attemptCustomer(identity.customerId);
     } catch {
+      // Registration remains successful; events/lazy repair own recovery.
       return pendingStatus(false);
     }
+  }
+
+  private async canInitiallyAffiliate(identity: BondaRegistrationIdentity): Promise<boolean> {
+    const canonical = await this.eligibility.read(identity.customerId);
+    return canonical?.eligible === true && canonical.rewardsId === identity.rewardsId;
   }
 
   async status(customerId: CustomerId): Promise<BondaAffiliateStatusHttpResponse> {
@@ -90,7 +92,11 @@ implements BondaAffiliateProvisioningHttpApplication {
     record: BondaAffiliateProvisioningRecord,
   ): Promise<BondaAffiliateStatusHttpResponse> {
     try {
+      // Re-check after the claim: retries and callers share this same gate.
+      if (!await this.canInitiallyAffiliate(record)) return disabledStatus();
       const exists = await this.gateway.affiliateExists(record.rewardsId);
+      // A level/status change during the existence lookup must not initiate an affiliation.
+      if (!exists && !await this.canInitiallyAffiliate(record)) return disabledStatus();
       const result = exists
         ? { state: "ALREADY_EXISTS" as const, externalMemberId: null }
         : await this.gateway.createAffiliate(record.rewardsId);

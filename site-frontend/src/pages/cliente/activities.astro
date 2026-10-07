@@ -1,4 +1,5 @@
 ---
+import BondaPointsBalance from "../../components/BondaPointsBalance.astro";
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
@@ -41,9 +42,11 @@ const movementTitle = (code: string) => ({ V2_INVITED_REGISTRATION: "Bienvenida 
       </section>
     ) : portal && (
       <>
+        <BondaPointsBalance balance={portal.journey.points.bonda} />
+        <p>Este historial muestra los movimientos registrados en Carobra. Consulta tus compras de gift cards en Bonda.</p>
         <dl class="customer-activity__summary" aria-label="Resumen de tu actividad">
           <div class="customer-activity__balance">
-            <dt>Saldo disponible</dt>
+            <dt>Puntos registrados en Carobra</dt>
             <dd>{points(portal.journey.points.available)} <span>pts</span></dd>
           </div>
           <div>

@@ -90,3 +90,13 @@ test("Bonda capabilities can be enabled independently", () => {
   assert.equal(bonda.catalogAffiliateCode, "990910001");
   assert.deepEqual(bonda.allowedHosts, ["bonda-test.example"]);
 });
+
+// Public navigation does not activate profile transmission or partner permissions.
+test("gift card configuration describes the confirmed public link and local Gold visibility", () => {
+  const bonda = loadConfig({ BONDA_GIFT_CARD_ACCESS_ENABLED: "true" }).bonda;
+  assert.deepEqual(bonda?.giftCardAccess, {
+    status: "LINK_ONLY", enabled: true, loginMethod: null,
+    micrositeUrl: "https://carobrarewards.bonda.com",
+    identifierField: "rewards_id", minimumLevel: "GOLD",
+  });
+});

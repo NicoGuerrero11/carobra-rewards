@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 
 const host = "127.0.0.1";
-const port = 3002;
+const port = Number(process.env.MOCK_SITE_BACKEND_PORT ?? 3002);
 const pendingSessionCookie = "carobra_session=e2e-pending";
 const eligibleSessionCookie = "carobra_session=e2e-eligible";
 const inactiveSessionCookie = "carobra_session=e2e-inactive";
@@ -33,7 +33,7 @@ function homePortal(request,candidate) {
       activity_updates: true, learning_updates: false, product_updates: true, updated_at: null,
     };
   }
-  const level=homeCookie(request,'home-level');
+  const level=homeCookie(request,'home-level') ?? (process.env.GIFT_CARD_PREVIEW === 'true' ? 'GOLD' : undefined);
   if(['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'].includes(level)) portal.journey.journey.current_level=level;
   const state=homeCookie(request,'home-state');
   if(['BLOCKED','INACTIVE'].includes(state)) portal.journey.journey.state=state;
@@ -50,6 +50,13 @@ function homePortal(request,candidate) {
   }
   if (homeCookie(request, 'help-fixture') === 'empty') portal.help = [];
   if (homeCookie(request, 'help-fixture') === 'markup') portal.help = [{ id: 'untrusted', title: '<img src=x onerror=alert(1)>', body: '<script>alert(1)</script>' }];
+  const balanceMode = homeCookie(request, 'bonda-balance') ?? process.env.BONDA_POINTS_PREVIEW;
+  if (balanceMode) portal.journey.points.bonda = {
+    status: ({fresh:'FRESH',zero:'FRESH',stale:'STALE',unavailable:'UNAVAILABLE',disabled:'DISABLED'})[balanceMode] ?? 'UNAVAILABLE',
+    available: balanceMode === 'zero' ? '0' : ['fresh','stale'].includes(balanceMode) ? '900' : null,
+    observed_at: ['fresh','zero','stale'].includes(balanceMode) ? '2026-10-07T12:00:00Z' : null,
+    pending: balanceMode === 'disabled' ? null : '300', verification_required: balanceMode === 'disabled' ? null : '150',
+  };
   return notificationPortal(request, candidate, portal);
 }
 function homeProgress(request,id) {
@@ -224,7 +231,7 @@ const server = createServer(async (request, response) => {
     const authenticated = authenticatedProfile(request);
     return authenticated
       ? json(response, 200, {
-          customer: homeCookie(request, 'account-identity') === 'long' ? {
+          customer: (homeCookie(request, 'gift-identity') || process.env.GIFT_CARD_PREVIEW === 'true') ? { ...authenticated, rewards_id: { numeric: '123456789', missing: '', legacy: 'RWD-synthetic', malformed: '123 456 789' }[homeCookie(request, 'gift-identity') ?? 'numeric'] ?? '' } : homeCookie(request, 'account-identity') === 'long' ? {
             ...authenticated,
             first_name: 'María Fernanda Alejandra',
             last_name: 'Guerrero Fernández de la Concepción',
@@ -373,9 +380,11 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && path === "/api/v1/rewards/portal") {
     if (request.headers.cookie?.includes('products-failure=true')) return siteError(response, 503, 'portal_unavailable', 'Unavailable');
     const authenticated = authenticatedProfile(request);
-    return authenticated
-      ? json(response, 200, activityPortal(request, authenticated))
-      : siteError(response, 401, "unauthenticated", "Authentication is required");
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const portal = activityPortal(request, authenticated);
+    const balance = homePortal(request, authenticated).journey.points.bonda;
+    if (balance) portal.journey.points.bonda = balance;
+    return json(response, 200, portal);
   }
 
   if (method === 'POST' && path === '/api/v1/rewards/portal/notifications/read') {

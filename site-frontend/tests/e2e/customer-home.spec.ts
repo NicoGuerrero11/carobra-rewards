@@ -14,7 +14,7 @@ test('home discovers real eligible modules and retains working destinations with
   const response=await page.goto('/cliente/recompensas');
   expect(response?.headers()['cache-control']).toContain('no-store');
   await expect(page.getByRole('heading',{name:'Bronce',exact:true})).toBeVisible();
-  await expect(page.locator('.home-balance__amount')).toHaveText('150 pts');
+  await expect(page.locator('.home-recorded-points')).toHaveText('Puntos registrados en Carobra: 150 pts');
   await expect(page.locator('.home-next-level')).toHaveCount(0);
   await expect(page.locator('.coupon-card')).toHaveCount(2);
   await expect(page.locator('.coupon-card__logo img')).toHaveCount(1);
@@ -40,7 +40,8 @@ test('home discovers real eligible modules and retains working destinations with
   await expect(page.getByRole('article',{name:'Artículo de bienestar'})).toBeVisible();
 });
 
-test('saved manual and partial playback resume the pending chapter; finished courses do not continue',async({page,context,request})=>{
+test('saved manual and partial playback resume the pending chapter; finished courses do not continue',async({page,context,request,baseURL})=>{
+  const url=baseURL!;
   const key=`home-${test.info().project.name}`;
   await cookies(context,{'progress-test':key});
   const save=async(chapter_id:number,ranges:number[][],manual:boolean)=>{

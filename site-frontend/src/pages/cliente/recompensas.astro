@@ -1,4 +1,6 @@
 ---
+import BondaPointsBalance from "../../components/BondaPointsBalance.astro";
+import RewardsMemberNumber from "../../components/RewardsMemberNumber.astro";
 import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
 import CouponCard from '../../components/CouponCard.astro';
 import HomeLearningCard from '../../components/HomeLearningCard.astro';
@@ -59,6 +61,7 @@ const learningEmpty = !learning ? 'No pudimos cargar estos contenidos. Puedes vo
       <div><p class="home-eyebrow">Tu espacio Carobra Rewards</p><h1>Hola, {Astro.locals.user?.firstName ?? 'cliente'}<span aria-hidden="true">.</span></h1></div>
       <a class="home-text-link" href="/cliente/perfil">Ver mi cuenta <span aria-hidden="true">↗</span></a>
     </header>
+    <RewardsMemberNumber rewardsId={Astro.locals.user?.rewardsId} />
 
     {journey ? <section class="home-account" aria-label="Resumen de tu cuenta">
       <div class="home-level" data-level={invited ? 'INVITED' : currentLevel ?? 'UNKNOWN'}>
@@ -68,7 +71,7 @@ const learningEmpty = !learning ? 'No pudimos cargar estos contenidos. Puedes vo
         {invited ? <a href="/cliente/productos">Descubrir productos <span aria-hidden="true">→</span></a> : restricted && <a href="/cliente/ayuda">Ir a Ayuda <span aria-hidden="true">→</span></a>}
       </div>
       <div class="home-balance">
-        <div><p class="home-eyebrow">Tus puntos Rewards</p><p class="home-balance__amount">{points(journey.points.available)} <span>pts</span></p>{expiry && <p class="home-expiry">Próximo vencimiento: {expiry}</p>}<a class="home-text-link" href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a></div>
+        <div><BondaPointsBalance balance={journey.points.bonda} /><p class="home-recorded-points">Puntos registrados en Carobra: <strong>{points(journey.points.available)} pts</strong></p>{expiry && <p class="home-expiry">Próximo vencimiento: {expiry}</p>}<a class="home-text-link" href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a></div>
         {requirements.length > 0 ? <div class="home-next-level"><strong>Tu camino a {levelLabel(target!)}</strong><p>Te faltan:</p><ul>{requirements.map(item => <li>{item.remaining} {item.remaining === 1 ? item.singular : item.plural}</li>)}</ul></div> : <div class="home-balance__note"><span aria-hidden="true">✦</span><p>{state === 'ACTIVE' ? 'Tus cupones y descuentos no consumen puntos.' : 'Consulta el detalle de tu saldo y los movimientos de tu cuenta.'}</p></div>}
       </div>
     </section> : <section class="home-notice" role="status"><h2>No pudimos actualizar tu cuenta</h2><p>No podemos mostrar tu nivel y saldo en este momento. Puedes seguir explorando las secciones disponibles.</p><a class="home-text-link" href="/cliente/recompensas">Volver a intentar →</a></section>}
