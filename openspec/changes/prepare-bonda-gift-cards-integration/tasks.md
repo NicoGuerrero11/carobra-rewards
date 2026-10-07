@@ -26,3 +26,12 @@
 - [x] 4.2 Preparar migración 028/eventos apagados para ascensos por cualquier producto; preservar afiliaciones al descenso.
 - [x] 4.3 Verificar Invitado, todos los niveles, Afore/PPR sintéticos, duplicados, fallos, recuperación y enriquecimiento Oro+.
 - [x] 4.4 Documentar exclusión de cuentas productivas, checks y activación pendiente.
+
+## 5. Acreditación y saldo apagados
+
+- [x] 5.1 Revisar contrato público de puntos, unidades 1:1 y reglas del maestro sin APIs operativas.
+- [x] 5.2 Implementar gateway estricto, outbox por premio, leases, conciliación y catch-up explícito.
+- [x] 5.3 Conectar lectura de saldo con caché/estados honestos en Inicio, Actividad y Gift Cards.
+- [x] 5.4 Probar persistencia, duplicados, requisitos, incertidumbre, revisión y UI desktop/móvil con mocks.
+- [x] 5.5 Documentar límites de sandbox, cashback, compras, caducidad externa y discrepancia de avisos.
+- [ ] 5.6 Publicar en misma rama/PR y verificar CI final, sin merge ni despliegue manual.

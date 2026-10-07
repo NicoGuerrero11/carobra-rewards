@@ -1,3 +1,4 @@
+import { createBondaPointsRuntime, type BondaPointsQuery } from "../bonda/points-application.js";
 import { PostgresBondaAffiliateEligibility } from "../bonda/affiliate-eligibility.js";
 import { BondaAffiliateEventWorker } from "../bonda/affiliate-event-worker.js";
 import { createBondaAffiliateProfileRuntime } from "../bonda/affiliate-profile-worker.js";
@@ -102,6 +103,7 @@ export function createReferralHttpApplication(
 
 export function createRewardsV2JourneyHttpApplication(
   database: Pool,
+  points?: BondaPointsQuery,
 ): RewardsV2JourneyHttpApplication {
   const clock = new SystemClock();
   return new DefaultRewardsV2JourneyHttpApplication(
@@ -109,6 +111,7 @@ export function createRewardsV2JourneyHttpApplication(
       database,
       new PostgresRewardsV2RuleLookup(database),
       clock,
+      points,
     ),
     new PostgresRewardsV2LiveJourney(database, clock),
     new PostgresRewardsJourneyDetailsQuery(database),
@@ -117,6 +120,7 @@ export function createRewardsV2JourneyHttpApplication(
 
 export function createRewardsCustomerPortalApplication(
   database: Pool,
+  points?: BondaPointsQuery,
 ): RewardsCustomerPortalApplication {
   const clock = new SystemClock();
   const details = new PostgresRewardsJourneyDetailsQuery(database);
@@ -125,6 +129,7 @@ export function createRewardsCustomerPortalApplication(
       database,
       new PostgresRewardsV2RuleLookup(database),
       clock,
+      points,
     ),
     details,
     new PostgresRewardsCustomerPortalStore(database),
@@ -137,6 +142,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   coupons: BondaCouponApplication;
   affiliateProfiles: ReturnType<typeof createBondaAffiliateProfileRuntime>;
   affiliateEvents: BondaAffiliateEventWorker;
+  points: ReturnType<typeof createBondaPointsRuntime>;
   warmCatalog(): Promise<void>;
 } {
   const clock = new SystemClock();
@@ -160,6 +166,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   const rules = new PostgresRewardsV2RuleLookup(database);
   return {
     affiliateProfiles: createBondaAffiliateProfileRuntime(database, config),
+    points: createBondaPointsRuntime(database, config),
     affiliateEvents: new BondaAffiliateEventWorker(database, affiliateProvisioning, config.affiliateProvisioningEnabled && !config.localPreviewEnabled),
     affiliateProvisioning,
     coupons: new BondaCouponApplication(

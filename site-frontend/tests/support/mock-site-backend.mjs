@@ -50,6 +50,13 @@ function homePortal(request,candidate) {
   }
   if (homeCookie(request, 'help-fixture') === 'empty') portal.help = [];
   if (homeCookie(request, 'help-fixture') === 'markup') portal.help = [{ id: 'untrusted', title: '<img src=x onerror=alert(1)>', body: '<script>alert(1)</script>' }];
+  const balanceMode = homeCookie(request, 'bonda-balance') ?? process.env.BONDA_POINTS_PREVIEW;
+  if (balanceMode) portal.journey.points.bonda = {
+    status: ({fresh:'FRESH',zero:'FRESH',stale:'STALE',unavailable:'UNAVAILABLE',disabled:'DISABLED'})[balanceMode] ?? 'UNAVAILABLE',
+    available: balanceMode === 'zero' ? '0' : ['fresh','stale'].includes(balanceMode) ? '900' : null,
+    observed_at: ['fresh','zero','stale'].includes(balanceMode) ? '2026-10-07T12:00:00Z' : null,
+    pending: balanceMode === 'disabled' ? null : '300', verification_required: balanceMode === 'disabled' ? null : '150',
+  };
   return notificationPortal(request, candidate, portal);
 }
 function homeProgress(request,id) {
@@ -373,9 +380,11 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && path === "/api/v1/rewards/portal") {
     if (request.headers.cookie?.includes('products-failure=true')) return siteError(response, 503, 'portal_unavailable', 'Unavailable');
     const authenticated = authenticatedProfile(request);
-    return authenticated
-      ? json(response, 200, activityPortal(request, authenticated))
-      : siteError(response, 401, "unauthenticated", "Authentication is required");
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const portal = activityPortal(request, authenticated);
+    const balance = homePortal(request, authenticated).journey.points.bonda;
+    if (balance) portal.journey.points.bonda = balance;
+    return json(response, 200, portal);
   }
 
   if (method === 'POST' && path === '/api/v1/rewards/portal/notifications/read') {

@@ -25,8 +25,8 @@ const server = createSiteBackendServer(
   database && config.referralIdentityHmacSecret
     ? createReferralHttpApplication(database, config.referralIdentityHmacSecret)
     : undefined,
-  database ? createRewardsV2JourneyHttpApplication(database) : undefined,
-  database ? createRewardsCustomerPortalApplication(database) : undefined,
+  database ? createRewardsV2JourneyHttpApplication(database, bonda?.points) : undefined,
+  database ? createRewardsCustomerPortalApplication(database, bonda?.points) : undefined,
   bonda?.affiliateProvisioning,
   bonda?.coupons,
   database && config.bonda ? new CoursesApplication(

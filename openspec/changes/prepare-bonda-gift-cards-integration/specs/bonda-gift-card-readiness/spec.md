@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Gift cards must use local level visibility
-The customer site SHALL render the gift-card section only for canonical ACTIVE journeys at Gold, Platinum or Titanium. It SHALL describe the full catalog and informational conversion of 3 points to 1 MXN without claiming partner balance. The rule MUST NOT require or implement external level permissions, deletion or segmentation.
+The customer site SHALL render the gift-card section only for canonical ACTIVE journeys at Gold, Platinum or Titanium. It SHALL describe the full catalog and informational conversion of 3 points to 1 MXN without claiming an unverified partner balance. The rule MUST NOT require or implement external level permissions, deletion or segmentation.
 
 #### Scenario: Eligible customer opens the microsite
 - **WHEN** an active Gold customer with canonical Rewards ID views Benefits
@@ -73,3 +73,25 @@ Registration, status/benefits access, retries, backfill and level-event processi
 #### Scenario: Outcome is ambiguous
 - **WHEN** minimal affiliation succeeds remotely but its acknowledgement is lost
 - **THEN** a later eligible retry checks existence and converges without another POST when the affiliate is found
+
+### Requirement: Earned points must be credited once with exact units
+The prepared integration SHALL capture each positive ISSUANCE transactionally, preserve pending earnings before eligibility, and credit 1 Rewards point as 1 Bonda point only after canonical ACTIVE Gold+, matching ACTIVE affiliate, valid matching email and an unexpired intact source lot. Unknown POST outcomes MUST NOT automatically resend. It SHALL NOT debit the local ledger or change level when Bonda points are spent. Dispatch and reads SHALL default off.
+
+#### Scenario: Eligible backlog becomes payable
+- **WHEN** a customer reaches all prerequisites after earning several awards
+- **THEN** processing sends each eligible unconfirmed award once, with each_amount equal to local points, without re-crediting a balance snapshot
+
+#### Scenario: Confirmation is lost
+- **WHEN** assignment may have happened but its response or local acknowledgement is lost
+- **THEN** the durable operation requires audited APPLIED/NOT_APPLIED review; APPLIED verifies the exact movement and no automatic resend occurs
+
+### Requirement: Spendable balance must come from Bonda
+The UI SHALL distinguish Bonda balance from local recorded earnings, pending credits and verification cases. It SHALL show timestamped stale data on error, unknown without fabricated zero, and true zero when confirmed. Cache SHALL expire after 60 seconds on subsequent read. Local history MUST NOT fabricate external purchases from balance differences.
+
+#### Scenario: Customer spends externally
+- **WHEN** a subsequent read after cache expiry returns a lower balance
+- **THEN** the UI displays that Bonda balance without another local debit or level reduction
+
+#### Scenario: Provider cannot be reached
+- **WHEN** a balance read fails
+- **THEN** the last known balance is visibly stale with its observation time, or unknown when no identity-bound cache exists

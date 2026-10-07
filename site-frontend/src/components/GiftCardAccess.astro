@@ -1,4 +1,5 @@
 ---
+import BondaPointsBalance from "./BondaPointsBalance.astro";
 import RewardsMemberNumber from "./RewardsMemberNumber.astro";
 import { giftCardReadiness } from "../lib/rewards-member";
 import type { RewardsJourneySummary } from "../lib/rewards-v2-contract";
@@ -22,7 +23,7 @@ const messages = {
     <h2 id="gift-access-title">Más posibilidades con tus puntos</h2>
     <p>Desde Oro, accede al catálogo completo de gift cards, sin un límite de catálogo por nivel.</p>
     <div class="gift-access__rules"><span>Oro · Platino · Titanio</span><strong>3 puntos = $1 MXN</strong></div>
-    <p class="gift-access__note">La conversión es una regla del programa. Tus puntos Rewards no indican un saldo disponible en Bonda.</p>
+    <BondaPointsBalance balance={journey?.points.bonda} />
   </div>
   <div class="gift-access__access">
     <span class="gift-access__badge">Disponible desde Oro</span>

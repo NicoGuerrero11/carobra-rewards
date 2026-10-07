@@ -1,3 +1,4 @@
+import type { BondaPointsQuery } from "../bonda/points-application.js";
 import type { QueryResult, QueryResultRow } from "pg";
 
 import type { Clock } from "../shared/clock.js";
@@ -68,6 +69,7 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
     private readonly database: Queryable,
     private readonly rules: RewardsV2RuleLookupPort,
     private readonly clock: Clock,
+    private readonly bondaPoints?: BondaPointsQuery,
   ) {}
 
   async getForCustomer(
@@ -169,6 +171,7 @@ export class PostgresRewardsJourneySummaryQuery implements RewardsJourneySummary
             : "REDEMPTION_DISABLED",
       },
       points: {
+        ...(this.bondaPoints ? { bonda: await this.bondaPoints.getBalance(customerId) } : {}),
         available: row.available_points,
         reserved: row.reserved_points,
         next_expiration_at: expiration?.toISOString() ?? null,

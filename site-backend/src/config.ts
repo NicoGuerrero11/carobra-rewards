@@ -15,6 +15,7 @@ export interface BondaGiftCardAccessConfig {
 }
 
 export interface BondaConfig {
+  points?: { sendEnabled: boolean; balanceEnabled: boolean; token?: string; sourceWalletId?: string };
   profileSync?: { enabled: boolean; contract: AffiliateProfileContract; revisionKey?: string };
   giftCardAccess?: BondaGiftCardAccessConfig;
   baseUrl: string;
@@ -198,7 +199,19 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   if (profileSyncEnabled && (!revisionKey || revisionKey.length < 32 || !affiliateProvisioningEnabled || localPreviewEnabled)) {
     throw new Error("Bonda profile synchronization requires a dedicated revision key and affiliate provisioning");
   }
+  const pointsSendEnabled = parseBoolean("BONDA_POINTS_SEND_ENABLED", environment.BONDA_POINTS_SEND_ENABLED ?? "false");
+  const pointsBalanceEnabled = parseBoolean("BONDA_POINTS_BALANCE_ENABLED", environment.BONDA_POINTS_BALANCE_ENABLED ?? "false");
+  const pointsToken = optionalValue(environment.BONDA_POINTS_TOKEN);
+  const sourceWalletId = optionalValue(environment.BONDA_POINTS_SOURCE_WALLET_ID);
+  if ((pointsSendEnabled || pointsBalanceEnabled) && (!pointsToken || /[\r\n]/.test(pointsToken) || !micrositeId || localPreviewEnabled)) {
+    throw new Error("Bonda points require dedicated configuration and no local preview");
+  }
+  if (pointsSendEnabled && (!sourceWalletId || !/^[1-9][0-9]{0,19}$/.test(sourceWalletId))) {
+    throw new Error("Bonda points require a source wallet ID");
+  }
   const config: BondaConfig = {
+    points: { sendEnabled: pointsSendEnabled, balanceEnabled: pointsBalanceEnabled,
+      ...(pointsToken ? { token: pointsToken } : {}), ...(sourceWalletId ? { sourceWalletId } : {}) },
     profileSync: { enabled: profileSyncEnabled, contract: pendingAffiliateProfileContract, ...(revisionKey ? { revisionKey } : {}) },
     giftCardAccess: {
       status: "LINK_ONLY",
