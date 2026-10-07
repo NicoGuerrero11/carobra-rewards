@@ -90,3 +90,12 @@ test("Bonda capabilities can be enabled independently", () => {
   assert.equal(bonda.catalogAffiliateCode, "990910001");
   assert.deepEqual(bonda.allowedHosts, ["bonda-test.example"]);
 });
+
+// No environment value can turn this preparation contract into external access.
+test("gift card readiness remains inert with Rewards ID and Gold policy", () => {
+  const bonda = loadConfig({ BONDA_GIFT_CARD_ACCESS_ENABLED: "true" }).bonda;
+  assert.deepEqual(bonda?.giftCardAccess, {
+    status: "PENDING_BONDA_FEEDBACK", enabled: false, loginMethod: null,
+    identifierField: "rewards_id", minimumLevel: "GOLD",
+  });
+});

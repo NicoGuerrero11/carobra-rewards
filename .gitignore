@@ -36,6 +36,7 @@ docs/*
 !docs/rewards-operations-runbook.md
 !docs/rewards-scheduler-runbook.md
 !docs/bonda-courses-reconciliation.md
+!docs/bonda-gift-card-access-local.md
 !docs/course-video-progress.md
 !docs/production-site-release.md
 

@@ -5,8 +5,8 @@ export interface BondaGiftCardAccessConfig {
   readonly status: "PENDING_BONDA_FEEDBACK";
   readonly enabled: false;
   readonly loginMethod: null;
-  /** Carobra profile field selected for login; Bonda mapping is unconfirmed. */
-  readonly identifierField: "curp";
+  /** Carobra field used for the member number; external authentication remains unconfirmed. */
+  readonly identifierField: "rewards_id";
   /** Gift cards start at Gold; this records policy without enabling access. */
   readonly minimumLevel: "GOLD";
 }
@@ -190,7 +190,7 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
       status: "PENDING_BONDA_FEEDBACK",
       enabled: false,
       loginMethod: null,
-      identifierField: "curp",
+      identifierField: "rewards_id",
       minimumLevel: "GOLD",
     },
     baseUrl,

@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 
 const host = "127.0.0.1";
-const port = 3002;
+const port = Number(process.env.MOCK_SITE_BACKEND_PORT ?? 3002);
 const pendingSessionCookie = "carobra_session=e2e-pending";
 const eligibleSessionCookie = "carobra_session=e2e-eligible";
 const inactiveSessionCookie = "carobra_session=e2e-inactive";
@@ -33,7 +33,7 @@ function homePortal(request,candidate) {
       activity_updates: true, learning_updates: false, product_updates: true, updated_at: null,
     };
   }
-  const level=homeCookie(request,'home-level');
+  const level=homeCookie(request,'home-level') ?? (process.env.GIFT_CARD_PREVIEW === 'true' ? 'GOLD' : undefined);
   if(['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'].includes(level)) portal.journey.journey.current_level=level;
   const state=homeCookie(request,'home-state');
   if(['BLOCKED','INACTIVE'].includes(state)) portal.journey.journey.state=state;
@@ -224,7 +224,7 @@ const server = createServer(async (request, response) => {
     const authenticated = authenticatedProfile(request);
     return authenticated
       ? json(response, 200, {
-          customer: homeCookie(request, 'account-identity') === 'long' ? {
+          customer: (homeCookie(request, 'gift-identity') || process.env.GIFT_CARD_PREVIEW === 'true') ? { ...authenticated, rewards_id: { numeric: '123456789', missing: '', legacy: 'RWD-synthetic', malformed: '123 456 789' }[homeCookie(request, 'gift-identity') ?? 'numeric'] ?? '' } : homeCookie(request, 'account-identity') === 'long' ? {
             ...authenticated,
             first_name: 'María Fernanda Alejandra',
             last_name: 'Guerrero Fernández de la Concepción',

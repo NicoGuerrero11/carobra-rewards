@@ -1,3 +1,21 @@
+## Alcance vigente — 2026-10-07
+
+La nueva instrucción autoriza una sección local revisable y pruebas con datos sintéticos sobre esta rama. Sustituye la elección previa de CURP por `rewards_id`, presentado como «Número de socio Rewards»: nueve dígitos en grupos de tres, copia canónica sin espacios. No altera identidades ni ejecuta migraciones. La preparación histórica inferior documenta decisiones anteriores; donde difiera prevalece este alcance.
+
+Gift cards desde Oro (también Platino y Titanio), catálogo completo sin techo por nivel, conversión informativa de 3 puntos = $1 MXN según el documento maestro revisado por el usuario. El nivel del portal sirve para explicar el requisito, no para autorizar acceso externo. El componente se renderiza en servidor, sin enlace externo ni handler que pueda activarlo por CSS. Cupones y saldo Carobra no prueban disponibilidad de gift cards o saldo Bonda.
+
+El campo giftCardAccess conserva enabled=false, status=PENDING_BONDA_FEEDBACK, loginMethod=null y minimumLevel=GOLD. identifierField pasa a rewards_id. La URL confirmada por captura aportada por el usuario es `https://carobrarewards.bonda.com`, micrositio `913085`; no se visita ni configura en runtime. No se añade interruptor de activación: falta contrato de elegibilidad externa (incluido descenso de nivel), titularidad/primer acceso y recuperación. El flujo descrito es introducir el número y después crear contraseña en Bonda; no se afirma verificación externa ni SSO. La activación futura requiere contrato específico de backend y controles Bonda; ocultar un botón no impide acceso directo al micrositio.
+
+Inicio muestra el número debajo del saludo; Mi cuenta lo muestra junto a los datos personales; Beneficios contiene la sección y la ruta existente /cliente/gift-cards reutiliza el mismo bloque. No se añade navegación principal. Identidad ausente o legado no numérico produce «No disponible», nunca un identificador nuevo. La copia usa Clipboard API, fallback local y selección manual si ambos fallan.
+
+No conexiones a servicios reales, envíos de datos, canjes, puntos, cambios de credenciales, push, PR, merge ni deploy. No se modifica el trabajo Skandia ni los archivos ajenos.
+
+---
+
+La aclaración posterior del usuario mantiene CURP como parte de la ficha del afiliado al vincularlo con Bonda. Ya está almacenada como texto en customers.curp; se conserva íntegra y no se convierte a número. Su envío futuro requiere contrato HTTP de campo personalizado (ubicación JSON, clave exacta y tipo textual en alta/PATCH); Referencias del importador no lo prueba. El identificador permanece rewards_id/code. No se transmite información real ni se cambia la política de envío adicional desde Oro.
+
+## Preparación histórica (2026-10-06)
+
 ## Context
 
 El perfil actual ya contiene Rewards ID, correo y CURP. El micrositio observado anteriormente pide ID Rewards para ingresar y contraseña adicional para consultar saldo; no se confirmó el canje. El usuario decidió usar CURP para el acceso y conservar el correo como dato actualizable. Esta decisión de producto todavía requiere confirmar la configuración correspondiente con Bonda.

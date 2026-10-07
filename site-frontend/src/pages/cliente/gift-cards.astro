@@ -1,4 +1,5 @@
 ---
+import GiftCardAccess from "../../components/GiftCardAccess.astro";
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
@@ -6,56 +7,26 @@ import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-co
 const cookie = Astro.request.headers.get("cookie") ?? "";
 const portalLoadedWithContext = Astro.locals.rewardsPortal !== undefined;
 let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
-let unavailable = portalLoadedWithContext && !portal;
 
 if (!portalLoadedWithContext) {
   try {
     const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
     if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
     if (response.ok) portal = await response.json() as RewardsCustomerPortal;
-    else unavailable = true;
   } catch {
-    unavailable = true;
+    // The section handles unavailable portal data.
   }
 }
-const journey = portal?.journey;
-const productValidated = portal?.products.some((product) => product.status === "ACTIVE") ?? false;
-const catalogEnabled = journey?.modules.benefits_enabled === true;
-const balance = journey ? new Intl.NumberFormat("es-MX").format(BigInt(journey.points.available)) : "—";
+Astro.response.headers.set("Cache-Control", "private, no-store");
 ---
-
-<ClientShellLayout title="Gift Cards | Beneficios Carobra" description="Consulta la disponibilidad de Gift Cards dentro de tus beneficios." currentPath="/cliente/gift-cards" sectionLabel="Beneficios · Gift Cards">
+<ClientShellLayout title="Gift Cards | Beneficios Carobra" description="Gift cards desde Oro: conoce el estado de tu acceso a Bonda." currentPath="/cliente/gift-cards" sectionLabel="Beneficios · Gift Cards">
   <main class="portal-page">
-    <a class="giftcards-back" href="/cliente/beneficios"><span aria-hidden="true">←</span> Volver a Beneficios</a>
-    <header class="portal-welcome"><div><p class="portal-eyebrow">Beneficios · Gift Cards</p><h1>Gift Cards</h1><p>Consulta el estado de esta categoría y los requisitos visibles de tu cuenta.</p></div><span>{catalogEnabled ? "Categoría disponible" : "Categoría en preparación"}</span></header>
-
-    {unavailable && !portal ? (
-      <section class="portal-card portal-empty-state" role="status"><span aria-hidden="true">!</span><div><h2>No pudimos consultar esta categoría</h2><p>Intenta de nuevo en unos minutos. No se habilitará ningún canje sin información confirmada.</p></div></section>
-    ) : portal && (
-      <>
-        <section class="giftcards-hero" aria-labelledby="giftcards-title">
-          <div><p class="portal-eyebrow">Estado de acceso</p><h2 id="giftcards-title">{catalogEnabled ? "Tus opciones están listas para consultar" : "Esta categoría aún no está habilitada"}</h2><p>{catalogEnabled ? "Aquí verás únicamente las opciones y condiciones aprobadas para tu cuenta." : productValidated ? "Tu producto ya está confirmado y tu cuenta está preparada. Falta habilitar el catálogo antes de mostrar opciones o permitir canjes." : "Primero necesitamos confirmar un producto activo y después contar con un catálogo habilitado. Puedes seguir consultando tu avance mientras tanto."}</p><span class:list={["giftcards-access", productValidated && "is-validated"]}>{productValidated ? "Producto confirmado" : "Producto pendiente"}</span></div>
-          <article class="giftcards-balance-card"><span aria-hidden="true">✦</span><p>Saldo disponible</p><strong>{balance} pts</strong><small>{catalogEnabled ? "Revisa cada opción antes de confirmar." : "Tu saldo se conserva; el canje no está disponible todavía."}</small></article>
-        </section>
-
-        <section class="portal-section" aria-labelledby="giftcards-requirements-title">
-          <div class="portal-section-heading"><div><p class="portal-eyebrow">Antes de canjear</p><h2 id="giftcards-requirements-title">Qué necesita esta categoría</h2></div><p>Solo avanzamos cuando cada condición está confirmada por el sistema.</p></div>
-          <div class="giftcards-flow-grid">
-            <article><span>01</span><h3>Producto confirmado</h3><p>Tu cuenta debe tener al menos un producto activo visible.</p><small>{productValidated ? "Listo" : "Pendiente"}</small></article>
-            <article><span>02</span><h3>Catálogo habilitado</h3><p>Las opciones, costos y condiciones deben llegar aprobadas.</p><small>{catalogEnabled ? "Listo" : "En preparación"}</small></article>
-            <article><span>03</span><h3>Confirmación segura</h3><p>Antes de usar puntos podrás revisar el detalle completo del canje.</p><small>{catalogEnabled ? "Consulta disponible" : "Flujo deshabilitado"}</small></article>
-          </div>
-        </section>
-
-        {!catalogEnabled && <section class="portal-card portal-empty-state"><span aria-hidden="true">◇</span><div><p class="portal-eyebrow">Sin catálogo publicado</p><h2>No hay Gift Cards disponibles todavía</h2><p>Mientras tanto puedes explorar los beneficios disponibles.</p><div class="giftcards-next"><a href="/cliente/beneficios">Explorar Beneficios</a></div></div></section>}
-      </>
-    )}
+    <a href="/cliente/beneficios#gift-cards">← Volver a Beneficios</a>
+    <header class="portal-welcome"><div><p class="portal-eyebrow">Beneficios</p><h1>Gift Cards</h1></div></header>
+    <GiftCardAccess journey={portal?.journey} rewardsId={Astro.locals.user?.rewardsId} />
   </main>
   <script>
     import { attachLogoutHandler, requireElement } from "../../lib/client-page-utils";
     attachLogoutHandler(requireElement<HTMLButtonElement>("#logout"), "");
   </script>
-  <style>
-    .giftcards-back{display:inline-flex;align-items:center;gap:.4rem;margin:.2rem 0 1rem;color:#176f9e;font-size:.8rem;font-weight:900}.giftcards-next{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1rem}.giftcards-next a{padding:.65rem .85rem;border-radius:999px;color:#fff;background:#176f9e;font-size:.78rem;font-weight:850}.giftcards-next a+ a{color:#5e4a91;background:#eee8ff}
-  </style>
 </ClientShellLayout>
