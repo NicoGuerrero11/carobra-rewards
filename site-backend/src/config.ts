@@ -1,17 +1,21 @@
+import { pendingAffiliateProfileContract, type AffiliateProfileContract } from "./rewards/bonda/affiliate-profile.js";
+
 export type CookieSameSite = "lax" | "strict" | "none";
 
-/** Reserved until Bonda confirms access and the user authorizes integration. */
+/** Public navigation only; does not enable profile transmission or partner permissions. */
 export interface BondaGiftCardAccessConfig {
-  readonly status: "PENDING_BONDA_FEEDBACK";
-  readonly enabled: false;
+  readonly status: "LINK_ONLY";
+  readonly enabled: true;
   readonly loginMethod: null;
+  readonly micrositeUrl: "https://carobrarewards.bonda.com";
   /** Carobra field used for the member number; external authentication remains unconfirmed. */
   readonly identifierField: "rewards_id";
-  /** Gift cards start at Gold; this records policy without enabling access. */
+  /** Visibility in Carobra starts at Gold; no external level restriction. */
   readonly minimumLevel: "GOLD";
 }
 
 export interface BondaConfig {
+  profileSync?: { enabled: boolean; contract: AffiliateProfileContract; revisionKey?: string };
   giftCardAccess?: BondaGiftCardAccessConfig;
   baseUrl: string;
   allowedHosts: readonly string[];
@@ -185,10 +189,21 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
     );
   }
 
+  const profileSyncEnabled = parseBoolean("BONDA_PROFILE_SYNC_ENABLED", environment.BONDA_PROFILE_SYNC_ENABLED ?? "false");
+  // Deployment activation cannot stand in for the unresolved microsite contract.
+  if (profileSyncEnabled && (!pendingAffiliateProfileContract.curpTextAccepted || !pendingAffiliateProfileContract.patchFields)) {
+    throw new Error("Bonda profile synchronization contract is pending confirmation");
+  }
+  const revisionKey = optionalValue(environment.BONDA_PROFILE_REVISION_KEY);
+  if (profileSyncEnabled && (!revisionKey || revisionKey.length < 32 || !affiliateProvisioningEnabled || localPreviewEnabled)) {
+    throw new Error("Bonda profile synchronization requires a dedicated revision key and affiliate provisioning");
+  }
   const config: BondaConfig = {
+    profileSync: { enabled: profileSyncEnabled, contract: pendingAffiliateProfileContract, ...(revisionKey ? { revisionKey } : {}) },
     giftCardAccess: {
-      status: "PENDING_BONDA_FEEDBACK",
-      enabled: false,
+      status: "LINK_ONLY",
+      enabled: true,
+      micrositeUrl: "https://carobrarewards.bonda.com",
       loginMethod: null,
       identifierField: "rewards_id",
       minimumLevel: "GOLD",

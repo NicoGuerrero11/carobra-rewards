@@ -1,68 +1,56 @@
 ## ADDED Requirements
 
-### Requirement: Gift-card access configuration must remain inert pending partner feedback
-The site backend SHALL reserve an internal giftCardAccess configuration containing status PENDING_BONDA_FEEDBACK, enabled false, loginMethod null, identifierField rewards_id and minimumLevel GOLD. The selected identifier SHALL refer to the Carobra profile field and MUST NOT imply a confirmed Bonda payload mapping or authentication mechanism. This change MUST NOT add an environment switch or runtime flow that enables gift-card access.
+### Requirement: Gift cards must use local level visibility
+The customer site SHALL render the gift-card section only for canonical ACTIVE journeys at Gold, Platinum or Titanium. It SHALL describe the full catalog and informational conversion of 3 points to 1 MXN without claiming partner balance. The rule MUST NOT require or implement external level permissions, deletion or segmentation.
 
-#### Scenario: Configuration loads without an access agreement
-- **WHEN** the site backend loads its configuration
-- **THEN** gift-card access is pending and disabled, with Rewards ID selected locally and no inferred login method or external field mapping
+#### Scenario: Eligible customer opens the microsite
+- **WHEN** an active Gold customer with canonical Rewards ID views Benefits
+- **THEN** the section links to https://carobrarewards.bonda.com without identity, credentials, autologin or Referrer
 
-### Requirement: Preparation must not connect to Bonda
-This change MUST NOT execute real network calls, affiliate writes, point operations, identity exports, or connected tests. The subsequently authorized profile preparation MAY add inert HTTP methods and a synchronization application verified only through synthetic transports and stores. Existing unrelated integrations SHALL remain unchanged. Future integration work SHALL require Bonda feedback and a subsequent user instruction.
+#### Scenario: Customer drops below Gold
+- **WHEN** the canonical level becomes Silver
+- **THEN** the section is absent from server-rendered HTML and no external revocation or deletion occurs
 
-#### Scenario: Preparation is verified
-- **WHEN** configuration and type checks run locally
-- **THEN** no Bonda request is made and no real identity or balance is changed
+#### Scenario: Data is missing
+- **WHEN** journey data is unavailable or restricted
+- **THEN** the section is absent; if only the canonical number is missing for an eligible journey, the section explains it and disables the link
 
-#### Scenario: Bonda feedback becomes available
-- **WHEN** the provider supplies an access contract without a subsequent user instruction to connect
-- **THEN** gift-card access remains disabled
+### Requirement: Member number must preserve identity
+The site SHALL display existing nine-digit rewards_id as Número de socio Rewards on Home, Account and beside Bonda, grouped in threes. Copy MUST use the canonical value with accessible confirmation and a local fallback. No identity SHALL be generated or changed.
 
-### Requirement: Readiness documentation must distinguish base affiliation from level-gated profile data
-The preparation contract SHALL record Rewards ID as the future base affiliation link through the payroll API and CURP/email as additional data restricted to Gold, Platinum and Titanium customers. It SHALL record GOLD as the minimum level and MUST NOT treat an affiliation, active product or positive balance as sufficient gift-card eligibility. This planning rule MUST NOT activate any synchronization in this change or prescribe replacing the existing affiliate code with CURP.
+#### Scenario: Repeated copying
+- **WHEN** the customer copies their number repeatedly
+- **THEN** the same canonical value is copied without spaces or API writes
 
-#### Scenario: Minimum level is configured
-- **WHEN** the site backend loads the preparation configuration
-- **THEN** it records GOLD as the gift-card threshold while access remains disabled and no additional customer data is sent
+### Requirement: Affiliation and enrichment must be separate
+The base affiliation SHALL continue sending only code and its existing welcome flag. The prepared enrichment worker SHALL load canonical customer/profile/level data and require ACTIVE Gold or above and a matching confirmed existing affiliation before PATCH. Optional profile data SHALL remain in Carobra before Gold. Public navigation SHALL NOT depend on enrichment completion or coupon permission.
 
-#### Scenario: Below-threshold customers are described
-- **WHEN** the planned data flow is reviewed for Invitado, Bronze or Silver
-- **THEN** it excludes gift-card CURP/email provisioning for those levels even if a base affiliation exists
+#### Scenario: Customer reaches Gold
+- **WHEN** activated processing receives a relevant event for a confirmed existing affiliate at Gold
+- **THEN** it compares HMAC revisions and sends only changed approved email/nombre/apellido/curp fields under the same code
 
-#### Scenario: Base affiliation is described
-- **WHEN** the team reviews the planned Rewards ID link
-- **THEN** the contract distinguishes that link from the later level-gated CURP/email update on the same affiliate and preserves the ban on current external calls
+#### Scenario: Default contract is pending
+- **WHEN** the explicit text-CURP/PATCH agreement is unavailable
+- **THEN** profile dispatch remains blocked even if Gold is reached
 
-### Requirement: Local gift-card section must explain policy without activating external access
-The customer site SHALL show a nested Benefits section and reuse it on the existing gift-card route. It SHALL describe Gold, Platinum and Titanium as meeting the level threshold, the full catalog without a level-based ceiling, and the informational conversion of 3 points to 1 MXN. It MUST keep access disabled regardless of coupon flags, balance or level until the external access contract and authorized URL exist. Missing or restricted account data MUST fail closed.
+### Requirement: Local preparation must not contact real services
+Preparation SHALL use synthetic transports, profiles and isolated databases. It SHALL NOT execute real migrations, affiliate writes, point operations or identity exports. The prepared migration and runtime MAY be registered with capture and processing disabled by default. No startup, GET or UI click SHALL trigger this new worker.
 
-#### Scenario: Gold customer views gift cards
-- **WHEN** an active Gold customer with a canonical Rewards ID views Benefits
-- **THEN** the section says the level requirement is met while Bonda access remains in preparation, with no external link or balance claim
+#### Scenario: Default deployment configuration loads
+- **WHEN** configuration and composition are created
+- **THEN** the profile runtime is inert and no database or transport operation is made by that construction
 
-#### Scenario: Customer copies the member number
-- **WHEN** a canonical nine-digit Rewards ID appears on Home, Account or the Bonda section
-- **THEN** it is labelled Número de socio Rewards, grouped in threes and copied unchanged without spaces, with accessible feedback and a local fallback
+### Requirement: Profile synchronization must persist and reconcile safely
+The store SHALL persist field HMAC checkpoints, a pre-dispatch intent and leased ownership with fencing. Queue generations SHALL preserve changes during processing. Ambiguous outcomes SHALL require explicit operation-scoped audited reconciliation without automatic resend. Raw personal fields SHALL NOT appear in checkpoints, events or review references.
 
-#### Scenario: Identity or portal data is missing
-- **WHEN** identity is missing, legacy or malformed, or the portal is unavailable
-- **THEN** no ID is generated or changed and no external access is enabled
+#### Scenario: Lease expires
+- **WHEN** a successor claims the customer
+- **THEN** the prior owner cannot write a checkpoint or release the successor's lease
 
-### Requirement: Prepared affiliate profile synchronization must fail closed
-The prepared application SHALL keep Rewards ID as code and CURP as a textual profile field. It MUST require an explicit agreement for CURP text and PATCH fields, canonical ACTIVE status and Gold or above, and confirmed affiliate lifecycle before dispatch. The default contract SHALL remain pending. No production consumer or storage adapter SHALL be installed in this local preparation.
+#### Scenario: Ambiguous mutation is reviewed
+- **WHEN** authorized evidence confirms the operation APPLIED or NOT_APPLIED
+- **THEN** a transaction records one consistent review and requeues current data; stale or contradictory reviews are rejected
 
-#### Scenario: Runtime has not confirmed custom fields
-- **WHEN** the default profile contract is used
-- **THEN** no profile operation or persistence call occurs
-
-#### Scenario: Synthetic confirmed profile is synchronized
-- **WHEN** a synthetic test supplies an explicit confirmed contract and eligible customer
-- **THEN** create sends code and approved top-level fields, and later PATCH sends only changed fields without changing code
-
-#### Scenario: Mutation outcome is uncertain
-- **WHEN** dispatch may have occurred but acknowledgement is missing or invalid
-- **THEN** the checkpoint requires verification and repeating the request does not resend it
-
-#### Scenario: Customer level decreases
-- **WHEN** a previously synchronized customer is below Gold
-- **THEN** no DELETE, segmentation change or gift-card permission is inferred or dispatched
+#### Scenario: Process restarts
+- **WHEN** a new store opens the same isolated database
+- **THEN** the pending intent persists and prevents automatic duplicate dispatch

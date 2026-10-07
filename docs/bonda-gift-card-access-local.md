@@ -1,84 +1,60 @@
-# Gift cards: sección local y revisión de afiliación
+# Gift cards y ficha de afiliado: preparación local
 
-Fecha: 2026-10-07. Rama: `codex/bonda-gift-cards-preparation`, base `339f718`.
+Fecha: 2026-10-07. Rama: `codex/bonda-gift-cards-preparation`, base `339f718`. Este documento reemplaza los pendientes anteriores sobre autorización por nivel dentro de Bonda: el usuario aclaró que Oro controla **visibilidad en Carobra**, no permisos externos.
 
-## Resultado local
+## Resultado y reglas confirmadas
 
-- Número de socio Rewards usa exclusivamente `user.rewardsId` derivado de `rewards_id`. Nueve dígitos se muestran en grupos de tres y se copian sin espacios. Identidades ausentes/legadas no se transforman ni regeneran.
-- Visible debajo del saludo de Inicio, en Mi cuenta y junto a Bonda dentro de Beneficios. La ruta existente `/cliente/gift-cards` reutiliza la misma sección; no hay nueva página ni ítem principal.
-- Oro, Platino y Titanio cumplen el requisito de nivel; Invitado/Bronce/Plata, cuenta restringida, número faltante y portal no disponible tienen mensajes específicos. El requisito no equivale a autorización externa.
-- Catálogo completo sin techo por nivel y equivalencia informativa 3 puntos = $1 MXN, según la regla confirmada por el usuario. No se muestra saldo Bonda ni se calcula capacidad de canje.
-- Botón deshabilitado, sin URL ni handler externo. Quitar CSS o disabled no produce navegación, sincronización ni canje. El contrato `giftCardAccess` conserva estado pendiente, `enabled: false`, `loginMethod: null`, mínimo `GOLD`; la selección local cambia de `curp` a `rewards_id`.
-- No se habilitó ninguna bandera, migración, envío de datos o integración. No se verificó aplicación de la migración numérica en producción. El runbook numérico conserva su advertencia sobre afiliaciones existentes.
+- Número de socio Rewards utiliza `user.rewardsId` / `customers.rewards_id` existente: nueve dígitos, grupos de tres, copia canónica sin espacios, confirmación accesible y fallback. Aparece en Inicio, Mi cuenta y junto al enlace Bonda. Identidades ausentes/legadas no se transforman ni regeneran; UUID y CURP no cambian.
+- La sección se renderiza en Beneficios y en la ruta existente `/cliente/gift-cards` solo con journey canónico ACTIVE desde Oro (Oro/Platino/Titanio). Por debajo de Oro, con cuenta restringida o nivel no verificable, no existe en el HTML; no depende de CSS.
+- Micrositio autorizado: `https://carobrarewards.bonda.com`, ID informado `913085`. El enlace abre otra pestaña sin ID, query, credenciales, autologin ni Referer. Un número faltante/legado mantiene el botón deshabilitado. El enlace no afirma que la cuenta externa esté activa; ante número no reconocido orienta a Ayuda. No depende del permiso de cupones ni de completar la ficha opcional.
+- Catálogo completo sin techo por nivel; conversión informativa 3 puntos = $1 MXN. No hay saldo compartido, descuento inventado, transferencia ni canje implementado.
+- Al descender de Oro se oculta la sección en Carobra. No se revoca afiliación, borra ficha ni modifica segmentación en Bonda.
 
-## Evidencia aportada por el usuario
+## Flujo en dos etapas autorizado
 
-Micrositio autorizado: `https://carobrarewards.bonda.com`; identificador de micrositio: `913085`. Se registra como información del proveedor, sin visitar el sitio ni alterar configuración de ejecución.
+1. El aprovisionamiento base existente conserva POST `{code: rewardsId, send_welcome_email: false}`. No manda CURP, nombre, apellido ni correo. Sus controles/flags y reconciliación existentes se preservan.
+2. Al alcanzar Oro o superior, el enriquecimiento preparado carga ficha y nivel actuales del servidor, exige afiliación base ACTIVE coincidente y envía PATCH mínimo para email/nombre/apellido/curp. Antes de Oro los campos permanecen en Carobra. El usuario confirmó este disparador automático; está preparado pero **no activado**.
+3. Cambios posteriores se comparan mediante HMAC por campo. Repetir un evento confirmado no repite la operación. El worker nunca crea afiliados ni interpreta una fila faltante/GET 404 como permiso para crearlos. La aplicación conserva un método de alta con ficha aislado para contratos/pruebas, sin consumidor en este flujo.
 
-El correo indica que `code` es obligatorio para alta API; `apellido`, `contrasena`, `email`, `nombre`, `segmentacion` son opcionales. No fue necesario inspeccionar o almacenar la clave de la captura. Los enlaces de APIs no visibles en la captura no se reconstruyeron.
+CURP está persistida como String(18), obligatoria y única, en `api/src/carobra_rewards/modules/customer_intake/infrastructure/persistence/models.py`. Se conserva textual. No se usa como code ni se convierte a entero.
 
-El panel de Referencias describe un importador de archivos: `id-rewards` principal y campos `curp`, `email`, `nombre`, `apellido`. No prueba que esos nombres correspondan al payload HTTP. La indicación de CURP como entero es inconsistente; no se aplica. La instrucción posterior del usuario confirma que CURP debe conservarse en la ficha y contemplarse al vincular el afiliado. No se añade todavía a un payload HTTP sin contrato, ni se envían contraseñas.
+## Contrato Bonda: confirmado y pendiente
 
-## Sincronización base (previa a la ampliación local de ficha)
+Fuente pública revisada: [Bonda Nóminas V1](https://documenter.getpostman.com/view/1928874/TVetZjgf), colección pública enlazada desde la página. Se consultó documentación, no endpoints operativos.
 
-- `site-backend/src/app.ts`: después de registro exitoso invoca `afterRegistration` si la aplicación está instalada. El login delega al servicio de autenticación; no sincroniza perfil. La ruta GET `coupons/affiliate-status` llama `ensureForBenefits`, por lo que tampoco es una consulta segura para pruebas reales.
-- `rewards/bonda/catalog-application.ts`: catálogo de cupones verifica reglas efectivas y estado/nivel canónico; la consulta normal puede reparar afiliación. La vista previa de Inicio usa afiliado técnico y evita aprovisionar al cliente.
-- `affiliate-provisioning.ts`: con bandera apagada no escribe; con bandera activa guarda pendiente, reclama trabajo, consulta existencia y crea si falta. Un registro local ACTIVE evita otra alta. Fallos de credenciales/respuesta inválida exigen acción; errores transitorios reintentan con backoff. Un fallo local después del alta se repara consultando existencia.
-- `http-gateway.ts`: alta `POST /api/v2/microsite/{micrositeId}/affiliates` con `{code: rewardsId, send_welcome_email: false}`. Consulta por code. Reconoce el error documentado de code duplicado. La ruta base no envía perfil; los métodos nuevos de ficha están separados y bloqueados por defecto, según la ampliación descrita abajo.
-- `persistence.ts`: unicidad por cliente, conflicto si cambia rewards_id, claims atómicos con reserva de cinco minutos y `FOR UPDATE SKIP LOCKED` para lotes. Eso controla altas/reintentos locales; no es evidencia de activación de gift cards ni confirmación de titularidad externa.
+POST exige code y admite slugs de Referencias al mismo nivel del JSON; por ello la captura identifica curp sin inventar un contenedor. PATCH debe enviar solo cambios y remite al ejecutivo para confirmar campos aceptados. Queda pendiente **confirmar aceptación de email, nombre, apellido y curp en PATCH para este micrositio, y que curp acepta texto de 18 caracteres**: la captura dice entero. Que los campos sean opcionales en POST no prueba ese contrato de actualización. `pendingAffiliateProfileContract` bloquea todo envío de ficha hasta resolverlo.
 
-## CURP: conservación y contrato pendiente
+El flujo de primer ingreso informado es Número de socio y creación de contraseña en Bonda. No se verificó su mecanismo de titularidad/recuperación; el enlace no implementa ni promete SSO. Esto no impide preparar el enlace público ni agrega una exigencia de permiso gift-card externo por nivel.
 
-Verificado por código, sin consultar clientes: `api/src/carobra_rewards/modules/customer_intake/infrastructure/persistence/models.py` define `customers.curp` como `String(18)`, obligatorio y único. El dominio, comandos, repositorios y registro BFF conservan CURP como string; la normalización existente solo elimina espacios externos y pasa a mayúsculas. No se modifica ese almacenamiento ni se elimina CURP de la ficha. UUID y Rewards ID siguen separados.
+GET no documenta devolución de todos los campos personalizados. DELETE afecta al afiliado completo; POST puede restaurar una baja mientras GET no la muestra. Por ello no se implementa reconciliación automática por ausencia ni se adivina un esquema de lectura.
 
-La ficha futura del afiliado debe contemplar CURP según la aclaración del usuario. La revisión posterior de la documentación pública confirmó el uso de slugs de Referencias como propiedades del alta. Ya no falta ubicar curp para POST; falta confirmar su tipo textual ante la contradicción del panel y su aceptación en PATCH. Ver ampliación posterior. No se propone `code=CURP`, `id-rewards` como propiedad API ni un contenedor inventado. La política vigente conserva envío adicional desde Oro, pendiente de controles efectivos y de confirmar ese contrato.
+## Persistencia, eventos y conciliación preparados
 
-## Ampliación necesaria antes de conectar
+- Migración **027** registrada, sin ejecutar en una base real: tablas de control (captura apagada), cola por cliente con generaciones, checkpoints, leases y auditoría de conciliación. No almacena CURP/nombre/email crudos en la cola o checkpoints. Restricciones SQL aceptan solo HMAC hex de los cuatro campos.
+- Triggers transaccionales observan cambios relevantes de cliente, nivel y afiliación base. Con `capture_enabled=false` regresan sin encolar. No hay HTTP ni datos personales en el evento. La generación evita perder cambios que llegan durante un envío.
+- `PostgresAffiliateProfileSyncStore` reclama exclusión por cliente con token y vencimiento; un proceso cuyo lease expiró no puede escribir ni liberar el sucesor. Guarda intención antes del transporte. Identidad diferente no puede sobrescribir el code.
+- Timeout, duplicado, respuesta inválida/error de negocio, miembro inesperado o pérdida de confirmación quedan en VERIFICATION_REQUIRED sin reenvío automático. Credenciales rechazadas quedan ACTION_REQUIRED.
+- Conciliación explícita por operation ID, resultado APPLIED/NOT_APPLIED, UUID del revisor y referencia de evidencia sin PII. Transacción y auditoría única rechazan resultados contradictorios/obsoletos. APPLIED conserva los digests de la operación revisada; NOT_APPLIED autoriza nuevo intento. Ambos vuelven a encolar para comparar con la ficha actual. La evidencia debe confirmar esa operación completa; una respuesta GET genérica/404 no basta.
+- Worker acotado (hasta 100) y catch-up paginado preparados. Lee estado actual antes de procesar; solo enriquece afiliados existentes confirmados desde Oro. Eventos bajo Oro no envían ni eliminan datos. La composición registra el runtime, sin ejecutarlo al iniciar servidor ni en un GET/clic.
+- `BONDA_PROFILE_SYNC_ENABLED` por defecto false; contrato pendiente impide habilitarlo. Requiere clave HMAC dedicada de al menos 32 caracteres, aprovisionamiento base activo y preview apagado. No se creó/configuró ningún secreto. Captura SQL y worker tienen controles independientes apagados.
 
-La captura confirma URL y datos de alta, pero no hace falta mandar todos los campos opcionales al entrar. El alta base por code y la habilitación de gift cards son capacidades distintas. No debe dispararse una actualización en cada GET o clic.
+CLI `npm run bonda:profiles -- --mode process` es dry-run sin conexión. Modos process/enqueue/inspect/reconcile requieren `--apply` para actuar; process/enqueue siguen sin abrir DB con bandera apagada. Enqueue acepta `--limit` y `--after-customer-id`; inspect requiere `--customer-id`; reconcile exige además `--operation-id`, `--outcome`, `--evidence-ref`, `--reviewer-id`. No se ejecutaron modos apply contra datos reales. No hay nueva ruta de administración ni cron creado.
 
-1. Confirmar qué datos opcionales necesita este micrositio para primer acceso/recuperación usando Rewards ID, cómo se verifica al titular y si hay invitación. El flujo descrito por el usuario es introducir Número de socio y luego crear contraseña en Bonda; la verificación de titularidad sigue sin confirmar.
-2. Confirmar el contrato para permitir gift cards solo desde Oro dentro de Bonda y qué ocurre al bajar de nivel. Ocultar el enlace Carobra no bloquea acceso directo al micrositio. No asumir que `segmentacion` resuelve esto sin valores/reglas acordados.
-3. Implementar proyección de disponibilidad específica de backend y sincronización por cambio de identidad/nivel, sobre el mismo code; separar estado de afiliación, perfil actualizado y acceso a gift cards. Persistir revisión/idempotencia y errores sin datos crudos, reclamar una sola operación, consultar/reconciliar después de resultado ambiguo. No reutilizar `can_request_codes` de cupones como permiso de gift cards.
-4. Acordar qué sucede con clientes existentes y Rewards IDs legados antes de cualquier ejecución de migración o afiliación. Evitar duplicar cuenta/historial.
-5. La conversión está acordada, pero la sección no implementa transferencias/saldo compartido. Un flujo de puntos requiere su propio contrato transaccional y pruebas de recuperación, sin inferirlo de la API de Nómina.
+La activación operativa posterior requiere aprobar/aplicar migración, confirmar contrato, provisionar secreto, habilitar captura y procesador, definir su ejecución periódica y revisar tratamiento de identidades legadas. Son pasos de activación; la persistencia, conciliación y conexión apagada ya están implementadas. No se asume aplicada la migración numérica previa en producción.
 
-## Vista previa reproducible
+## Vista previa y pruebas
 
-Usar Node 24. En `site-frontend`, iniciar en terminales separadas:
+Node 24, desde `site-frontend`, dos terminales:
 
 ```sh
 MOCK_SITE_BACKEND_PORT=3006 GIFT_CARD_PREVIEW=true node tests/support/mock-site-backend.mjs
 SITE_BACKEND_BASE_URL=http://127.0.0.1:3006 node node_modules/astro/bin/astro.mjs dev --ignore-lock --host 127.0.0.1 --port 4326
 ```
 
-Abrir `http://127.0.0.1:4326/login`. Cuenta **sintética**: `eligible@example.com`, contraseña de fixture `correct-horse-7`. Luego `http://127.0.0.1:4326/cliente/beneficios#gift-cards`. El modo de preview solo existe en el servidor de tests, muestra Oro y `123456789`; no es un bypass nuevo en la app. No usar credenciales reales. No tocar puerto 4325 del preview Skandia.
+Login local `http://127.0.0.1:4326/login`, fixture `eligible@example.com` / `correct-horse-7`; sección `/cliente/beneficios#gift-cards`. No usar credenciales reales. Skandia en 4325 permanece separado. La suite `node node_modules/@playwright/test/cli.js test --config playwright.gift-cards.config.ts` requiere 3006/4326 libres e intercepta el micrositio con una respuesta sintética, bloqueando otros destinos externos.
 
-Suite aislada (requiere puertos 3006/4326 libres): `node node_modules/@playwright/test/cli.js test --config playwright.gift-cards.config.ts`. Los requests de navegador fuera de loopback se abortan durante la suite.
+Verificaciones previas: build frontend Node 24, ocho contratos, 58 regresiones de Inicio/Mi cuenta/portal/Gift Cards; Brave nativo en Mac con portapapeles real `123456789`, y Chromium desktop/Pixel 5/320px, fallbacks, teclado y navegación. La corrección final de enlace/visibilidad repite build, contratos y ocho casos desktop/móvil con clics repetidos al destino interceptado.
 
-## Verificación realizada
+Backend completo: **300 aprobadas, 7 omitidas** por requerir base externa. Persistencia tiene ocho pruebas con PostgreSQL WASM PGlite aislado: migración up/down, rollback de evento, reinicio desde disco, claims entre stores independientes, fencing de lease vencido, conciliación idempotente, nuevas generaciones durante envío, descenso/retorno y catch-up. No había daemon Docker/PostgreSQL nativo disponible; no se afirma validación multiproceso contra PostgreSQL nativo. Tras el ajuste de enlace, 29 pruebas backend específicas, ocho contratos frontend y ocho pruebas Chromium desktop/móvil aprobaron; build frontend y OpenSpec estricto también.
 
-- Backend TypeScript compilado; 20 pruebas de configuración, afiliación y gateway aprobadas, con transporte simulado. La primera ejecución del gateway desde la raíz no encontró fixtures; se corrigió el directorio de ejecución a site-backend y pasó completa.
-- Frontend: ocho contratos aprobados; build completo con Node 24.21.0, Astro check sin errores ni warnings y función SSR verificada nodejs24.x. Astro muestra un hint por execCommand, usado únicamente como fallback de copia.
-- Chromium instalado en la Mac, proyectos desktop y Pixel 5: ocho pruebas específicas aprobadas; matriz con Oro/Platino/Titanio, Bronce/Plata/Invitado, restringido, identidad ausente/legada/malformada y portal faltante. Prueba explícita de 320 px, copia canónica, rechazo del portapapeles, fallback y selección manual, clics repetidos, teclado y navegación autenticada/anónima. Sin escrituras durante copia/navegación específica.
-- Regresión de Inicio, Mi cuenta, portal y Gift Cards: 58 aprobadas. Se precisaron selectores de feedback de preferencias porque ahora existe otro status accesible para copiar el número. La ejecución usa mock independiente en 3007 y frontend 4322; no se tocó el proceso ajeno de 3002. Los logs de Astro dev incluyen fallos del auditor al consultar recursos externos durante bloqueo de red; los casos y build terminaron correctamente.
-- Brave nativo de la Mac, ventana privada: login sintético, Inicio, sección de Beneficios, confirmación de copia repetida y portapapeles real con 123456789. Chrome no estaba expuesto como navegador de automatización. No se abrió el micrositio ni endpoints reales.
-- Capturas locales de QA en tmp/gift-card-access-qa: benefits-gift-cards desktop/móvil y gift-cards-320. Son datos sintéticos y no se incluyen en el commit.
-- OpenSpec validado en modo estricto y git diff --check sin errores. Sin pruebas de servicios reales, migraciones, puntos, afiliados reales o verificación de producción.
-
-## Ampliación local posterior: ficha del afiliado
-
-Fuente pública revisada el 2026-10-07: [Bonda Nóminas V1](https://documenter.getpostman.com/view/1928874/TVetZjgf), colección pública enlazada por esa página. Alta POST exige code y admite los slugs de Referencias como propiedades del cuerpo; los ejemplos colocan email y nombre al mismo nivel. Por ello la captura permite identificar curp para el alta, sin inventar un contenedor. El tipo entero mostrado contradice CURP textual. PATCH solo debe llevar cambios y remite al ejecutivo para confirmar campos admitidos. Falta confirmar curp textual y la lista de PATCH. La eliminación afecta al afiliado completo: comienza reversible y termina permanente; POST puede restaurarlo dentro de esa ventana y GET no muestra los eliminados. No se documenta una autorización específica de gift cards ni una política de descenso por nivel. Estos hallazgos reemplazan la duda anterior sobre ubicación de curp en POST, sin autorizar llamadas reales.
-
-Implementación preparada, sin consumidores productivos:
-
-- `affiliate-profile.ts`: aplicación con puerto de almacenamiento y contrato explícito. Solo clientes ACTIVE con journey canónico ACTIVE desde GOLD pueden compartir la ficha. El contrato pendiente bloquea antes de cualquier acceso a persistencia/transporte. No se confía en nivel de un request: la futura integración debe cargarlo del servidor.
-- `BondaHttpGateway`: métodos separados para alta con ficha y PATCH, bloqueados por contrato pendiente de forma predeterminada. Lista cerrada de email/nombre/apellido/curp; no code editable, id-rewards, contraseña, segmentación o propiedades arbitrarias. CURP permanece string de 18 caracteres; Rewards ID es numérico de nueve dígitos. Alta no envía bienvenida; PATCH solo envía campos cambiados. Redirecciones HTTP rechazadas para no reenviar datos a otro destino.
-- Estado del afiliado debe estar confirmado; un GET 404 aislado no autoriza alta porque podría restaurar una baja. No se añade automatización de DELETE ni cambios de segmentación.
-- La aplicación reclama exclusión por cliente, registra intención antes de enviar y compara HMAC por campo contra la última confirmación. Checkpoints no contienen nombre, correo, CURP ni payload crudo. El secreto de revisión se inyecta; no se creó ni configuró ninguno para producción.
-- Repetición idéntica no envía otra operación; cambio de ficha produce PATCH mínimo en el mismo code. Identidad diferente queda en conflicto. Duplicado, timeout, HTTP 200 con error, JSON inválido, miembro inesperado o fallo de persistencia tras envío quedan en VERIFICATION_REQUIRED sin reenvío automático. Credenciales rechazadas detienen los reintentos. Ningún resultado equivale a acceso a gift cards.
-- Descenso de nivel no borra ni modifica automáticamente al afiliado; devuelve NOT_ELIGIBLE y deja la política externa pendiente.
-
-Límites concretos: las pruebas usan contrato **hipotético confirmado** y store en memoria declarado dentro del test. No se instaló store productivo, nueva tabla, migración, ruta, worker, bandera de entorno o lector automático de datos reales. Para activación todavía se necesitan confirmaciones Bonda, almacenamiento duradero con claims/leases entre procesos, procedimiento de conciliación y conexión a eventos autorizados con lectura de ficha/nivel canónicos. No se debe presentar el prototipo probado como sincronización operativa de producción.
-
-Validación posterior: TypeScript backend y 35 pruebas (15 nuevas de ficha + 20 de regresión) aprobadas con fetch simulado, incluyendo estados por nivel, datos inválidos, alta/actualización, corrección de CURP, duplicados, concurrencia, cambio mínimo, fallos ambiguos y privacidad de resultados/checkpoints. La UI no cambió; no se repitió la suite visual ya aprobada.
+Sin migraciones reales, endpoints de clientes/Bonda, exportación de identidades, puntos, credenciales, push, PR o deploy. `GET portal` puede sincronizar en un entorno real; todas las navegaciones de esta tarea usan backend sintético. Archivos QA locales en `tmp/gift-card-access-qa`; no se incluyen en commit.

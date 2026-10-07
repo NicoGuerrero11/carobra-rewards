@@ -40,8 +40,9 @@ export function assertAffiliateProfileContract(contract: AffiliateProfileContrac
   }
 }
 
-export type AffiliateProfileSyncStatus = "SYNCHRONIZED" | "VERIFICATION_REQUIRED" | "ACTION_REQUIRED";
+export type AffiliateProfileSyncStatus = "SYNCHRONIZED" | "VERIFICATION_REQUIRED" | "ACTION_REQUIRED" | "RETRY_APPROVED";
 export interface AffiliateProfileCheckpoint {
+  readonly operationId?: string;
   readonly rewardsId: string;
   readonly status: AffiliateProfileSyncStatus;
   readonly fieldDigests: Readonly<Partial<Record<AffiliateProfileKey, string>>>;
@@ -65,7 +66,7 @@ export type AffiliateProfileSyncResult = {
   readonly changedFields?: readonly AffiliateProfileKey[];
 };
 
-/** Prepared application: no routes, jobs, production store or environment activation are installed. */
+/** Contract-gated synchronization; only the canonical-source worker may call this in runtime. */
 export class BondaAffiliateProfileSyncApplication {
   constructor(
     private readonly enabled: boolean,

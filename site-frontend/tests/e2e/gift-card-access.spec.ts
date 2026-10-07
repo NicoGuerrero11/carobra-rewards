@@ -47,7 +47,7 @@ test('clipboard rejection uses a local fallback; total failure exposes selectabl
   await expect(input).toBeVisible(); await expect(input).toHaveValue('123456789'); await expect(input).toBeFocused();
   await expect(page.locator('rewards-member-number [role=status]')).toContainText('Selecciona y copia');
 });
-test('all levels and missing data explain readiness but never expose external access', async ({ page, context }) => {
+test('Gold visibility and canonical identity control the public link without external permissions', async ({ page, context }) => {
   const scenarios = [
     [{ 'home-level':'GOLD' }, 'level_met'], [{ 'home-level':'PLATINUM' }, 'level_met'], [{ 'home-level':'TITANIUM' }, 'level_met'],
     [{ 'home-level':'BRONZE' }, 'below_level'], [{ 'home-level':'SILVER' }, 'below_level'],
@@ -60,14 +60,36 @@ test('all levels and missing data explain readiness but never expose external ac
     await context.clearCookies(); await fixture(context, cookies);
     await page.goto('/cliente/beneficios');
     const section = page.locator('#gift-cards');
+    if (['below_level','restricted','unavailable'].includes(state)) {
+      await expect(section).toHaveCount(0);
+      await page.goto('/cliente/gift-cards');
+      await expect(page.locator('#gift-cards')).toHaveCount(0);
+      continue;
+    }
     await expect(section).toHaveAttribute('data-state',state);
-    await expect(section.getByRole('button', { name: /Ir a Bonda/ })).toBeDisabled();
-    await expect(section.locator('a[href^="http"]')).toHaveCount(0);
+    if (state === 'level_met') {
+      const link = section.getByRole('link', { name: /Ir a Bonda/ });
+      await expect(link).toHaveAttribute('href', 'https://carobrarewards.bonda.com');
+      await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      // Observe navigation with an in-memory response; never contact the real microsite.
+      const requests: string[] = [];
+      await context.route('https://carobrarewards.bonda.com/', route => { requests.push(route.request().url()); return route.fulfill({ status:200, body:'Synthetic Bonda destination' }); });
+      for (let i = 0; i < 2; i++) {
+        const popupPromise = context.waitForEvent('page');
+        await link.click();
+        const popup = await popupPromise; await popup.waitForLoadState();
+        await expect(popup).toHaveURL('https://carobrarewards.bonda.com/');
+        await popup.close();
+      }
+      expect(requests).toEqual(['https://carobrarewards.bonda.com/','https://carobrarewards.bonda.com/']);
+    } else {
+      await expect(section.getByRole('button', { name: /Ir a Bonda/ })).toBeDisabled();
+      await expect(section.locator('a[href^="http"]')).toHaveCount(0);
+      await section.getByRole('button', { name: /Ir a Bonda/ }).evaluate((button: HTMLButtonElement) => { button.disabled = false; button.click(); button.click(); });
+    }
     await expect(section).toContainText('3 puntos = $1 MXN');
     await expect(section).toContainText('catálogo completo');
     await expect(section).not.toContainText('Saldo disponible');
-    // Removing CSS/disabled cannot reveal a destination or network action.
-    await section.getByRole('button', { name: /Ir a Bonda/ }).evaluate((button: HTMLButtonElement) => { button.disabled = false; button.click(); button.click(); });
     await expect(page).toHaveURL(/\/cliente\/beneficios$/);
   }
 });

@@ -1,3 +1,4 @@
+import { createBondaAffiliateProfileRuntime } from "../bonda/affiliate-profile-worker.js";
 import type { Pool } from "pg";
 import type { BondaConfig } from "../../config.js";
 
@@ -132,6 +133,7 @@ export function createRewardsCustomerPortalApplication(
 export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   affiliateProvisioning: BondaAffiliateProvisioningApplication;
   coupons: BondaCouponApplication;
+  affiliateProfiles: ReturnType<typeof createBondaAffiliateProfileRuntime>;
   warmCatalog(): Promise<void>;
 } {
   const clock = new SystemClock();
@@ -153,6 +155,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
   const policies = new PostgresBondaCouponPolicyQuery(database);
   const rules = new PostgresRewardsV2RuleLookup(database);
   return {
+    affiliateProfiles: createBondaAffiliateProfileRuntime(database, config),
     affiliateProvisioning,
     coupons: new BondaCouponApplication(
       gateway,

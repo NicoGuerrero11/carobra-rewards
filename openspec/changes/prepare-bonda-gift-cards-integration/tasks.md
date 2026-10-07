@@ -1,26 +1,21 @@
-## 1. Alcance y rama
+## 1. Rama y sección
 
-- [x] 1.1 Crear una rama nueva desde el estado actual y preservar el trabajo ajeno sin modificar main.
-- [x] 1.2 Sustituir el alcance anterior por configuración inactiva y documentar las preguntas de acceso para Bonda.
+- [x] 1.1 Identificar rama/campo preparados y preservar cambios ajenos.
+- [x] 1.2 Mostrar Número de socio Rewards existente en Inicio, Mi cuenta y Bonda; copia canónica accesible con fallback.
+- [x] 1.3 Renderizar sección solo desde Oro y enlazar al micrositio confirmado sin identidad en URL ni restricción externa por nivel.
+- [x] 1.4 Verificar desktop/móvil, identidad faltante, cuenta no elegible, copia, navegación y repetición con mocks.
 
-## 2. Campo de preparación
+## 2. Ficha y contrato
 
-- [x] 2.1 Añadir giftCardAccess pendiente y deshabilitado, con loginMethod null e identifierField curp según la decisión del usuario, sin variables de activación ni consumidores de red.
-- [x] 2.2 Comprobar tipos y pruebas de configuración existentes de forma local y revisar el diff; no ejecutar conexiones, servidores o jobs Bonda.
+- [x] 2.1 Revisar colección pública; confirmar slugs POST y documentar pendiente CURP textual/lista PATCH.
+- [x] 2.2 Separar alta mínima existente de enriquecimiento automático autorizado desde Oro.
+- [x] 2.3 Preparar aplicación/gateway bloqueados por contrato, lectura canónica y PATCH mínimo; no modificar code ni borrar datos al descenso.
+- [x] 2.4 Verificar contratos con transportes sintéticos y datos ficticios.
 
-Verificación: compilación TypeScript correcta; cinco pruebas existentes de configuración Bonda aprobadas; validación OpenSpec estricta y diff sin errores de espacios. No se ejecutaron conexiones a Bonda.
+## 3. Persistencia y operación apagada
 
-Aclaración posterior: vínculo por Rewards ID mediante Nómina; CURP/correo solo desde Oro, incluyendo Platino y Titanio. Se registró minimumLevel GOLD en la configuración inactiva y se retiró la suposición de reemplazar `code` por CURP. No se implementó sincronización ni ejecución de elegibilidad.
-
-## 3. Sección local autorizada el 2026-10-07
-
-- [x] 3.1 Actualizar la selección local a rewards_id conservando el contrato deshabilitado.
-- [x] 3.2 Mostrar Número de socio Rewards en Inicio, Mi cuenta y sección de Bonda; copiar sin espacios con confirmación accesible y fallback.
-- [x] 3.3 Sustituir el estado genérico de gift cards por sección desde Oro, catálogo completo y conversión informativa 3 puntos = $1 MXN; mantener acceso externo deshabilitado.
-- [x] 3.4 Verificar tipos, contratos y navegación/copia/estados en Chromium de Mac, desktop y móvil, con mocks.
-
-## 4. Sincronización local de ficha (ampliación posterior)
-
-- [x] 4.1 Revisar colección pública Nóminas V1 y corregir el diagnóstico sobre slugs de Referencias; conservar pendientes tipo CURP/PATCH y permiso gift cards.
-- [x] 4.2 Preparar aplicación y métodos HTTP separados con contrato pendiente por defecto, elegibilidad canónica desde Oro, cambios mínimos, exclusión e intención previa; sin consumidores de runtime ni migraciones.
-- [x] 4.3 Probar con transporte y store simulados alta, PATCH, CURP textual, identidad estable, concurrencia, repetición, ambigüedad, fallos y descenso; documentar límites antes de producción.
+- [x] 3.1 Preparar migración 027, cola generacional y eventos transaccionales con captura apagada.
+- [x] 3.2 Implementar claims duraderos con fencing, intención previa y reconciliación auditada por operación.
+- [x] 3.3 Conectar runtime deshabilitado y CLI acotada con dry-run predeterminado.
+- [x] 3.4 Probar SQL aislado, reinicio, lease vencido, eventos concurrentes, conciliación y catch-up.
+- [x] 3.5 Compilar, validar OpenSpec y documentar evidencia/límites sin migraciones reales ni llamadas Bonda.
