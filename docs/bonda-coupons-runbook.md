@@ -197,3 +197,49 @@ La caché sigue en memoria: después de reiniciar, o vencido el límite, se mues
 un error reintentable. No se promete continuidad durante una caída prolongada.
 La política de nivel y vencimiento se aplica en cada lectura, y solicitar un
 código vuelve a validar la oferta en vivo, sin usar la caché de presentación.
+
+### Diagnóstico con cobertura temporal y propuesta de continuidad (2026-10-08)
+
+Railway Log Explorer, filtrado al despliegue `f2507dbe-077a-422b-a8af-1c75bb30a14c`,
+mostró ambos extremos del intervalo 2026-10-07 23:16:07.703 UTC a
+2026-10-08 17:37:37.020 UTC. Sólo aparecieron siete líneas del arranque de las
+23:17:50 UTC, sin otro arranque ni `site_backend_warmup_failed`. El código
+productivo no registra el resultado de cada refresco. Ausencia de log de fallo
+no demuestra éxito: esos registros no permiten fechar último catálogo correcto
+ni primer error, ni correlacionar los cinco POST de afiliados de revisión.
+La frecuencia diaria sigue siendo reportada, no medida. El POST individual
+implementado añade un código; no existe una operación local de reemplazo de
+nómina o borrado del lector técnico. Su existencia posterior ya fue confirmada.
+
+Se añade `bonda_catalog_refresh` por refresco real (también el inicial), con hora,
+resultado `SUCCESS`/`STALE`/`UNAVAILABLE`, conteos, fecha original de validación y
+código de error tipado. No registra credenciales, URLs, afiliados, clientes,
+mensajes arbitrarios ni payloads. Los hits frescos y las consultas concurrentes
+coalescidas no agregan llamadas al proveedor ni generan un monitor. Una caída
+del logger no cambia el resultado de lectura. Tras desplegarlo, estos eventos
+permitirán correlacionar transiciones con los arranques existentes; no reconstruyen
+el pasado ni corrigen por sí mismos la respuesta actual del servicio externo.
+
+**Propuesta pendiente: snapshot durable en PostgreSQL existente.** No hay una
+tabla de cache de catálogo reutilizable. Escribir un archivo en el contenedor
+no garantiza supervivencia a redeploy; añadir un volumen introduce configuración
+operativa. La opción mínima durable requiere una tabla y migración nueva,
+revisadas por separado. No se implementa ni ejecuta esa migración en este PR.
+El diseño debe conservar sólo metadatos públicos normalizados, con lista explícita
+de campos; excluir respuestas crudas, credenciales, datos de afiliado, códigos,
+recibos, historial y saldos. La clave debe aislar versión de esquema/normalizador,
+proveedor y origen, micrositio, lector técnico, revisión de configuración y
+conjunto de políticas aprobadas; nunca usar ni guardar una credencial como clave.
+
+Al arrancar, intentar lectura viva antes de usar el snapshot persistido. Permitir
+fallback sólo para errores transitorios/ambiguos ya admitidos, dentro del máximo
+actual desde validación original; no renovar su antigüedad al cargarlo o fallar.
+Autorización/configuración rechazada, cambio de ámbito o payload corrupto impiden
+su uso. Vacío válido y bajas confirmadas deben invalidar el snapshot previo,
+incluso ante otros fallos parciales; actualizar atómicamente evitando que una
+respuesta tardía sobrescriba una más reciente. Reaplicar vigencia y políticas
+actuales por cliente en cada respuesta; solicitudes de códigos siguen en vivo.
+Pruebas necesarias: reinicio simulado, expiración, concurrencia, aislamiento de
+ámbitos, invalidación y ausencia de datos privados. Esto cubriría reinicios dentro
+de la ventana aprobada (default 30 minutos), no una interrupción de un día ni el
+problema actual sin una última respuesta válida guardada.

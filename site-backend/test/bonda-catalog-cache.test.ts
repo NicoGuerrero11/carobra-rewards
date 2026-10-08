@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { BondaCatalogCache } from "../src/rewards/bonda/catalog-cache.js";
+import { BondaCatalogCache, type BondaCatalogRefreshEvent } from "../src/rewards/bonda/catalog-cache.js";
 import { fakeBondaCoupon } from "../src/rewards/bonda/fake-gateway.js";
 import { BondaGatewayError } from "../src/rewards/bonda/gateway.js";
 import type { Clock } from "../src/rewards/shared/clock.js";
@@ -178,4 +178,42 @@ test('refresh completing past stale deadline cannot serve expired cache', async 
   }}, clock, 1000, 5000);
   await cache.read('technical'); broken = true; clock.advance(1001);
   await assert.rejects(cache.read('technical'), BondaGatewayError);
+});
+
+test("records last validated time across success, stale failure and expiry without private data", async () => {
+  const clock = new MutableClock("2026-10-08T12:00:00.000Z");
+  const events: BondaCatalogRefreshEvent[] = [];
+  let fail = false;
+  const cache = new BondaCatalogCache({ listCoupons: async () => {
+    if (fail) throw new BondaGatewayError("INVALID_RESPONSE", "secret-key/private-response", false);
+    return [fakeBondaCoupon({ name: "private-payload-marker" })];
+  } }, clock, 1_000, 3_000, event => events.push(event));
+  await cache.read("private-affiliate-marker");
+  await cache.read("private-affiliate-marker");
+  assert.equal(events.length, 1, "fresh hits must not produce additional refresh logs");
+  fail = true;
+  clock.advance(1_001);
+  await cache.read("private-affiliate-marker");
+  clock.advance(2_000);
+  await assert.rejects(cache.read("private-affiliate-marker"));
+  assert.deepEqual(events.map(event => [event.outcome, event.last_validated_at, event.error_code]), [
+    ["SUCCESS", "2026-10-08T12:00:00.000Z", null],
+    ["STALE", "2026-10-08T12:00:00.000Z", "INVALID_RESPONSE"],
+    ["UNAVAILABLE", "2026-10-08T12:00:00.000Z", "INVALID_RESPONSE"],
+  ]);
+  assert.equal(events[2]?.at, "2026-10-08T12:00:03.001Z");
+  assert.doesNotMatch(JSON.stringify(events), /private|secret/);
+});
+
+test("telemetry cannot break reads and unknown errors never disclose their messages", async () => {
+  const clock = new MutableClock("2026-10-08T12:00:00.000Z");
+  const failingObserver = new BondaCatalogCache({ listCoupons: async () => [] }, clock, 1_000, 3_000,
+    () => { throw new Error("logger unavailable"); });
+  assert.deepEqual((await failingObserver.read("synthetic")).items, []);
+  const events: BondaCatalogRefreshEvent[] = [];
+  const empty = new BondaCatalogCache({ listCoupons: async () => { throw new Error("secret contents"); } },
+    clock, 1_000, 3_000, event => events.push(event));
+  await assert.rejects(empty.read("synthetic"));
+  assert.deepEqual(events, [{ event: "bonda_catalog_refresh", at: "2026-10-08T12:00:00.000Z",
+    outcome: "UNAVAILABLE", approved_count: 0, item_count: null, last_validated_at: null, error_code: "UNEXPECTED_ERROR" }]);
 });

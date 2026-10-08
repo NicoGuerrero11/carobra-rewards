@@ -161,6 +161,7 @@ export function createBondaIntegrations(database: Pool, config: BondaConfig): {
     clock,
     config.catalogCacheTtlMs,
     config.catalogCacheMaxStaleMs,
+    event => console.log(JSON.stringify(event)),
   );
   const policies = new PostgresBondaCouponPolicyQuery(database);
   const rules = new PostgresRewardsV2RuleLookup(database);

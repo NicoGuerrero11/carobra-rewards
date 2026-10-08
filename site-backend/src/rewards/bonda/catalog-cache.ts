@@ -14,6 +14,17 @@ export interface BondaCatalogReader {
   readBranches(affiliateCode: string, couponId: string): Promise<readonly BondaCouponBranch[]>;
 }
 
+/** Deliberately excludes request URLs, identity, credentials and partner payloads. */
+export interface BondaCatalogRefreshEvent {
+  event: "bonda_catalog_refresh";
+  at: string;
+  outcome: "SUCCESS" | "STALE" | "UNAVAILABLE";
+  approved_count: number;
+  item_count: number | null;
+  last_validated_at: string | null;
+  error_code: BondaGatewayError["code"] | "UNEXPECTED_ERROR" | null;
+}
+
 interface CachedCatalog {
   snapshot: BondaCatalogSnapshot;
   freshUntil: number;
@@ -40,6 +51,7 @@ export class BondaCatalogCache implements BondaCatalogReader {
     private readonly clock: Clock,
     private readonly ttlMs: number,
     private readonly maxStaleMs: number,
+    private readonly observe?: (event: BondaCatalogRefreshEvent) => void,
   ) {}
 
   async read(
@@ -104,6 +116,7 @@ export class BondaCatalogCache implements BondaCatalogReader {
         freshUntil: refreshedAt.getTime() + this.ttlMs,
         staleUntil: refreshedAt.getTime() + this.maxStaleMs,
       });
+      this.report("SUCCESS", approvedCouponIds.length, snapshot, null);
       return snapshot;
     } catch (error) {
       // A partial refresh may positively confirm removals before another read
@@ -117,10 +130,28 @@ export class BondaCatalogCache implements BondaCatalogReader {
         && error instanceof BondaGatewayError
         && (error.retryable || error.code === "INVALID_RESPONSE")
       ) {
+        this.report("STALE", approvedCouponIds.length, cached.snapshot, error);
         return { ...cached.snapshot, freshness: "STALE" };
       }
+      this.report("UNAVAILABLE", approvedCouponIds.length, cached?.snapshot, error);
       throw error;
     }
+  }
+
+  private report(
+    outcome: BondaCatalogRefreshEvent["outcome"],
+    approvedCount: number,
+    snapshot: BondaCatalogSnapshot | undefined,
+    error: unknown,
+  ): void {
+    try {
+      this.observe?.({
+        event: "bonda_catalog_refresh", at: this.clock.now().toISOString(), outcome,
+        approved_count: approvedCount, item_count: snapshot?.items.length ?? null,
+        last_validated_at: snapshot?.refreshedAt.toISOString() ?? null,
+        error_code: error === null ? null : error instanceof BondaGatewayError ? error.code : "UNEXPECTED_ERROR",
+      });
+    } catch { /* Observability must never change catalog availability. */ }
   }
 
   private async refreshBranches(
