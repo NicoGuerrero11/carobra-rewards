@@ -27,7 +27,9 @@ function progressFor(request,courseId) {
 }
 function homeCookie(request,name) {return request.headers.cookie?.match(new RegExp(`(?:^|; )${name}=([^;]+)`))?.[1];}
 function homePortal(request,candidate) {
-  const portal=portalFor(candidate);
+  // Context and focused portal reads represent the same customer data.
+  // Keep activity scenarios when pages reuse the middleware's portal.
+  const portal=activityPortal(request,candidate);
   if (homeCookie(request, 'account-test')) {
     portal.preferences = accountPreferences.get(accountKey(request, candidate)) ?? {
       activity_updates: true, learning_updates: false, product_updates: true, updated_at: null,

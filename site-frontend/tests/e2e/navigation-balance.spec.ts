@@ -19,6 +19,9 @@ test('a pending balance never blocks navigation and a confirmed zero remains dis
   release();
   await expect(balance.locator('.bonda-balance__amount')).toHaveText('0 pts');
   await expect(balance).toHaveAttribute('data-bonda-status','FRESH');
+  // The dev-only Astro toolbar overlays the mobile bottom navigation in CI.
+  // Remove that tooling overlay; still exercise a real, unforced user click.
+  await page.addStyleTag({content:'astro-dev-toolbar { display: none !important; }'});
   await page.getByRole('link',{name:'Productos',exact:true}).first().click();
   await expect(page).toHaveURL(/\/cliente\/productos$/);
 });

@@ -255,8 +255,12 @@ como tiempo puro de autenticación. No incluye red pública, fuentes ni pintura.
   ejecutó después la omitida de progreso de cursos usando PGlite ya instalado:
   **1/1 aprobada**. Acumulado: **351 aprobadas, seis pendientes** que requieren
   PostgreSQL dedicado. Los casos de saldo también corren con PGlite.
-- Frontend: `astro check` y build Node 24/Vercel correctos; contratos **9/9**,
+- Frontend: `astro check` y build Node 24/Vercel correctos; contratos **10/10**,
   runtime **5/5**, SSR compilado **9/9**. `git diff --check` limpio.
+- Ajuste de pruebas tras CI: las fixtures de Actividad ahora se conservan
+  también en el contexto reutilizado; una regresión comprueba igualdad con la
+  ruta de portal. El test móvil retira sólo la barra dev de Astro que interceptaba
+  el click. No cambió código de aplicación ni las condiciones del benchmark.
 - Regresiones nuevas: aislamiento por sesión concurrente, revalidación tras
   cambio/revocación, reintento tras fallo, independencia de autorización de
   comandos, endpoint de saldo atado a identidad, lectura local de saldo sin
