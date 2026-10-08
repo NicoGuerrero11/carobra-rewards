@@ -6,6 +6,7 @@ import { BondaGatewayError } from "./gateway.js";
 export interface BondaCatalogSnapshot {
   items: readonly BondaCouponDetail[];
   refreshedAt: Date;
+  freshness?: "FRESH" | "STALE";
 }
 
 export interface BondaCatalogReader {
@@ -54,7 +55,7 @@ export class BondaCatalogCache implements BondaCatalogReader {
     const pending = this.inFlight.get(cacheKey);
     if (pending) return pending;
 
-    const refresh = this.refresh(cacheKey, affiliateCode, normalizedIds, cached, now);
+    const refresh = this.refresh(cacheKey, affiliateCode, normalizedIds, cached);
     this.inFlight.set(cacheKey, refresh);
     try {
       return await refresh;
@@ -91,7 +92,6 @@ export class BondaCatalogCache implements BondaCatalogReader {
     affiliateCode: string,
     approvedCouponIds: readonly string[],
     cached: CachedCatalog | undefined,
-    now: number,
   ): Promise<BondaCatalogSnapshot> {
     try {
       const items = approvedCouponIds.length > 0 && this.gateway.getCoupon
@@ -106,13 +106,18 @@ export class BondaCatalogCache implements BondaCatalogReader {
       });
       return snapshot;
     } catch (error) {
+      // A partial refresh may positively confirm removals before another read
+      // fails. Never reintroduce those offers through the stale fallback.
+      if (cached && error instanceof ApprovedCouponReadError && error.removedIds.length) {
+        cached.snapshot = { ...cached.snapshot, items: cached.snapshot.items.filter(item => !error.removedIds.includes(item.id)) };
+      }
       if (
         cached
-        && now <= cached.staleUntil
+        && this.clock.now().getTime() <= cached.staleUntil
         && error instanceof BondaGatewayError
-        && error.retryable
+        && (error.retryable || error.code === "INVALID_RESPONSE")
       ) {
-        return cached.snapshot;
+        return { ...cached.snapshot, freshness: "STALE" };
       }
       throw error;
     }
@@ -146,6 +151,12 @@ export class BondaCatalogCache implements BondaCatalogReader {
 
 const MAX_PARALLEL_COUPON_READS = 8;
 
+class ApprovedCouponReadError extends BondaGatewayError {
+  constructor(error: BondaGatewayError, readonly removedIds: readonly string[]) {
+    super(error.code, error.message, error.retryable);
+  }
+}
+
 async function loadApprovedCoupons(
   getCoupon: BondaGateway["getCoupon"],
   affiliateCode: string,
@@ -153,17 +164,32 @@ async function loadApprovedCoupons(
 ): Promise<readonly BondaCouponDetail[]> {
   const items: Array<BondaCouponDetail | null> = new Array(couponIds.length).fill(null);
   let nextIndex = 0;
+  const failures: unknown[] = [];
+  const removedIds: string[] = [];
   const workers = Array.from(
     { length: Math.min(MAX_PARALLEL_COUPON_READS, couponIds.length) },
     async () => {
       while (nextIndex < couponIds.length) {
         const index = nextIndex;
         nextIndex += 1;
-        items[index] = await getCoupon(affiliateCode, couponIds[index]!);
+        try {
+          items[index] = await getCoupon(affiliateCode, couponIds[index]!);
+          if (items[index] === null) removedIds.push(couponIds[index]!);
+        } catch (error) {
+          failures.push(error);
+        }
       }
     },
   );
   await Promise.all(workers);
+  if (failures.length) {
+    // Authentication/configuration failures must not be hidden by another
+    // concurrent, retryable failure.
+    const failure = failures.find(error => !(error instanceof BondaGatewayError)
+      || (!error.retryable && error.code !== "INVALID_RESPONSE")) ?? failures[0];
+    if (failure instanceof BondaGatewayError) throw new ApprovedCouponReadError(failure, removedIds);
+    throw failure;
+  }
   return items.filter((item): item is BondaCouponDetail => item !== null);
 }
 

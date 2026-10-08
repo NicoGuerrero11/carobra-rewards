@@ -68,6 +68,7 @@ export interface BondaCouponCatalogHttpResponse {
   affiliate_state: BondaAffiliateIntegrationState;
   items: readonly BondaCouponSummary[];
   refreshed_at: string | null;
+  freshness?: "FRESH" | "STALE";
   page: number;
   page_size: number;
   total: number;
@@ -75,6 +76,7 @@ export interface BondaCouponCatalogHttpResponse {
 }
 
 export interface BondaCouponDetailHttpResponse {
+  freshness?: "FRESH" | "STALE";
   access_state: BondaCouponAccessState;
   affiliate_state: BondaAffiliateIntegrationState;
   item: BondaCouponDetail | null;

@@ -75,7 +75,8 @@ test("serves a bounded stale catalog only for retryable partner failures", async
   clock.advance(60_001);
   const stale = await cache.read("affiliate-1");
 
-  assert.equal(stale, first);
+  assert.equal(stale.refreshedAt, first.refreshedAt);
+  assert.equal(stale.freshness, "STALE");
   assert.equal(stale.items[0]?.id, "cached");
 
   clock.advance(240_000);
@@ -122,3 +123,59 @@ class MutableClock implements Clock {
     this.value = new Date(this.value.getTime() + milliseconds);
   }
 }
+
+for (const partial of [false, true]) {
+  test(`invalid ${partial ? 'partial' : 'full'} refresh preserves bounded validated catalog`, async () => {
+    const clock = new MutableClock('2026-10-08T12:00:00Z');
+    let broken = false;
+    const gateway = {
+      listCoupons: async () => [],
+      getCoupon: async (_code: string, id: string) => {
+        if (broken && (!partial || id === '2')) throw new BondaGatewayError('INVALID_RESPONSE', 'unknown error', false);
+        return fakeBondaCoupon({ id });
+      },
+    };
+    const cache = new BondaCatalogCache(gateway, clock, 1000, 5000);
+    const first = await cache.read('technical', ['1', '2']);
+    broken = true;
+    clock.advance(1001);
+    const degraded = await cache.read('technical', ['1', '2']);
+    assert.equal(degraded.freshness, 'STALE');
+    assert.equal(degraded.refreshedAt, first.refreshedAt);
+    assert.equal(degraded.items.length, 2);
+    await assert.rejects(new BondaCatalogCache(gateway, clock, 1000, 5000).read('technical', ['1', '2']), BondaGatewayError);
+    clock.advance(4000);
+    await assert.rejects(cache.read('technical', ['1', '2']), BondaGatewayError);
+  });
+}
+
+test('confirmed removals replace valid data and are not resurrected by partial failure', async () => {
+  const clock = new MutableClock('2026-10-08T12:00:00Z');
+  let mode = 'good';
+  const cache = new BondaCatalogCache({
+    listCoupons: async () => [],
+    getCoupon: async (_code, id) => {
+      if (mode === 'partial' && id === '2') throw new BondaGatewayError('PARTNER_UNAVAILABLE', 'temporary', true);
+      if (mode !== 'good') return null;
+      return fakeBondaCoupon({ id });
+    },
+  }, clock, 1000, 5000);
+  await cache.read('technical', ['1', '2']);
+  mode = 'partial'; clock.advance(1001);
+  assert.deepEqual((await cache.read('technical', ['1', '2'])).items.map(x => x.id), ['2']);
+  mode = 'removed';
+  const empty = await cache.read('technical', ['1', '2']);
+  assert.equal(empty.items.length, 0);
+  assert.notEqual(empty.freshness, 'STALE');
+});
+
+test('refresh completing past stale deadline cannot serve expired cache', async () => {
+  const clock = new MutableClock('2026-10-08T12:00:00Z');
+  let broken = false;
+  const cache = new BondaCatalogCache({listCoupons: async () => {
+    if (broken) { clock.advance(5000); throw new BondaGatewayError('PARTNER_UNAVAILABLE', 'timeout', true); }
+    return [fakeBondaCoupon()];
+  }}, clock, 1000, 5000);
+  await cache.read('technical'); broken = true; clock.advance(1001);
+  await assert.rejects(cache.read('technical'), BondaGatewayError);
+});

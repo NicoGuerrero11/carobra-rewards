@@ -140,3 +140,60 @@ Versionar este procedimiento y el diagnóstico ayuda a detectar y resolver la re
 ## Trabajo futuro separado
 
 Afiliar clientes, solicitar códigos y consultar historial requiere otro OpenSpec con un ambiente de prueba aprobado, comportamiento idempotente, manejo de resultados ambiguos, auditoría, consentimiento operativo y rollout explícito. Este cierre de lectura no autoriza ninguna de esas acciones.
+
+### Respuesta inválida de contenido: diagnóstico del 2026-10-08
+
+Preflight desde la consola oficial de `site-backend`, producción, commit
+`5761c9f052d153f3ee8385c91b48aca32c5ccabd`, micrositio `913085`:
+
+- Afiliado técnico `990910001`: HTTP 200, OK.
+- Cupón aprobado `9510`: HTTP 200, INVALID_RESPONSE; el JSON contenía sólo
+  `error` de tipo texto, sin identidad ni nombre de cupón.
+- Curso y bienestar de control: HTTP 500, PARTNER_UNAVAILABLE.
+
+No se recuperó ni modificó la identidad técnica: existe. El diagnóstico ampliado
+usó los 12 IDs habilitados en `catalog_items` (no sólo el control 9510):
+Bronce 9510/12490/11208/9471; Plata 5850/5849/4749/8344/11919;
+Oro 14220; Platino 14806; Titanio 14799. Todos tienen fecha local de inicio
+2026-09-10, sin fin local. Los 25 candidatos sin ID siguen deshabilitados.
+9510 proviene de la aprobación versionada 024; no es solamente un ID de fixture.
+
+A las 17:02 UTC los 12 detalles respondieron HTTP 200 con el mismo texto
+`Cupon no existente o desactivado`. El listado soportado `/api/cupones`,
+primera página, respondió HTTP 403. A las 17:02:44 se leyó el mensaje sanitizado:
+`Algo no salió bien, intentá nuevamente en unos minutos`.
+La consulta V2 del afiliado confirmó success, code y ambos campos de micrositio
+correctos, con deleted_at vacío (17:05:53). Se usó también loadConfig del runtime;
+no hubo diferencia por normalización de variables.
+
+La colección oficial Bonda Public API V2.3 documenta el lector de sólo información
+00698115. Un contraste acotado con ese lector, sin modificar configuración,
+respondió igual para 9510 y el listado (17:09:13). No se usó para emitir órdenes.
+Cupones usa key/micrositio_id/codigo_afiliado en query; nómina V2 usa header token.
+No se inventó un esquema Bearer ni se rotaron credenciales.
+
+Esto **no prueba retiro de las 12 ofertas**, ni rechazo de toda la API, ni identifica
+la causa de los HTTP 500 de cursos/bienestar. Por eso incluso ese texto genérico
+se conserva como INVALID_RESPONSE: no debe vaciar un catálogo validado.
+Restaurar o recrear un afiliado que existe no tiene fundamento. El siguiente paso
+externo es que Bonda confirme acceso de contenido del micrositio 913085 con la clave
+existente y la discrepancia entre nómina y catálogo; no enviar claves en tickets.
+No se contactó al proveedor ni se sustituyeron ofertas. La recuperación operativa
+no está confirmada. El comando `bonda:reconcile` puede consultar la lista vigente
+cuando el endpoint vuelva a responder; no aprueba ni publica ofertas por nombre.
+
+El adaptador rechaza errores desconocidos, success:false, respuestas inválidas y
+404 ambiguos. Ninguno demuestra retirada. Sólo resultados válidos se publican;
+la vigencia y el nivel se filtran por política actual.
+
+Ante una respuesta inválida o fallo transitorio, la caché conserva metadatos
+validados hasta su límite original (30 minutos por defecto), sin renovar su
+fecha. La respuesta marca `freshness: STALE` y la interfaz informa del fallo de
+actualización. Fallos de autorización/configuración no permiten ese fallback.
+Las retiradas confirmadas por el adaptador se quitan incluso si otras lecturas
+fallan. Un vacío válido sustituye al catálogo previo; un fallo no lo vacía.
+
+La caché sigue en memoria: después de reiniciar, o vencido el límite, se muestra
+un error reintentable. No se promete continuidad durante una caída prolongada.
+La política de nivel y vencimiento se aplica en cada lectura, y solicitar un
+código vuelve a validar la oferta en vivo, sin usar la caché de presentación.
