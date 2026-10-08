@@ -7,21 +7,17 @@ const amount = balance?.available;
 const known = (status === 'FRESH' || status === 'STALE') && amount != null && /^\d+$/.test(amount);
 const format = (value: string) => new Intl.NumberFormat('es-MX').format(BigInt(value));
 const positive = (value: string | null | undefined): value is string => value != null && /^\d+$/.test(value) && BigInt(value) > 0n;
-// Only a freshly confirmed external balance receives a money equivalence.
-const cents = known && status === 'FRESH' ? (BigInt(amount!) * 100n + 1n) / 3n : null;
-const equivalent = cents !== null ? `$${format((cents / 100n).toString())}.${(cents % 100n).toString().padStart(2, '0')}` : null;
 const timestamp = balance?.observed_at ? new Date(balance.observed_at) : null;
 const observed = timestamp && Number.isFinite(timestamp.getTime()) ? timestamp : null;
 ---
 <div class="bonda-balance" data-bonda-status={status} aria-label="Puntos para gift cards">
   <p class="bonda-balance__label">{status === 'STALE' ? 'Último saldo consultado' : 'Puntos para gift cards'}</p>
   {known && <p class="bonda-balance__amount">{format(amount!)} <span>pts</span></p>}
-  {equivalent && <p class="bonda-balance__equivalent">Equivalen a {equivalent} MXN</p>}
   <p class="bonda-balance__status" role="status">{status === 'STALE' ? 'No pudimos actualizarlo. Puede haber cambiado desde la última consulta.' : status === 'DISABLED' ? 'Consulta tu saldo para gift cards al ingresar.' : !known ? 'No pudimos consultar tu saldo. Intenta de nuevo más tarde.' : 'Saldo confirmado para gift cards.'}</p>
   {known && observed && <p class="bonda-balance__time">Última consulta: <time datetime={observed.toISOString()}>{new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' }).format(observed)} (CDMX)</time></p>}
   {positive(balance?.pending) && <p class="bonda-balance__pending">{format(balance.pending)} puntos pendientes de acreditar.</p>}
   {positive(balance?.verification_required) && <p class="bonda-balance__pending">{format(balance.verification_required)} puntos en revisión. Pueden estar incluidos en el saldo consultado.</p>}
 </div>
 <style>
-.bonda-balance{padding:.8rem 0;color:inherit;min-width:0}.bonda-balance p{margin:.3rem 0}.bonda-balance__label{font-size:.75rem;font-weight:700}.bonda-balance .bonda-balance__amount{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;line-height:1.2;overflow-wrap:anywhere}.bonda-balance__amount span{font-size:.85rem;font-weight:600}.bonda-balance .bonda-balance__status,.bonda-balance .bonda-balance__time,.bonda-balance .bonda-balance__pending{font-size:.75rem;line-height:1.55;max-width:55ch}.bonda-balance__equivalent{font-size:.85rem;font-weight:700}.bonda-balance__time{opacity:.8}.bonda-balance__pending{font-weight:600}
+.bonda-balance{padding:.8rem 0;color:inherit;min-width:0}.bonda-balance p{margin:.3rem 0}.bonda-balance__label{font-size:.75rem;font-weight:700}.bonda-balance .bonda-balance__amount{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;line-height:1.2;overflow-wrap:anywhere}.bonda-balance__amount span{font-size:.85rem;font-weight:600}.bonda-balance .bonda-balance__status,.bonda-balance .bonda-balance__time,.bonda-balance .bonda-balance__pending{font-size:.75rem;line-height:1.55;max-width:55ch}.bonda-balance__time{opacity:.8}.bonda-balance__pending{font-weight:600}
 </style>

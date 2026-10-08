@@ -11,7 +11,7 @@ test('Bonda is the balance authority across Home, Activity and gift cards; unkno
       const balance=page.getByLabel('Puntos para gift cards',{exact:true});
       if (['fresh','zero','stale'].includes(mode)) await expect(balance.locator('.bonda-balance__amount')).toHaveText(`${mode==='zero'?'0':'900'} pts`);
       else await expect(balance.locator('.bonda-balance__amount')).toHaveCount(0);
-      await expect(balance.locator('.bonda-balance__equivalent')).toHaveCount(['fresh','zero'].includes(mode)?1:0);
+      await expect(balance.locator('.bonda-balance__equivalent')).toHaveCount(0);
       if(mode==='stale')await expect(balance).toContainText('Puede haber cambiado');
       if(mode==='disabled')await expect(balance).toContainText('al ingresar');
       if(mode==='unavailable')await expect(balance).toContainText('No pudimos consultar');

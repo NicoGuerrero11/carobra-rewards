@@ -87,7 +87,8 @@ test('Gold visibility and canonical identity control the public link without ext
       await expect(section.locator('a[href^="http"]')).toHaveCount(0);
       await section.getByRole('button', { name: /Ver gift cards/ }).evaluate((button: HTMLButtonElement) => { button.disabled = false; button.click(); button.click(); });
     }
-    await expect(section).toContainText('3 puntos = $1 MXN');
+    await expect(section).not.toContainText('3 puntos');
+    await expect(section).not.toContainText('MXN');
     await expect(section).toContainText('catálogo completo');
     await expect(section).not.toContainText('Saldo disponible');
     await expect(page).toHaveURL(/\/cliente\/beneficios$/);
