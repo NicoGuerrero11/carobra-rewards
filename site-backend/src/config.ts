@@ -172,7 +172,11 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   }
   const micrositeId = optionalValue(environment.BONDA_MICROSITE_ID);
   const couponApiKey = optionalValue(environment.BONDA_COUPON_API_KEY);
-  const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN);
+  // Explicit opt-in for Carobra's verified shared credential; never assume a
+  // content key can administer affiliates in another integration.
+  const useSharedAffiliateKey = parseBoolean("BONDA_AFFILIATE_USE_SHARED_KEY", environment.BONDA_AFFILIATE_USE_SHARED_KEY ?? "false");
+  const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN)
+    ?? (useSharedAffiliateKey ? couponApiKey : undefined);
   const catalogAffiliateCode = optionalValue(environment.BONDA_CATALOG_AFFILIATE_CODE);
   const coursesEnabled = parseBoolean('BONDA_COURSES_ENABLED', environment.BONDA_COURSES_ENABLED ?? 'false');
   if (coursesEnabled && (!micrositeId || !couponApiKey || !catalogAffiliateCode)) {

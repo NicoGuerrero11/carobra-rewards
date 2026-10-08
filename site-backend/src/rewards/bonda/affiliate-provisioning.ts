@@ -47,7 +47,10 @@ implements BondaAffiliateProvisioningHttpApplication {
       // A downgrade never revokes, recreates or updates an already confirmed affiliate.
       if (existing?.state === "ACTIVE") return activeStatus();
       if (!await this.canInitiallyAffiliate(identity)) return disabledStatus();
-      if (existing?.state === "ACTION_REQUIRED") return actionRequiredStatus();
+      if (existing?.state === "ACTION_REQUIRED") {
+        if (existing.safeErrorCode === "affiliate_dispatch_unverified") return this.reconcileDispatch(existing);
+        return actionRequiredStatus();
+      }
       await this.store.ensurePending(identity.customerId, identity.rewardsId, this.clock.now());
       return await this.attemptCustomer(identity.customerId);
     } catch {
@@ -91,18 +94,29 @@ implements BondaAffiliateProvisioningHttpApplication {
   private async attemptClaimed(
     record: BondaAffiliateProvisioningRecord,
   ): Promise<BondaAffiliateStatusHttpResponse> {
+    let dispatched = false;
     try {
       // Re-check after the claim: retries and callers share this same gate.
       if (!await this.canInitiallyAffiliate(record)) return disabledStatus();
       const exists = await this.gateway.affiliateExists(record.rewardsId);
       // A level/status change during the existence lookup must not initiate an affiliation.
       if (!exists && !await this.canInitiallyAffiliate(record)) return disabledStatus();
+      if (!exists) {
+        // Durable intent BEFORE the POST: a crash or lost acknowledgement must
+        // never turn a later 404 into permission to send another creation.
+        await this.store.markFailure(record.customerId, "affiliate_dispatch_unverified", null, this.clock.now());
+        dispatched = true;
+      }
       const result = exists
         ? { state: "ALREADY_EXISTS" as const, externalMemberId: null }
         : await this.gateway.createAffiliate(record.rewardsId);
+      if (!exists && !await this.gateway.affiliateExists(record.rewardsId)) {
+        return actionRequiredStatus();
+      }
       await this.store.markActive(record.customerId, result.externalMemberId, this.clock.now());
       return activeStatus();
     } catch (error) {
+      if (dispatched) return this.reconcileDispatch(record);
       const failure = affiliateFailure(error);
       const retryAt = failure.retryable
         ? new Date(this.clock.now().getTime() + retryDelayMilliseconds(record.attemptCount))
@@ -119,6 +133,15 @@ implements BondaAffiliateProvisioningHttpApplication {
       }
       return retryAt ? pendingStatus(true) : actionRequiredStatus();
     }
+  }
+  private async reconcileDispatch(record: BondaAffiliateProvisioningRecord): Promise<BondaAffiliateStatusHttpResponse> {
+    try {
+      if (await this.gateway.affiliateExists(record.rewardsId)) {
+        await this.store.markActive(record.customerId, record.externalMemberId, this.clock.now());
+        return activeStatus();
+      }
+    } catch { /* Keep durable ACTION_REQUIRED intent, never resend POST. */ }
+    return actionRequiredStatus();
   }
 }
 

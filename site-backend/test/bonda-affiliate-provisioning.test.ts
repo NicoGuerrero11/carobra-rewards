@@ -99,7 +99,7 @@ test("a local failure after partner creation remains repairable without duplicat
   const gateway = new FakeBondaGateway();
   const application = createApplication(store, gateway);
 
-  assert.equal((await application.afterRegistration({ customerId, rewardsId: "RWD-TEST" })).state, "PENDING");
+  assert.equal((await application.afterRegistration({ customerId, rewardsId: "RWD-TEST" })).state, "ACTIVE");
   assert.equal(gateway.affiliateCodes.size, 1);
   store.records.get(customerId)!.nextAttemptAt = null;
 
@@ -231,4 +231,29 @@ test("downgrade during partner lookup prevents first creation", async () => {
   const app = new BondaAffiliateProvisioningApplication(true, store, gateway, new FixedClock(now), { read: async () => ({ rewardsId: "RWD-TEST", eligible }) });
   assert.equal((await app.afterRegistration({ customerId, rewardsId: "RWD-TEST" })).state, "DISABLED");
   assert.equal(gateway.affiliateCodes.size, 0);
+});
+
+test('an uncertain creation is durably blocked before POST and never resent after a negative lookup', async () => {
+  const store = new MemoryAffiliateStore();
+  const gateway = new FakeBondaGateway();
+  let posts=0;
+  gateway.createAffiliate = async () => {
+    posts++;
+    assert.equal(store.records.get(customerId)?.state, 'ACTION_REQUIRED');
+    assert.equal(store.records.get(customerId)?.safeErrorCode, 'affiliate_dispatch_unverified');
+    throw new BondaGatewayError('PARTNER_UNAVAILABLE','lost acknowledgement',true);
+  };
+  const app=createApplication(store,gateway);
+  assert.equal((await app.ensureForBenefits({customerId,rewardsId:'RWD-TEST'})).state,'ACTION_REQUIRED');
+  await app.retryDue();
+  assert.equal((await app.ensureForBenefits({customerId,rewardsId:'RWD-TEST'})).state,'ACTION_REQUIRED');
+  assert.equal(posts,1);
+});
+
+test('a success acknowledgement without a verified GET remains ACTION_REQUIRED', async () => {
+  const store = new MemoryAffiliateStore();
+  const gateway = new FakeBondaGateway();
+  gateway.createAffiliate=async()=>({state:'ACTIVE',externalMemberId:'123'});
+  assert.equal((await createApplication(store,gateway).ensureForBenefits({customerId,rewardsId:'RWD-TEST'})).state,'ACTION_REQUIRED');
+  assert.equal(store.records.get(customerId)?.state,'ACTION_REQUIRED');
 });

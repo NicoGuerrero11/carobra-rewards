@@ -135,13 +135,13 @@ test("pending retries stop below Bronze and reconcile a lost acknowledgement wit
     await level(db,'BRONZE'); let creates = 0;
     const create = gateway.createAffiliate.bind(gateway);
     gateway.createAffiliate = async code => { creates++; await create(code); throw new BondaGatewayError('PARTNER_UNAVAILABLE','synthetic lost acknowledgement',true); };
-    assert.equal((await app.ensureForBenefits(identity)).state,'PENDING'); assert.equal(creates,1);
+    assert.equal((await app.ensureForBenefits(identity)).state,'ACTIVE'); assert.equal(creates,1);
     await level(db,null,'INVITED'); await db.exec(`UPDATE bonda_affiliate_provisioning SET next_attempt_at = NULL`);
     let reads = 0; const exists = gateway.affiliateExists.bind(gateway);
     gateway.affiliateExists = async code => { reads++; return exists(code); };
     await app.retryDue(); assert.equal(reads,0); assert.equal(creates,1);
     await level(db,'BRONZE'); await db.exec(`UPDATE bonda_affiliate_provisioning SET next_attempt_at = NULL`);
-    await app.retryDue(); assert.equal(reads,1); assert.equal(creates,1); assert.equal((await store.find(customerId))?.state,'ACTIVE');
+    await app.retryDue(); assert.equal(reads,0); assert.equal(creates,1); assert.equal((await store.find(customerId))?.state,'ACTIVE');
   } finally { await db.close(); }
 });
 
