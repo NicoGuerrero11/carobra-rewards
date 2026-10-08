@@ -1,3 +1,4 @@
+import { startBondaAffiliatePolling } from "./rewards/bonda/affiliate-polling.js";
 import { createSiteBackendServer } from "./app.js";
 import { loadConfig } from "./config.js";
 import { CoursesApplication } from './rewards/courses/application.js';
@@ -38,8 +39,13 @@ const server = createSiteBackendServer(
     new PostgresProgressStore(database),
   ) : undefined,
 );
+const affiliatePolling = bonda && config.bonda
+  ? startBondaAffiliatePolling(bonda.affiliateEvents,
+    config.bonda.affiliateProvisioningEnabled && !config.bonda.localPreviewEnabled,
+    result => console.log(JSON.stringify({ event: "bonda_affiliation_events", ...result })))
+  : undefined;
 if (database) {
-  server.on("close", () => void database.end());
+  server.on("close", () => { void (async () => { await affiliatePolling?.stop(); await database.end(); })(); });
   void database.query("SELECT 1")
     .then(async () => bonda?.warmCatalog())
     .catch((error: unknown) => {
@@ -56,3 +62,6 @@ server.listen(config.port, config.host, () => {
     console.log(`Site backend listening on http://${config.host}:${address.port}`);
   }
 });
+
+process.once("SIGTERM", () => server.close());
+process.once("SIGINT", () => server.close());
