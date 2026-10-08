@@ -17,6 +17,7 @@ let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
 let portalUnavailable = portalLoadedWithContext && !portal;
 let catalog: BondaCouponCatalog = emptyCatalog("PARTNER_UNAVAILABLE");
 let history: BondaCouponHistory = { items: [] };
+let historyUnavailable = false;
 
 if (!portalLoadedWithContext) {
   try {
@@ -29,14 +30,26 @@ if (!portalLoadedWithContext) {
   }
 }
 
-if (portal) {
+const loaded = Astro.locals.navigationModules;
+if (portal && loaded?.coupons) {
+  if (loaded.coupons.status === 401 || loaded.history?.status === 401) return Astro.redirect("/login?error=unauthenticated");
+  catalog = loaded.coupons.data ?? emptyCatalog("PARTNER_UNAVAILABLE", portal.journey.journey.current_level);
+  if (loaded.history) {
+    history = loaded.history.data ?? {items: []};
+    historyUnavailable = loaded.history.data === null;
+  }
+} else if (portal) {
   try {
     const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons?page_size=50`, { headers: { cookie } });
     if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
     if (response.ok) catalog = await response.json() as BondaCouponCatalog;
     if (catalog.access_state === "AVAILABLE" && catalog.affiliate_state === "ACTIVE" && catalog.items.length > 0) {
-      const historyResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons/history`, { headers: { cookie } });
-      if (historyResponse.ok) history = await historyResponse.json() as BondaCouponHistory;
+      try {
+        const historyResponse = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/coupons/history`, { headers: { cookie } });
+        if (historyResponse.status === 401) return Astro.redirect("/login?error=unauthenticated");
+        if (historyResponse.ok) history = await historyResponse.json() as BondaCouponHistory;
+        else historyUnavailable = true;
+      } catch { historyUnavailable = true; }
     }
   } catch {
     catalog = emptyCatalog("PARTNER_UNAVAILABLE", portal.journey.journey.current_level);
@@ -80,6 +93,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
 
 <ClientShellLayout title="Beneficios | Carobra Rewards" description="Cupones y descuentos disponibles para tu nivel Carobra Rewards." currentPath="/cliente/beneficios" sectionLabel="Beneficios">
   <main class="benefits-page">
+    {historyUnavailable && <p role="status">No pudimos cargar tus cupones recibidos. <a href="/cliente/beneficios">Volver a intentar</a></p>}
     {portalUnavailable && !portal ? (
       <section class="benefits-page__empty" role="status"><span aria-hidden="true">!</span><div><h1>No pudimos cargar tus beneficios</h1><p>Intenta de nuevo en unos minutos. No mostraremos opciones que no estén confirmadas para tu cuenta.</p></div></section>
     ) : portal && (

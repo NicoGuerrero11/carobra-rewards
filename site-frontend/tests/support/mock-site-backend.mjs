@@ -227,8 +227,39 @@ const server = createServer(async (request, response) => {
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
+  if (method === "GET" && path === "/api/v1/rewards/bonda-balance") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication required");
+    const delay = Math.min(10000, Math.max(0, Number(process.env.BONDA_POINTS_PREVIEW_DELAY_MS) || 0));
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    const refreshMode = process.env.BONDA_POINTS_REFRESH_PREVIEW;
+    const balanceRequest = refreshMode ? {headers:{cookie:`bonda-balance=${refreshMode}; ${request.headers.cookie ?? ''}`}} : request;
+    return json(response, 200, homePortal(balanceRequest, authenticated).journey.points.bonda ?? {
+      status: 'DISABLED', available: null, observed_at: null, pending: null, verification_required: null,
+    });
+  }
+
   if (method === "GET" && path === "/api/v1/rewards/customer-context") {
     const authenticated = authenticatedProfile(request);
+    let navigationModules;
+    const include = new URL(request.url, `http://${host}:${port}`).searchParams.get('include');
+    if (authenticated && process.env.NAVIGATION_BUNDLE_PREVIEW === 'true' && ['home','benefits','courses'].includes(include)) {
+      // Test-only same-origin composition; never use a real BFF/provider here.
+      const read = async resource => {
+        const result = await fetch(`http://${host}:${port}/api/v1/rewards/${resource}`, {headers:{cookie:request.headers.cookie ?? ''}});
+        return {status:result.status,data:result.ok?await result.json():null};
+      };
+      if (include === 'home') {
+        const [coupons,courses]=await Promise.all([read('coupons?page_size=4&preview=true'),read('courses')]);
+        navigationModules={coupons,courses};
+      } else if (include === 'courses') navigationModules={courses:await read('courses')};
+      else if (request.headers.cookie?.includes('products-failure=true')) navigationModules={coupons:{status:503,data:null}};
+      else {
+        const coupons=await read('coupons?page_size=50');
+        navigationModules={coupons};
+        if(coupons.data?.access_state==='AVAILABLE'&&coupons.data?.affiliate_state==='ACTIVE'&&coupons.data.items.length) navigationModules.history=await read('coupons/history');
+      }
+    }
     return authenticated
       ? json(response, 200, {
           customer: (homeCookie(request, 'gift-identity') || process.env.GIFT_CARD_PREVIEW === 'true') ? { ...authenticated, rewards_id: { numeric: '123456789', missing: '', legacy: 'RWD-synthetic', malformed: '123 456 789' }[homeCookie(request, 'gift-identity') ?? 'numeric'] ?? '' } : homeCookie(request, 'account-identity') === 'long' ? {
@@ -238,6 +269,7 @@ const server = createServer(async (request, response) => {
             email: 'maria.fernanda.alejandra.guerrero.fernandez@clientes.ejemplo.test',
           } : authenticated,
           validation: { status: validationFor(authenticated).status },
+          ...(navigationModules ? {navigation_modules:navigationModules} : {}),
           portal: request.headers.cookie?.includes('products-failure=true') ? null : homePortal(request,authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");

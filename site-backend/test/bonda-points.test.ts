@@ -143,3 +143,52 @@ test('lost intent acknowledgement cannot reset a durable uncertain operation to 
     assert.equal(calls.length,0);
   }finally{await db.close();}
 });
+
+test('portal balance snapshots never call the provider, retain unknowns and age local observations', async () => {
+  const {db,store,gateway,app} = await setup();
+  try {
+    let calls = 0;
+    gateway.wallet = async () => {calls++; throw Error('provider must not run during SSR');};
+    const unknown = await app.getStoredBalance(customer);
+    assert.equal(unknown.status, 'UNAVAILABLE'); assert.equal(unknown.available, null); assert.equal(calls, 0);
+    const old = new Date(Date.now() - 120_000);
+    await store.saveBalance(customer, 'synthetic', '123456789', {id:'20',balance:'0',email:null}, old, old);
+    const stale = await app.getStoredBalance(customer);
+    assert.equal(stale.status, 'STALE'); assert.equal(stale.available, '0'); assert.equal(calls, 0);
+    const now = new Date();
+    await store.saveBalance(customer, 'synthetic', '123456789', {id:'20',balance:'900',email:null}, now, now);
+    assert.equal((await app.getStoredBalance(customer)).status, 'FRESH');
+    await db.exec("UPDATE customers SET rewards_id='987654321'");
+    assert.equal((await app.getStoredBalance(customer)).available, null); assert.equal(calls, 0);
+  } finally { await db.close(); }
+});
+
+test('repeated navigation cannot multiply an in-flight wallet read and local snapshots remain independent', async () => {
+  const {db,gateway,app} = await setup();
+  try {
+    for (let wave=0;wave<3;wave++) {
+      let release!:()=>void, entered!:()=>void;
+      const gate=new Promise<void>(resolve=>release=resolve);
+      const started=new Promise<void>(resolve=>entered=resolve);
+      let calls=0,completed=false;
+      gateway.wallet=async()=>{calls++;entered();await gate;throw Error('synthetic outage');};
+      const reads=Promise.all(Array.from({length:20},()=>app.getBalance(customer))).then(values=>{completed=true;return values;});
+      await started;
+      assert.equal((await app.getStoredBalance(customer)).available,null);
+      assert.equal(completed,false);assert.equal(calls,1);
+      release();
+      const values=await reads;
+      assert.equal(values.every(value=>value.status==='UNAVAILABLE'&&value.available===null),true);
+      assert.equal(calls,1);
+    }
+  } finally {await db.close();}
+});
+
+test('wallet deadline aborts the underlying fetch signal', async () => {
+  let signal: AbortSignal | null | undefined;
+  const gateway=new BondaPointsHttpGateway({...config(),requestTimeoutMs:5},async(_url,init)=>{
+    signal=init?.signal;return new Promise<Response>(()=>{});
+  });
+  await assert.rejects(gateway.wallet('123456789'),{code:'UNAVAILABLE'});
+  assert.equal(signal?.aborted,true);
+});

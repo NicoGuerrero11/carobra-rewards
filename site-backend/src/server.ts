@@ -38,6 +38,7 @@ const server = createSiteBackendServer(
     undefined,
     new PostgresProgressStore(database),
   ) : undefined,
+  bonda?.points,
 );
 const affiliatePolling = bonda && config.bonda
   ? startBondaAffiliatePolling(bonda.affiliateEvents,

@@ -7,7 +7,11 @@ if (type !== null && type !== 'cursos' && type !== 'bienestar') return Astro.red
 const space: LearningSpace | null = type;
 const retryUrl = space ? learningCatalogUrl(space) : '/cliente/cursos';
 let catalog: CoursesCatalog | null = null;
-try {
+const loaded = Astro.locals.navigationModules?.courses;
+if (loaded) {
+  if (loaded.status === 401) return Astro.redirect('/login');
+  catalog = loaded.data;
+} else try {
   const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/courses`, {
     headers: {cookie: Astro.request.headers.get('cookie') ?? ''}, signal: AbortSignal.timeout(12000),
   });

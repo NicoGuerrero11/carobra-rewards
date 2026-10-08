@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
+import type { BondaPointsQuery } from "./rewards/bonda/points-application.js";
 import { RewardsApiClient, SiteApiError, type FetchImplementation } from "./api-client.js";
 import type { SiteBackendConfig } from "./config.js";
 import type { CoursesApplication } from './rewards/courses/application.js';
@@ -44,23 +44,17 @@ import {
 } from "./rewards/bonda/catalog-application.js";
 
 const MAX_BODY_BYTES = 128 * 1024;
-// A customer commonly spends more than 30 seconds scanning the catalog before
-// opening a benefit. Keep the already validated, read-only context for the
-// length of that browsing session so every navigation does not repeat both
-// upstream identity requests. Explicit logout and customer mutations still
-// invalidate the entry immediately.
-const CUSTOMER_CONTEXT_CACHE_TTL_MS = 5 * 60_000;
-const CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES = 500;
-
+type NavigationRead<T> = { status: number; data: T | null };
+interface NavigationModules {
+  coupons?: NavigationRead<Awaited<ReturnType<BondaCouponHttpApplication["getCatalog"]>>>;
+  courses?: NavigationRead<Awaited<ReturnType<CoursesApplication["list"]>>>;
+  history?: NavigationRead<Awaited<ReturnType<BondaCouponHttpApplication["getHistory"]>>>;
+}
 interface CustomerContextPayload {
   customer: CustomerProfile;
   validation: { status: string };
   portal: RewardsCustomerPortalHttpResponse | null;
-}
-
-interface CachedCustomerContext {
-  payload: CustomerContextPayload;
-  evidence: RewardsIdentityEvidence;
+  navigation_modules?: NavigationModules;
 }
 
 export function createSiteBackendServer(
@@ -73,10 +67,10 @@ export function createSiteBackendServer(
   bondaAffiliateProvisioningApplication?: BondaAffiliateProvisioningHttpApplication,
   bondaCouponApplication?: BondaCouponHttpApplication,
   coursesApplication?: CoursesApplication,
+  bondaPoints?: BondaPointsQuery,
 ): Server {
   const client = new RewardsApiClient(config, fetchImplementation);
   const rewardsV2TestScenarios = new RewardsV2TestScenarioApplication();
-  const customerContextCache = new CustomerContextCache();
   return createServer((request, response) => {
     void routeRequest(
       request,
@@ -90,8 +84,8 @@ export function createSiteBackendServer(
       bondaAffiliateProvisioningApplication,
       bondaCouponApplication,
       rewardsV2TestScenarios,
-      customerContextCache,
       coursesApplication,
+      bondaPoints,
     );
   });
 }
@@ -108,8 +102,8 @@ async function routeRequest(
   bondaAffiliateProvisioningApplication: BondaAffiliateProvisioningHttpApplication | undefined,
   bondaCouponApplication: BondaCouponHttpApplication | undefined,
   rewardsV2TestScenarios: RewardsV2TestScenarioApplication,
-  customerContextCache: CustomerContextCache,
   coursesApplication: CoursesApplication | undefined,
+  bondaPoints: BondaPointsQuery | undefined,
 ): Promise<void> {
   try {
     const method = request.method ?? "GET";
@@ -151,7 +145,6 @@ async function routeRequest(
     }
     if (method === "POST" && path === "/api/v1/auth/logout") {
       const result = await client.logout(cookie);
-      customerContextCache.delete(cookie);
       return sendApiResult(response, result, config);
     }
     if (method === "GET" && path === "/api/v1/me") {
@@ -161,28 +154,42 @@ async function routeRequest(
       return sendApiResult(response, await client.getValidationStatus(cookie), config);
     }
     if (method === "GET" && path === "/api/v1/rewards/customer-context") {
-      const cached = customerContextCache.get(cookie);
-      if (cached) {
-        sendJson(response, 200, cached.payload);
-        return;
-      }
       const context = await client.getAuthenticatedCustomerContext(cookie);
+      const requestedPage = requestUrl.searchParams.get("include");
+      const page = requestedPage === "home" || requestedPage === "benefits" || requestedPage === "courses"
+        ? requestedPage : null;
+      let modules: Promise<NavigationModules> | undefined;
+      const readModules = () => loadNavigationModules(page!, context.data.evidence, bondaCouponApplication, coursesApplication);
       const customerPortal = await loadCustomerPortalSafely(
         rewardsCustomerPortalApplication,
         rewardsV2JourneyApplication,
         context.data.evidence,
+        () => {
+          // Only independent, side-effect-free reads overlap portal projection.
+          // The synchronization gate has completed before either read starts.
+          if (page === "home" || page === "courses") modules = readModules();
+        },
       );
+      // Catalog/history may provision or reconcile: preserve the successful
+      // portal prerequisite and their existing catalog -> history ordering.
+      if (page === "benefits" && customerPortal) modules = readModules();
       const payload: CustomerContextPayload = {
         customer: context.data.customer,
         validation: { status: context.data.validation.status },
         portal: customerPortal,
+        ...(page ? {navigation_modules: modules ? await modules : unavailableNavigationModules(page)} : {}),
       };
-      customerContextCache.set(cookie, { payload, evidence: context.data.evidence });
       return sendApiResult(response, {
         status: 200,
         data: payload,
         setCookies: context.setCookies,
       }, config);
+    }
+    if (method === "GET" && path === "/api/v1/rewards/bonda-balance") {
+      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      if (!bondaPoints) throw new SiteApiError(503, "api_unavailable", "Balance is unavailable");
+      sendJson(response, 200, await bondaPoints.getBalance(evidence.data.customer_id));
+      return;
     }
     if (method === "GET" && path === "/api/v1/rewards/journey") {
       if (!rewardsV2JourneyApplication) {
@@ -258,7 +265,6 @@ async function routeRequest(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<UpdatePreferencesInput>(request),
       );
-      customerContextCache.delete(cookie);
       sendJson(response, 200, preferences);
       return;
     }
@@ -267,7 +273,6 @@ async function routeRequest(
       const evidence = await client.getRewardsIdentityEvidence(cookie);
       const body = await readJsonBody<{ notification_id: string }>(request);
       await portal.markNotificationRead(asCustomerId(evidence.data.customer_id), body.notification_id);
-      customerContextCache.delete(cookie);
       sendJson(response, 200, { status: "recorded" });
       return;
     }
@@ -278,7 +283,6 @@ async function routeRequest(
       const completed = await portal.completeAction(
         asCustomerId(evidence.data.customer_id), body.action_id,
       );
-      customerContextCache.delete(cookie);
       sendJson(response, 200, { completed });
       return;
     }
@@ -289,7 +293,6 @@ async function routeRequest(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<UpdateLearningProgressInput>(request),
       );
-      customerContextCache.delete(cookie);
       sendJson(response, 200, { updated });
       return;
     }
@@ -309,7 +312,7 @@ async function routeRequest(
     }
     if (method === 'GET' && (path === '/api/v1/rewards/courses' || path.startsWith('/api/v1/rewards/courses/'))) {
       response.setHeader('cache-control', 'private, no-store');
-      const evidence = await client.getRewardsIdentityEvidence(cookie);
+      const evidence = await client.getReadOnlyRewardsIdentityEvidence(cookie);
       if (!coursesApplication) throw new CourseError(503, 'courses_unavailable');
       const customerId = asCustomerId(evidence.data.customer_id);
       if (path === '/api/v1/rewards/courses') {
@@ -323,12 +326,15 @@ async function routeRequest(
     }
     if (method === "GET" && path === "/api/v1/rewards/coupons") {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      const previewOnly = requestUrl.searchParams.get("preview") === "true";
+      const evidence = (await (previewOnly
+        ? client.getReadOnlyRewardsIdentityEvidence(cookie)
+        : client.getRewardsIdentityEvidence(cookie))).data;
       sendJson(response, 200, await coupons.getCatalog(
         bondaIdentity(evidence),
         integerQuery(requestUrl, "page", 1),
         integerQuery(requestUrl, "page_size", 20),
-        requestUrl.searchParams.get("preview") === "true",
+        previewOnly,
       ));
       return;
     }
@@ -344,7 +350,7 @@ async function routeRequest(
     }
     if (method === "GET" && path === "/api/v1/rewards/coupons/history") {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      const evidence = (await client.getRewardsIdentityEvidence(cookie)).data;
       sendJson(response, 200, await coupons.getHistory(bondaIdentity(evidence)));
       return;
     }
@@ -366,7 +372,7 @@ async function routeRequest(
     const couponBranchesMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)\/branches$/);
     if (method === "GET" && couponBranchesMatch) {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      const evidence = (await client.getRewardsIdentityEvidence(cookie)).data;
       sendJson(response, 200, await coupons.getBranches(
         bondaIdentity(evidence),
         decodePathSegment(couponBranchesMatch[1]!),
@@ -376,7 +382,7 @@ async function routeRequest(
     const couponDetailMatch = path.match(/^\/api\/v1\/rewards\/coupons\/([^/]+)$/);
     if (method === "GET" && couponDetailMatch) {
       const coupons = requireBondaCouponApplication(bondaCouponApplication);
-      const evidence = await readCachedRewardsEvidence(client, customerContextCache, cookie);
+      const evidence = (await client.getRewardsIdentityEvidence(cookie)).data;
       sendJson(response, 200, await coupons.getDetail(
         bondaIdentity(evidence),
         decodePathSegment(couponDetailMatch[1]!),
@@ -422,7 +428,6 @@ async function routeRequest(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<SiteActionHttpRequest>(request),
       );
-      customerContextCache.delete(cookie);
       sendJson(response, 200, result);
       return;
     }
@@ -433,7 +438,6 @@ async function routeRequest(
         asCustomerId(evidence.data.customer_id),
         await readJsonBody<OnboardingEvidenceHttpRequest>(request),
       );
-      customerContextCache.delete(cookie);
       sendJson(response, 200, result);
       return;
     }
@@ -477,54 +481,6 @@ async function routeRequest(
   }
 }
 
-class CustomerContextCache {
-  private readonly entries = new Map<string, { expiresAt: number; context: CachedCustomerContext }>();
-
-  get(cookie: string | undefined): CachedCustomerContext | undefined {
-    const key = contextCacheKey(cookie);
-    if (!key) return undefined;
-    const entry = this.entries.get(key);
-    if (!entry) return undefined;
-    if (entry.expiresAt <= Date.now()) {
-      this.entries.delete(key);
-      return undefined;
-    }
-    return entry.context;
-  }
-
-  set(cookie: string | undefined, context: CachedCustomerContext): void {
-    const key = contextCacheKey(cookie);
-    if (!key) return;
-    this.entries.delete(key);
-    this.entries.set(key, { expiresAt: Date.now() + CUSTOMER_CONTEXT_CACHE_TTL_MS, context });
-    while (this.entries.size > CUSTOMER_CONTEXT_CACHE_MAX_ENTRIES) {
-      const oldestKey = this.entries.keys().next().value as string | undefined;
-      if (!oldestKey) break;
-      this.entries.delete(oldestKey);
-    }
-  }
-
-  delete(cookie: string | undefined): void {
-    const key = contextCacheKey(cookie);
-    if (key) this.entries.delete(key);
-  }
-}
-
-async function readCachedRewardsEvidence(
-  client: RewardsApiClient,
-  cache: CustomerContextCache,
-  cookie: string | undefined,
-): Promise<RewardsIdentityEvidence> {
-  const cached = cache.get(cookie);
-  if (cached) return cached.evidence;
-  return (await client.getRewardsIdentityEvidence(cookie)).data;
-}
-
-function contextCacheKey(cookie: string | undefined): string | undefined {
-  if (!cookie) return undefined;
-  return createHash("sha256").update(cookie).digest("base64url");
-}
-
 async function loadCustomerPortalSafely(
   portal: RewardsCustomerPortalApplication | undefined,
   journey: RewardsV2JourneyHttpApplication | undefined,
@@ -534,10 +490,12 @@ async function loadCustomerPortalSafely(
     validation_status: string;
     product_evidence: null | { source_id: string; validated_at: string };
   },
+  afterSynchronization?: () => void,
 ) {
   if (!portal) return null;
   try {
     if (journey) await synchronizeJourneyEvidence(journey, evidence);
+    afterSynchronization?.();
     return await portal.getPortal(
       asCustomerId(evidence.customer_id),
       evidence.validation_status,
@@ -556,6 +514,52 @@ async function loadCustomerPortalSafely(
     }));
     return null;
   }
+}
+
+function unavailableNavigationModules(page: "home" | "benefits" | "courses"): NavigationModules {
+  const unavailable = {status: 503, data: null};
+  return page === "home" ? {coupons: unavailable, courses: unavailable}
+    : page === "benefits" ? {coupons: unavailable} : {courses: unavailable};
+}
+
+async function navigationRead<T>(operation: () => Promise<T>, budgetMs?: number): Promise<NavigationRead<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // These are the existing frontend wait budgets, not shorter provider
+    // deadlines. Provider cancellation/coalescing remains owned by its gateway.
+    const pending = operation();
+    const data = budgetMs === undefined ? await pending : await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("navigation_read_timeout")), budgetMs); }),
+    ]);
+    return {status: 200, data};
+  } catch { return {status: 503, data: null}; }
+  finally { if (timer) clearTimeout(timer); }
+}
+
+async function loadNavigationModules(
+  page: "home" | "benefits" | "courses",
+  evidence: RewardsIdentityEvidence,
+  coupons: BondaCouponHttpApplication | undefined,
+  courses: CoursesApplication | undefined,
+): Promise<NavigationModules> {
+  const readCourses = () => navigationRead(async () => {
+    if (!courses) throw new Error("courses_unavailable");
+    return courses.list(asCustomerId(evidence.customer_id));
+  }, page === "home" ? 5000 : 12000);
+  const readCoupons = () => navigationRead(async () => {
+    if (!coupons) throw new Error("coupons_unavailable");
+    return coupons.getCatalog(bondaIdentity(evidence), 1, page === "home" ? 4 : 50, page === "home");
+  }, page === "home" ? 5000 : undefined);
+  if (page === "courses") return {courses: await readCourses()};
+  if (page === "home") {
+    const [catalog, learning] = await Promise.all([readCoupons(), readCourses()]);
+    return {coupons: catalog, courses: learning};
+  }
+  const catalog = await readCoupons();
+  const available = catalog.data;
+  if (available?.access_state !== "AVAILABLE" || available.affiliate_state !== "ACTIVE" || !available.items.length) return {coupons: catalog};
+  return {coupons: catalog, history: await navigationRead(() => coupons!.getHistory(bondaIdentity(evidence)))};
 }
 
 async function captureReferralSafely(

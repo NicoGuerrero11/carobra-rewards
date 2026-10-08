@@ -13,6 +13,7 @@ const allowedPaths = new Set([
   "rewards/movements",
   "rewards/customer-context",
   "rewards/portal",
+  "rewards/bonda-balance",
   "rewards/portal/preferences",
   "rewards/portal/notifications/read",
   "rewards/portal/actions/complete",
@@ -43,6 +44,7 @@ const proxy: APIRoute = async ({ params, request }) => {
     method: request.method,
     headers,
     redirect: "manual",
+    ...(path === "rewards/bonda-balance" ? {signal: request.signal} : {}),
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     const body = await request.arrayBuffer();
