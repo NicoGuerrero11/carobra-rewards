@@ -14,7 +14,7 @@ test('home discovers real eligible modules and retains working destinations with
   const response=await page.goto('/cliente/recompensas');
   expect(response?.headers()['cache-control']).toContain('no-store');
   await expect(page.getByRole('heading',{name:'Bronce',exact:true})).toBeVisible();
-  await expect(page.locator('.home-recorded-points')).toHaveText('Puntos registrados en Carobra: 150 pts');
+  await expect(page.locator('.home-recorded-points')).toHaveText('Registrados en Carobra Rewards');
   await expect(page.locator('.home-next-level')).toHaveCount(0);
   await expect(page.locator('.coupon-card')).toHaveCount(2);
   await expect(page.locator('.coupon-card__logo img')).toHaveCount(1);

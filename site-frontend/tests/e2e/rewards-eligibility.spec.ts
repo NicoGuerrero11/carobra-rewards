@@ -5,7 +5,7 @@ test("pending customer enters the real invited Rewards experience", async ({ pag
 
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Invitado", exact: true })).toBeVisible();
-  await expect(page.getByText("Puntos registrados en Carobra:")).toBeVisible();
+  await expect(page.getByText("Registrados en Carobra Rewards")).toBeVisible();
   await expect(page.getByText("45 pts", { exact: true })).toBeVisible();
   await expect(page.getByText("Tu próximo paso comienza con un producto confirmado.")).toBeVisible();
   await expect(page.getByRole("region", { name: "Resumen de tu cuenta" }).getByRole("link", { name: "Descubrir productos" })).toBeVisible();
@@ -28,7 +28,7 @@ test("eligible customer sees the production Rewards summary at exactly 320 pixel
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
   await expect(page.getByRole("heading", { name: "Hola, Ada" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bronce" })).toBeVisible();
-  await expect(page.getByText("Puntos registrados en Carobra:")).toBeVisible();
+  await expect(page.getByText("Registrados en Carobra Rewards")).toBeVisible();
   await expect(page.getByText("150 pts").first()).toBeVisible();
   await expect(page.getByText("Producto confirmado").first()).toBeVisible();
   await expect(page.getByText("Registro completado")).toBeVisible();

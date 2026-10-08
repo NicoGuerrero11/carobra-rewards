@@ -49,7 +49,7 @@ const expiration = item?.expirationAt
   ? new Date(item.expirationAt).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
   : "Consulta los términos";
 const unavailableCopy = detail.access_state === "PARTNER_UNAVAILABLE"
-  ? ["No pudimos cargar este beneficio", "Bonda no respondió en este momento. Intenta nuevamente en unos minutos."]
+  ? ["No pudimos actualizar este beneficio", "Hay un problema temporal al consultar la información. Intenta nuevamente en unos minutos."]
   : ["Este beneficio ya no está disponible", "Puede haber cambiado, vencido o no corresponder a tu cuenta."];
 ---
 
@@ -69,6 +69,7 @@ const unavailableCopy = detail.access_state === "PARTNER_UNAVAILABLE"
             <div class="coupon-detail__copy">
               <p class="eyebrow">{displayCategory}</p>
               <h1 id="coupon-title">{item.name}</h1>
+              {detail.freshness === "STALE" && <p role="status">No pudimos actualizar esta información. Confirmaremos la disponibilidad antes de solicitar tu beneficio.</p>}
               {item.discount && <strong class="discount">{item.discount}</strong>}
               <BenefitRichText
                 class="description"

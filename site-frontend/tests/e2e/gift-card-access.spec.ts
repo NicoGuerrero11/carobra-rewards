@@ -28,7 +28,7 @@ test('member number on Home, Account and Bonda copies canonical value on repeate
   await page.getByRole('link', { name: /Volver a Beneficios/ }).click();
   await expect(page).toHaveURL(/\/cliente\/beneficios#gift-cards$/);
   await expect(page.locator('#gift-cards')).toBeVisible();
-  await page.getByRole('link', { name: /Ver mi avance/ }).click();
+  await page.getByRole('link', { name: 'Inicio', exact: true }).click();
   await expect(page).toHaveURL(/\/cliente\/recompensas$/);
 });
 test('clipboard rejection uses a local fallback; total failure exposes selectable canonical number', async ({ page, context }) => {
@@ -68,7 +68,7 @@ test('Gold visibility and canonical identity control the public link without ext
     }
     await expect(section).toHaveAttribute('data-state',state);
     if (state === 'level_met') {
-      const link = section.getByRole('link', { name: /Ir a Bonda/ });
+      const link = section.getByRole('link', { name: /Ver gift cards/ });
       await expect(link).toHaveAttribute('href', 'https://carobrarewards.bonda.com');
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       // Observe navigation with an in-memory response; never contact the real microsite.
@@ -83,11 +83,12 @@ test('Gold visibility and canonical identity control the public link without ext
       }
       expect(requests).toEqual(['https://carobrarewards.bonda.com/','https://carobrarewards.bonda.com/']);
     } else {
-      await expect(section.getByRole('button', { name: /Ir a Bonda/ })).toBeDisabled();
+      await expect(section.getByRole('button', { name: /Ver gift cards/ })).toBeDisabled();
       await expect(section.locator('a[href^="http"]')).toHaveCount(0);
-      await section.getByRole('button', { name: /Ir a Bonda/ }).evaluate((button: HTMLButtonElement) => { button.disabled = false; button.click(); button.click(); });
+      await section.getByRole('button', { name: /Ver gift cards/ }).evaluate((button: HTMLButtonElement) => { button.disabled = false; button.click(); button.click(); });
     }
-    await expect(section).toContainText('3 puntos = $1 MXN');
+    await expect(section).not.toContainText('3 puntos');
+    await expect(section).not.toContainText('MXN');
     await expect(section).toContainText('catálogo completo');
     await expect(section).not.toContainText('Saldo disponible');
     await expect(page).toHaveURL(/\/cliente\/beneficios$/);
