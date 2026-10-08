@@ -7,39 +7,28 @@ interface Props { journey?: RewardsJourneySummary | null; rewardsId?: string | n
 const { journey, rewardsId } = Astro.props;
 const state = giftCardReadiness(journey?.journey.state, journey?.journey.current_level, rewardsId);
 const visible = state === "level_met" || state === "identity_pending";
-// Public destination authorized by Carobra; never append identity or session data.
+// Authorized public destination. Never append identity or session data.
 const micrositeUrl = "https://carobrarewards.bonda.com";
-const messages = {
-  unavailable: ["No pudimos confirmar tu nivel", "Vuelve a consultar tu cuenta para conocer tu avance. El acceso permanece en preparación."],
-  restricted: ["Revisa el estado de tu cuenta", "Necesitamos confirmar el estado de tu cuenta antes de continuar. Puedes consultar Ayuda."],
-  below_level: ["Tu próximo destino: Oro", "Las gift cards comienzan en Oro. Sigue tu avance desde Inicio para conocer tu nivel actual."],
-  identity_pending: ["Tu nivel cumple el requisito", "Tu número de socio no está disponible. Consulta Ayuda antes de acceder a Bonda."],
-  level_met: ["Tu nivel cumple el requisito", "Consulta el catálogo en el micrositio de Bonda con tu Número de socio Rewards."],
-};
 ---
 {visible && <section id="gift-cards" class="gift-access" aria-labelledby="gift-access-title" data-state={state}>
   <div class="gift-access__intro">
-    <p class="gift-access__eyebrow">Gift cards · Bonda</p>
-    <h2 id="gift-access-title">Más posibilidades con tus puntos</h2>
-    <p>Desde Oro, accede al catálogo completo de gift cards, sin un límite de catálogo por nivel.</p>
-    <div class="gift-access__rules"><span>Oro · Platino · Titanio</span><strong>3 puntos = $1 MXN</strong></div>
+    <p class="gift-access__eyebrow"><span aria-hidden="true">✦</span> Gift cards <span class="gift-access__badge">Desde Oro</span></p>
+    <h2 id="gift-access-title">Convierte tus puntos en algo para ti</h2>
+    <p>Elige del catálogo completo de gift cards y encuentra tu próximo gusto.</p>
+    <p class="gift-access__rate">3 puntos <span>=</span> $1 MXN</p>
     <BondaPointsBalance balance={journey?.points.bonda} />
   </div>
   <div class="gift-access__access">
-    <span class="gift-access__badge">Disponible desde Oro</span>
-    <h3>{messages[state][0]}</h3>
-    <p>{messages[state][1]}</p>
+    <p class="gift-access__instructions">Usa tu número de socio para ingresar</p>
     <RewardsMemberNumber rewardsId={rewardsId} />
-    <p class="gift-access__instructions">Usa tu Número de socio Rewards en Bonda y sigue los pasos para crear allí tu contraseña.</p>
     {state === "level_met" ? (
-      <a class="gift-access__button gift-access__button--ready" href={micrositeUrl} target="_blank" rel="noopener noreferrer">Ir a Bonda <span aria-hidden="true">↗</span><span class="sr-only"> (abre en otra pestaña)</span></a>
+      <a class="gift-access__button" href={micrositeUrl} target="_blank" rel="noopener noreferrer">Ver gift cards <span aria-hidden="true">↗</span><span class="sr-only"> (abre en otra pestaña)</span></a>
     ) : (
-      <button class="gift-access__button" type="button" disabled>Ir a Bonda <span aria-hidden="true">↗</span></button>
+      <><button class="gift-access__button" type="button" disabled>Ver gift cards <span aria-hidden="true">↗</span></button><p class="gift-access__note">Necesitamos confirmar tu número de socio para continuar.</p></>
     )}
-    <p class="gift-access__note">Si Bonda aún no reconoce tu número, consulta Ayuda. Este enlace no confirma que tu cuenta externa esté activa.</p>
-    <a href={state === "identity_pending" ? "/cliente/ayuda" : "/cliente/recompensas"}>{state === "identity_pending" ? "Ir a Ayuda" : "Ver mi avance"} <span aria-hidden="true">→</span></a>
+    <p class="gift-access__help">¿Necesitas ayuda para ingresar? <a href="/cliente/ayuda">Te ayudamos</a></p>
   </div>
 </section>}
 <style>
-  .gift-access{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin:1.5rem 0;padding:2rem;border:1px solid #d7e1e8;border-radius:1.4rem;background:linear-gradient(115deg,#edf6fa,#fff 65%);color:#173f59}.gift-access__eyebrow{margin:0 0 .7rem;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#496579}.gift-access h2{margin:0 0 1rem;font-size:clamp(1.5rem,2.7vw,2rem);line-height:1.15;max-width:18ch}.gift-access p{font-size:.86rem;line-height:1.65}.gift-access__rules{display:flex;flex-wrap:wrap;gap:.65rem;margin:1.2rem 0}.gift-access__rules>*{padding:.45rem .7rem;border-radius:.6rem;background:#fff;border:1px solid #d7e1e8;font-size:.75rem}.gift-access .gift-access__note{font-size:.73rem;color:#526d80}.gift-access__access{min-width:0}.gift-access__badge{display:inline-block;padding:.35rem .65rem;border-radius:999px;background:#f3e8cf;color:#71551d;font-size:.68rem;font-weight:800}.gift-access h3{font-size:1rem;margin:1rem 0 .3rem}.gift-access__access>p{margin:.4rem 0 1rem}.gift-access .gift-access__instructions{font-size:.77rem}.gift-access__button{display:flex;align-items:center;justify-content:center;gap:1.5rem;width:100%;min-height:44px;padding:.75rem;border:1px solid #ccd7df;border-radius:.75rem;color:#556979;background:#e8eef2;font:inherit;font-weight:700;font-size:.82rem;cursor:not-allowed}.gift-access a{font-size:.8rem;font-weight:800;text-decoration:underline;text-underline-offset:4px}.gift-access .gift-access__button--ready{background:#173f59;color:#fff;cursor:pointer;text-decoration:none}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.gift-access a:focus-visible{outline:3px solid #176f9e;outline-offset:3px}@media(max-width:700px){.gift-access{grid-template-columns:1fr;padding:1.2rem;gap:1.3rem}.gift-access h2{max-width:none}.gift-access__access{padding-top:1.2rem;border-top:1px solid #d7e1e8}}
+.gift-access{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:2rem;margin:1.5rem 0;padding:2rem;border:1px solid #d4e3e7;border-radius:1.4rem;background:linear-gradient(120deg,#ecf4f6,#fff 80%);color:#163f56;overflow:hidden}.gift-access__eyebrow{display:flex;align-items:center;gap:.6rem;margin:0 0 1.1rem;font-size:.76rem;font-weight:800}.gift-access__eyebrow>span:first-child{font-size:1.35rem;color:#287d8d}.gift-access__badge{margin-left:auto;border:1px solid #c9b87e;border-radius:999px;padding:.3rem .6rem;background:#fffbef;color:#785d20;font-size:.65rem;font-weight:700}.gift-access h2{max-width:22ch;margin:0 0 .8rem;font-size:clamp(1.5rem,2.8vw,2rem);line-height:1.2;font-weight:750;letter-spacing:-.04em}.gift-access p{font-size:.82rem;line-height:1.6}.gift-access__intro>p:not(.gift-access__eyebrow){max-width:42ch}.gift-access .gift-access__rate{margin:1rem 0 .15rem;font-size:.85rem;font-weight:800}.gift-access__rate span{margin:0 .45rem;font-weight:400}.gift-access__access{align-self:center;min-width:0;padding:1.4rem;border:1px solid #d6e2e8;border-radius:1rem;background:#ffffffd9}.gift-access .gift-access__instructions{margin:0 0 .8rem;font-weight:700;font-size:.8rem}.gift-access__button{display:flex;align-items:center;justify-content:space-between;gap:.8rem;min-height:48px;width:100%;padding:.8rem 1rem;border:0;border-radius:.7rem;background:#17466a;color:#fff;font:inherit;font-size:.84rem;font-weight:800;text-decoration:none;box-sizing:border-box}.gift-access__button:hover{background:#103b5c}.gift-access__button:disabled{background:#e6edf0;color:#687a83;cursor:not-allowed}.gift-access .gift-access__help,.gift-access .gift-access__note{font-size:.68rem;line-height:1.6;margin:.8rem 0 0;color:#526b78}.gift-access__help a{color:#17466a;font-weight:700;text-underline-offset:3px}.gift-access a:focus-visible{outline:3px solid #187e9c;outline-offset:4px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}@media(max-width:700px){.gift-access{grid-template-columns:1fr;padding:1.3rem;gap:1rem}.gift-access h2{max-width:24ch}.gift-access__access{padding:1rem}.gift-access__intro>p:not(.gift-access__eyebrow){max-width:none}}
 </style>

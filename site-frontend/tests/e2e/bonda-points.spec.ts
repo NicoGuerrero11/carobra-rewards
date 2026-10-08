@@ -8,10 +8,12 @@ test('Bonda is the balance authority across Home, Activity and gift cards; unkno
     await context.addCookies([{name:'bonda-balance',value:mode,domain:'127.0.0.1',path:'/'}]);
     for (const path of ['/cliente/recompensas','/cliente/activities','/cliente/beneficios']) {
       await page.goto(path);
-      const balance=page.getByLabel('Puntos para gift cards en Bonda',{exact:true});
-      await expect(balance.locator('.bonda-balance__amount')).toHaveText(`${mode==='zero'?'0':['fresh','stale'].includes(mode)?'900':'—'} pts`);
+      const balance=page.getByLabel('Puntos para gift cards',{exact:true});
+      if (['fresh','zero','stale'].includes(mode)) await expect(balance.locator('.bonda-balance__amount')).toHaveText(`${mode==='zero'?'0':'900'} pts`);
+      else await expect(balance.locator('.bonda-balance__amount')).toHaveCount(0);
+      await expect(balance.locator('.bonda-balance__equivalent')).toHaveCount(['fresh','zero'].includes(mode)?1:0);
       if(mode==='stale')await expect(balance).toContainText('Puede haber cambiado');
-      if(mode==='disabled')await expect(balance).toContainText('en preparación');
+      if(mode==='disabled')await expect(balance).toContainText('al ingresar');
       if(mode==='unavailable')await expect(balance).toContainText('No pudimos consultar');
       if(mode!=='disabled'){await expect(balance).toContainText('300 puntos pendientes');await expect(balance).toContainText('150 puntos en revisión');}
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth)).toBe(true);
@@ -21,6 +23,6 @@ test('Bonda is the balance authority across Home, Activity and gift cards; unkno
 });
 test('downgrade hides gift access while balance remains separate from level and local earnings',async({page,context})=>{
   await context.addCookies([{name:'bonda-balance',value:'zero'},{name:'home-level',value:'SILVER'}].map(x=>({...x,domain:'127.0.0.1',path:'/'})));
-  await page.goto('/cliente/recompensas');await expect(page.getByLabel('Puntos para gift cards en Bonda',{exact:true})).toContainText('0 pts');await expect(page.locator('.home-level h2')).toHaveText('Plata');
+  await page.goto('/cliente/recompensas');await expect(page.locator('#gift-cards')).toHaveCount(0);await expect(page.locator('.home-balance__amount')).toContainText('150');await expect(page.locator('.home-level h2')).toHaveText('Plata');
   await page.goto('/cliente/beneficios');await expect(page.locator('#gift-cards')).toHaveCount(0);
 });
