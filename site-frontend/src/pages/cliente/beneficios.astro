@@ -55,8 +55,8 @@ const stateContent = {
   ACCOUNT_UNAVAILABLE: ["Tus beneficios no están disponibles", "Revisa el estado de tu cuenta para volver a consultar el catálogo."],
   AFFILIATE_PENDING: ["Estamos activando tus beneficios", "Tu cuenta funciona normalmente. Volveremos a intentar la activación con Bonda sin que tengas que registrarte otra vez."],
   COUPON_UNAVAILABLE: ["Este beneficio cambió", "Ya no se encuentra disponible en el catálogo actual."],
-  PARTNER_UNAVAILABLE: ["No pudimos cargar los beneficios", "Bonda no respondió en este momento. Intenta nuevamente en unos minutos."],
-  AVAILABLE: ["Aún no hay beneficios publicados", "No mostraremos marcas ni condiciones hasta que el catálogo haya sido validado."],
+  PARTNER_UNAVAILABLE: ["No pudimos actualizar tus beneficios", "Hay un problema temporal al consultar el catálogo. Intenta nuevamente en unos minutos."],
+  AVAILABLE: ["Por ahora no hay beneficios disponibles", "Vuelve pronto para consultar las opciones de tu nivel."],
 }[catalog.access_state];
 
 function emptyCatalog(
@@ -87,13 +87,14 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
         {catalog.items.length > 0 ? (
           <section class="benefits-page__section benefits-catalog" aria-labelledby="catalog-title">
             <div class="benefits-page__section-heading catalog-heading">
-              <div><p class="benefits-page__eyebrow">Disponible hoy</p><h1 id="catalog-title">{catalog.total === 1 ? "1 beneficio para ti" : `${catalog.total} beneficios para ti`}</h1></div>
+              <div><p class="benefits-page__eyebrow">Tus beneficios</p><h1 id="catalog-title">{catalog.total === 1 ? "1 beneficio para ti" : `${catalog.total} beneficios para ti`}</h1></div>
               <div class="catalog-filters" aria-label="Filtros de beneficios">
                 <label><span>Categoría</span><select id="category-filter"><option value="">Todos</option>{categories.map((category) => <option value={category}>{category}</option>)}</select></label>
                 <label><span>Cómo usarlo</span><select id="channel-filter"><option value="">Todos</option>{channels.map((channel) => <option value={channel}>{couponChannelLabel(channel)}</option>)}</select></label>
               </div>
             </div>
             {refreshedAt && <p class="catalog-freshness">Catálogo actualizado: <time datetime={catalog.refreshed_at ?? undefined}>{refreshedAt}</time></p>}
+            {catalog.freshness === "STALE" && <p class="catalog-freshness" role="status">No pudimos actualizar el catálogo. Estas son las últimas opciones consultadas; confirmaremos su disponibilidad al usarlas. <a href="/cliente/beneficios">Volver a intentar</a></p>}
             <div class="benefits-grid" id="benefits-grid">
               {catalogItems.map(item => <CouponCard item={item} />)}
             </div>

@@ -1,57 +1,41 @@
-# Revisión local Bonda — 2026-10-08
+# Revisión del diseño de Rewards y gift cards
 
-Rama: `codex/bonda-reliability-bronze-ui`, worktree `/tmp/carobra-bonda-reliability`.
-Preview: http://127.0.0.1:4327/cliente/recompensas, backend mock loopback 3042.
-No push, PR, merge, migración, cambio de flags ni despliegue productivo.
+Rama: `codex/bonda-ui-design`, basada en `main` `6f1f6a6`.
+El cambio contiene sólo interfaz, contratos de lectura frontend y pruebas con mocks.
 
-## Pruebas
+## Alcance
 
-- Backend completo tras afiliación: 342 pruebas, 335 aprobadas, 7 omitidas, 0 fallos.
-- Después del reconocimiento del mensaje de retirada: build TypeScript y 25 pruebas
-  focalizadas del gateway/caché, todas aprobadas.
-- Frontend: build completo con Node 24.21.0, Astro check sin errores ni advertencias
-  (2 hints de execCommand en tests existentes), empaquetado Vercel nodejs24.x válido.
-- Contratos frontend: 8 aprobados.
-- Se actualizaron las expectativas E2E de textos, balance y equivalencia; no se
-  ejecutó la suite Playwright por shell en esta sesión. La interacción de navegador
-  se realizó con CUA en el navegador integrado de Codex en la Mac.
+- Número de socio compacto; conserva formato de nueve dígitos en grupos de tres,
+  copia sin espacios, confirmación accesible y fallback ya existentes.
+- Inicio separa puntos registrados en Carobra Rewards del saldo para gift cards.
+- Tarjeta simple desde Oro, con número de socio y CTA al micrositio autorizado.
+  Se mantienen las reglas de estado, nivel e identidad. Sin fórmula de conversión
+  ni equivalente MXN. El enlace no transmite identidad, sesión ni credenciales.
+- FRESH y cero confirmado muestran puntos; STALE conserva el importe y advierte
+  que puede haber cambiado. UNAVAILABLE y DISABLED no inventan importe ni cero.
+- Catálogo y detalle avisan cuando el backend devuelve `freshness: STALE`.
 
-## Navegador integrado, datos sintéticos
+## Validación
 
-Se inspeccionaron los píxeles de Inicio y Mi cuenta. Como el override de viewport
-no cambiaba el panel real (790 px), un harness temporal DEV mostró la aplicación
-sin modificar dentro de iframes de 1440 y 390 px. Se comprobó el ancho efectivo del
-DOM y ausencia de desbordamiento: 1440/1440 y 390/390. El harness fue retirado del
-árbol de rutas y no está incluido en el build ni en el commit.
+Las pruebas se ejecutan con backend mock local y datos sintéticos. La suite de
+número de socio bloquea navegación externa e intercepta el enlace al micrositio;
+no llama a Bonda ni efectúa canjes reales. Incluye clicks repetidos, copia,
+fallback, identidad faltante y acceso por nivel/estado, en desktop y móvil.
+La suite de saldo recorre FRESH, cero, STALE, UNAVAILABLE y DISABLED.
+La prueba de catálogo verifica el aviso STALE y su desaparición al refrescar.
 
-- Copiar muestra confirmación accesible. Pegado real en textarea local confirma
-  `123456789`; tres clicks no alteraron el valor. Enter en Mi cuenta también copia.
-- Harness con rechazo sintético de Clipboard API: fallback confirmado. Rechazo
-  de ambos mecanismos: input seleccionable `123456789` y explicación visible.
-- Oro: tarjeta y enlace público; Bronce y BLOCKED: tarjeta ausente.
-- Identidad faltante: botón deshabilitado y ningún enlace externo en el bloque.
-- 900 puntos FRESH: equivalencia $300.00 MXN. STALE conserva cantidad con aviso,
-  sin equivalencia; UNAVAILABLE y DISABLED no inventan importe ni cero.
-- Navegación Inicio → Mi cuenta y Beneficios → Ayuda confirmada por UI.
-- Destino verificado: `https://carobrarewards.bonda.com`, sin query ni identificador,
-  `rel=noopener noreferrer`. No se abrió el destino real ni se ejecutaron canjes;
-  no se afirma validación del login externo o de titularidad.
+La propuesta anterior fue revisada manualmente en el navegador integrado de Codex
+con anchos de 1440 y 390 px, navegación y copia real. El diseño publicado conserva
+esos archivos de interfaz. La validación automatizada se repite sobre esta rama.
 
-## Límites y pendientes
+Resultados sobre esta rama: build Node 24.21.0 correcto; Astro check sin errores
+ni warnings (dos hints de `execCommand` existente); runtime 5/5, contratos 8/8,
+SSR 6/6 y E2E focalizado 44/44 en desktop/móvil. La suite completa y los checks
+del SHA publicado quedan registrados en el PR.
 
-Las tres capturas originales indicadas en Library no estuvieron disponibles mediante
-herramientas de lectura/materialización de este entorno. La comparación visual usó
-la aplicación local existente y el diseño textual aprobado; no se afirma haber leído
-esas capturas. Se requiere revisión humana de la propuesta.
+## Límites
 
-Railway quedó autenticado por el usuario en IAB pestaña 3 y se verificó a las
-16:46 UTC. El diagnóstico de cupón 9510 respondió HTTP 200 con
-`Cupon no existente o desactivado`. El runbook de cupones contiene la evidencia y
-el tratamiento específico. La falta de cupón vigente requiere confirmación del
-proveedor, no restaurar un afiliado técnico que ya existe. Los HTTP 500 de cursos
-no tienen causa confirmada.
-
-La afiliación automática está preparada en código, no activada. Consultar
-`bonda-bronze-activation.md` para publicar sólo backend, aplicar únicamente 028,
-activar los dos flags no secretos y la captura futura, y autorizar la nueva fixture
-sintética. No hay backfill histórico ni prueba de transición nueva en producción.
+Este PR no recupera el catálogo productivo, activa afiliación ni modifica reglas,
+backend, migraciones o configuración de producción. No verifica el login externo
+ni la titularidad en Bonda. La URL de preview depende del despliegue automático
+normal del PR; no debe confundirse con producción.

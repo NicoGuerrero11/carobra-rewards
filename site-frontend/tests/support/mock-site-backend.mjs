@@ -301,6 +301,7 @@ const server = createServer(async (request, response) => {
       affiliate_state: active ? "ACTIVE" : "DISABLED",
       items: ['disabled','empty'].includes(mode) ? [] : active ? mode==='many'?Array.from({length:6},(_,i)=>({...bronzeCoupons[0],id:`example-${i}`})):bronzeCoupons : [],
       refreshed_at: active ? "2026-09-10T12:00:00.000Z" : null,
+      freshness: mode === "stale" ? "STALE" : "FRESH",
       page: 1,
       page_size: 50,
       total: active ? bronzeCoupons.length : 0,
@@ -356,6 +357,7 @@ const server = createServer(async (request, response) => {
     const item = bronzeCoupons.find((candidate) => candidate.id === detailMatch[1]);
     return json(response, 200, {
       access_state: item ? "AVAILABLE" : "COUPON_UNAVAILABLE",
+      freshness: homeCookie(request, "home-coupons") === "stale" ? "STALE" : "FRESH",
       affiliate_state: "ACTIVE",
       item: item ? {
         ...item,
