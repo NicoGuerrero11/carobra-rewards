@@ -9,7 +9,10 @@ export interface BondaPointsView {
   available: string | null; observed_at: string | null;
   pending: string | null; verification_required: string | null;
 }
-export interface BondaPointsQuery { getBalance(customerId: string): Promise<BondaPointsView>; }
+export interface BondaPointsQuery {
+  getBalance(customerId: string): Promise<BondaPointsView>;
+  getStoredBalance(customerId: string): Promise<BondaPointsView>;
+}
 const empty = (status: BondaPointsView['status']): BondaPointsView => ({ status, available:null, observed_at:null, pending:null, verification_required:null });
 
 export class BondaPointsApplication implements DueJobProcessor, BondaPointsQuery {
@@ -88,7 +91,12 @@ export class BondaPointsApplication implements DueJobProcessor, BondaPointsQuery
     const result = this.readBalance(customerId).finally(() => this.reads.delete(customerId));
     this.reads.set(customerId, result); return result;
   }
-  private async readBalance(customerId: string): Promise<BondaPointsView> {
+  // Portal rendering reads only local observations. Refresh happens separately,
+  // after navigation, without blocking unrelated products, levels or activity.
+  getStoredBalance(customerId: string): Promise<BondaPointsView> {
+    return this.readBalance(customerId, false);
+  }
+  private async readBalance(customerId: string, refresh = true): Promise<BondaPointsView> {
     const settings = this.config.points;
     if ((!settings?.sendEnabled && !settings?.balanceEnabled) || this.config.localPreviewEnabled) return empty('DISABLED');
     let result = empty(settings.balanceEnabled ? 'UNAVAILABLE' : 'DISABLED');
@@ -102,6 +110,7 @@ export class BondaPointsApplication implements DueJobProcessor, BondaPointsQuery
       if (context.customer_status !== 'ACTIVE' || context.affiliate_state !== 'ACTIVE') return result;
       const started = new Date();
       if (cached && started.getTime() - cached.observed_at.getTime() < 60_000) return { ...result, status:'FRESH' };
+      if (!refresh) return result;
       const wallet = await this.gateway.wallet(context.rewards_id);
       const observed = new Date();
       await this.store.saveBalance(customerId, this.config.micrositeId, context.rewards_id, wallet, started, observed);

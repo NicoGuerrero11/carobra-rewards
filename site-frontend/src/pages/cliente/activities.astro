@@ -6,8 +6,9 @@ import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-co
 import "../../styles/customer-activity.css";
 
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let portal: RewardsCustomerPortal | null = null;
-let unavailable = false;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let unavailable = Astro.locals.rewardsPortal === null;
+if (Astro.locals.rewardsPortal === undefined) {
 try {
   const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
   if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
@@ -16,6 +17,8 @@ try {
 } catch {
   unavailable = true;
 }
+}
+Astro.response.headers.set("Cache-Control", "private, no-store");
 const timeline = portal?.timeline ?? [];
 const movements = portal?.movement_details.movements ?? [];
 const dateTime = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));

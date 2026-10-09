@@ -18,8 +18,8 @@ const [accountResult, couponResult, learningResult] = await Promise.all([
   Astro.locals.rewardsPortal !== undefined
     ? Promise.resolve({status:200, data:Astro.locals.rewardsPortal})
     : readHomeModule<RewardsCustomerPortal>(base, '/api/v1/rewards/portal', cookie),
-  readHomeModule<BondaCouponCatalog>(base, '/api/v1/rewards/coupons?page_size=4&preview=true', cookie),
-  readHomeModule<CoursesCatalog>(base, '/api/v1/rewards/courses', cookie),
+  Astro.locals.navigationModules?.coupons ?? readHomeModule<BondaCouponCatalog>(base, '/api/v1/rewards/coupons?page_size=4&preview=true', cookie),
+  Astro.locals.navigationModules?.courses ?? readHomeModule<CoursesCatalog>(base, '/api/v1/rewards/courses', cookie),
 ]);
 if ([accountResult, couponResult, learningResult].some(result => result.status === 401)) return Astro.redirect('/login?error=unauthenticated');
 Astro.response.headers.set('Cache-Control', 'private, no-store');
