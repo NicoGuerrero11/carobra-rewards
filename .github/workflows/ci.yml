@@ -66,3 +66,21 @@ jobs:
       - run: pnpm run test:ssr
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run test:e2e
+
+  site-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site-backend
+    env:
+      DATABASE_URL: ""
+      TEST_DATABASE_URL: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: site-backend/package-lock.json
+      - run: npm ci
+      - run: npm test

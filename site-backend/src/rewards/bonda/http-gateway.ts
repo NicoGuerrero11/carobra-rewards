@@ -15,15 +15,21 @@ import {
   optionalString,
 } from "./normalization.js";
 
+import {
+  assertAffiliateProfileContract, assertAffiliateProfileFields, pendingAffiliateProfileContract,
+  type AffiliateProfileContract, type AffiliateProfileFields, type AffiliateProfileChanges, type BondaAffiliateProfileGateway,
+} from "./affiliate-profile.js";
+
 type FetchImplementation = typeof fetch;
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_CATALOG_PAGES = 100;
 
-export class BondaHttpGateway implements BondaGateway {
+export class BondaHttpGateway implements BondaGateway, BondaAffiliateProfileGateway {
   constructor(
     private readonly config: BondaConfig,
     private readonly fetchImplementation: FetchImplementation = fetch,
+    private readonly profileContract: AffiliateProfileContract = pendingAffiliateProfileContract,
   ) {}
 
   async createAffiliate(rewardsId: string): Promise<BondaAffiliateResult> {
@@ -35,17 +41,46 @@ export class BondaHttpGateway implements BondaGateway {
         headers: { "content-type": "application/json", token },
         body: JSON.stringify({ code: requireIdentifier(rewardsId), send_welcome_email: false }),
       },
+      true,
     );
     const root = asRecord(payload);
     if (root.success === true) {
-      const data = optionalRecord(root.data);
-      const member = optionalRecord(data?.member);
+      const member = assertAffiliateIdentity(root, rewardsId, micrositeId);
       return { state: "ACTIVE", externalMemberId: optionalString(member?.id) };
     }
     if (isAlreadyUsed(root)) {
       return { state: "ALREADY_EXISTS", externalMemberId: null };
     }
     throw classifyPartnerPayload(root);
+  }
+
+  async createAffiliateProfile(rewardsId: string, fields: AffiliateProfileFields): Promise<"CREATED" | "ALREADY_EXISTS"> {
+    assertAffiliateProfileFields(fields, true);
+    assertAffiliateProfileContract(this.profileContract, fields, "CREATE");
+    if (!/^[1-9][0-9]{8}$/.test(rewardsId)) throw invalidResponse("Affiliate identity is invalid");
+    const { micrositeId, token } = this.requireAffiliateConfiguration();
+    const root = asRecord(await this.requestJson("POST", `/api/v2/microsite/${encodeURIComponent(micrositeId)}/affiliates`, {
+      headers: { "content-type": "application/json", token },
+      body: JSON.stringify({ code: rewardsId, ...fields, send_welcome_email: false }),
+      redirect: "error",
+    }, true));
+    if (isAlreadyUsed(root)) return "ALREADY_EXISTS";
+    assertAffiliateProfileAcknowledged(root, rewardsId);
+    return "CREATED";
+  }
+
+  async updateAffiliateProfile(rewardsId: string, changes: AffiliateProfileChanges): Promise<void> {
+    assertAffiliateProfileFields(changes);
+    assertAffiliateProfileContract(this.profileContract, changes, "UPDATE");
+    if (!/^[1-9][0-9]{8}$/.test(rewardsId)) throw invalidResponse("Affiliate identity is invalid");
+    const { micrositeId, token } = this.requireAffiliateConfiguration();
+    if (!Object.keys(changes).length) return;
+    const root = asRecord(await this.requestJson("PATCH", `/api/v2/microsite/${encodeURIComponent(micrositeId)}/affiliates/${encodeURIComponent(rewardsId)}`, {
+      headers: { "content-type": "application/json", token },
+      body: JSON.stringify(changes),
+      redirect: "error",
+    }, true));
+    assertAffiliateProfileAcknowledged(root, rewardsId);
   }
 
   async affiliateExists(rewardsId: string): Promise<boolean> {
@@ -57,9 +92,10 @@ export class BondaHttpGateway implements BondaGateway {
         { headers: { token } },
       );
       const root = asRecord(payload);
-      return root.success === true || optionalRecord(root.data) !== null;
+      assertAffiliateIdentity(root, rewardsId, micrositeId);
+      return true;
     } catch (error) {
-      if (error instanceof BondaGatewayError && error.code === "COUPON_UNAVAILABLE") return false;
+      if (error instanceof BondaGatewayError && error.code === "AFFILIATE_NOT_FOUND") return false;
       throw error;
     }
   }
@@ -98,8 +134,13 @@ export class BondaHttpGateway implements BondaGateway {
         "GET",
         `/api/cupones/${encodeURIComponent(requireIdentifier(couponId))}?${query.toString()}`,
       ));
+      // Even "Cupon no existente o desactivado" is not proof of removal:
+      // the 2026-10-08 diagnostic returned it for every approved ID while
+      // the listing failed with HTTP 403. Preserve the failure classification.
       throwIfPartnerError(root);
-      return normalizeCoupon(root, this.config.allowedImageHosts);
+      const coupon = normalizeCoupon(root, this.config.allowedImageHosts);
+      if (coupon.id !== couponId) throw invalidResponse("Bonda coupon identity does not match the request");
+      return coupon;
     } catch (error) {
       if (error instanceof BondaGatewayError && error.code === "COUPON_UNAVAILABLE") return null;
       throw error;
@@ -209,7 +250,7 @@ export class BondaHttpGateway implements BondaGateway {
   }
 
   private async requestJson(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PATCH",
     path: string,
     init: Omit<RequestInit, "method" | "signal"> = {},
     dispatchedMutation = false,
@@ -223,6 +264,7 @@ export class BondaHttpGateway implements BondaGateway {
       response = await this.fetchImplementation(url, {
         ...init,
         method,
+        redirect: "error",
         headers: { accept: "application/json", ...headersRecord(init.headers) },
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
       });
@@ -237,13 +279,15 @@ export class BondaHttpGateway implements BondaGateway {
       throw new BondaGatewayError("UNAUTHORIZED", "Bonda credentials were rejected", false);
     }
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new BondaGatewayError("COUPON_UNAVAILABLE", "Bonda resource was not found", false);
-      }
-      if (response.status === 400) {
+      if (response.status === 400 || response.status === 404) {
         const errorPayload = await readBoundedJson(response);
         const errorRoot = asRecord(errorPayload);
+        if (response.status === 404 && path.startsWith("/api/v2/microsite/")
+            && optionalRecord(errorRoot.error)?.code === "USER_NOT_FOUND") {
+          throw new BondaGatewayError("AFFILIATE_NOT_FOUND", "Affiliate was not found", false);
+        }
         if ("error" in errorRoot) throw classifyPartnerPayload(errorRoot);
+        throw invalidResponse("Bonda returned an unrecognized resource error");
       }
       throw new BondaGatewayError(
         "PARTNER_UNAVAILABLE",
@@ -263,8 +307,20 @@ function couponQuery(key: string, micrositeId: string, affiliateCode: string): U
   });
 }
 
+function assertAffiliateIdentity(root: Record<string, unknown>, code: string, microsite: string): Record<string, unknown> {
+  const data = optionalRecord(root.data);
+  const member = optionalRecord(data?.member);
+  const company = optionalRecord(data?.company);
+  if (root.success !== true || root.error || !member || String(member.code) !== code
+      || String(member.company_id) !== microsite || String(company?.id) !== microsite
+      || !optionalString(member.id) || member.deleted_at) {
+    throw invalidResponse("Affiliate identity requires verification");
+  }
+  return member;
+}
+
 function throwIfPartnerError(root: Record<string, unknown>): void {
-  if (!("error" in root) || root.error === null || root.error === false) return;
+  if (root.success !== false && (!("error" in root) || root.error === null || root.error === false)) return;
   throw classifyPartnerPayload(root);
 }
 
@@ -287,7 +343,9 @@ function classifyPartnerPayload(root: Record<string, unknown>): BondaGatewayErro
   ) {
     return new BondaGatewayError("UNAUTHORIZED", "Bonda credentials were rejected", false);
   }
-  return new BondaGatewayError("COUPON_UNAVAILABLE", "Coupon is unavailable", false);
+  // Unknown errors (including HTTP 200 error strings) never prove removal.
+  // A valid, expired coupon is filtered by the catalog policy separately.
+  return invalidResponse("Bonda returned an unrecognized partner error");
 }
 
 function isAlreadyUsed(root: Record<string, unknown>): boolean {
@@ -346,5 +404,12 @@ async function readBoundedJson(response: Response): Promise<unknown> {
     return JSON.parse(text) as unknown;
   } catch {
     throw invalidResponse("Bonda returned invalid JSON");
+  }
+}
+
+function assertAffiliateProfileAcknowledged(root: Record<string, unknown>, rewardsId: string): void {
+  const member = optionalRecord(optionalRecord(root.data)?.member);
+  if (root.success !== true || root.error || member?.code !== rewardsId) {
+    throw invalidResponse("Affiliate profile update requires verification");
   }
 }

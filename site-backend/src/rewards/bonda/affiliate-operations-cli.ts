@@ -17,13 +17,17 @@ try {
     ? apply
       ? await integrations.affiliateProvisioning.retryDue(limit)
       : { attempted: 0, active: 0, pending: 0, actionRequired: 0 }
+    : mode === "events"
+      ? apply
+        ? await integrations.affiliateEvents.processDue(new Date(), limit, "bonda-affiliate-cli")
+        : { processedJobs: 0, failedJobs: 0 }
     : mode === "backfill"
       ? await new BackfillBondaAffiliates(
         new PostgresBondaBackfillSource(database),
         integrations.affiliateProvisioning,
       ).run({ limit, apply })
       : null;
-  if (!result) throw new Error("--mode must be retry or backfill");
+  if (!result) throw new Error("--mode must be retry, backfill or events");
   process.stdout.write(`${JSON.stringify({ mode, apply, ...result })}\n`);
 } finally {
   await database.end();

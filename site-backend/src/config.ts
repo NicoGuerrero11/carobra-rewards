@@ -1,6 +1,23 @@
+import { pendingAffiliateProfileContract, type AffiliateProfileContract } from "./rewards/bonda/affiliate-profile.js";
+
 export type CookieSameSite = "lax" | "strict" | "none";
 
+/** Public navigation only; does not enable profile transmission or partner permissions. */
+export interface BondaGiftCardAccessConfig {
+  readonly status: "LINK_ONLY";
+  readonly enabled: true;
+  readonly loginMethod: null;
+  readonly micrositeUrl: "https://carobrarewards.bonda.com";
+  /** Carobra field used for the member number; external authentication remains unconfirmed. */
+  readonly identifierField: "rewards_id";
+  /** Visibility in Carobra starts at Gold; no external level restriction. */
+  readonly minimumLevel: "GOLD";
+}
+
 export interface BondaConfig {
+  points?: { sendEnabled: boolean; balanceEnabled: boolean; token?: string; sourceWalletId?: string };
+  profileSync?: { enabled: boolean; contract: AffiliateProfileContract; revisionKey?: string };
+  giftCardAccess?: BondaGiftCardAccessConfig;
   baseUrl: string;
   allowedHosts: readonly string[];
   allowedImageHosts: readonly string[];
@@ -155,7 +172,11 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
   }
   const micrositeId = optionalValue(environment.BONDA_MICROSITE_ID);
   const couponApiKey = optionalValue(environment.BONDA_COUPON_API_KEY);
-  const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN);
+  // Explicit opt-in for Carobra's verified shared credential; never assume a
+  // content key can administer affiliates in another integration.
+  const useSharedAffiliateKey = parseBoolean("BONDA_AFFILIATE_USE_SHARED_KEY", environment.BONDA_AFFILIATE_USE_SHARED_KEY ?? "false");
+  const affiliateToken = optionalValue(environment.BONDA_AFFILIATE_TOKEN)
+    ?? (useSharedAffiliateKey ? couponApiKey : undefined);
   const catalogAffiliateCode = optionalValue(environment.BONDA_CATALOG_AFFILIATE_CODE);
   const coursesEnabled = parseBoolean('BONDA_COURSES_ENABLED', environment.BONDA_COURSES_ENABLED ?? 'false');
   if (coursesEnabled && (!micrositeId || !couponApiKey || !catalogAffiliateCode)) {
@@ -173,7 +194,37 @@ function loadBondaConfig(environment: NodeJS.ProcessEnv): BondaConfig {
     );
   }
 
+  const profileSyncEnabled = parseBoolean("BONDA_PROFILE_SYNC_ENABLED", environment.BONDA_PROFILE_SYNC_ENABLED ?? "false");
+  // Deployment activation cannot stand in for the unresolved microsite contract.
+  if (profileSyncEnabled && (!pendingAffiliateProfileContract.curpTextAccepted || !pendingAffiliateProfileContract.patchFields)) {
+    throw new Error("Bonda profile synchronization contract is pending confirmation");
+  }
+  const revisionKey = optionalValue(environment.BONDA_PROFILE_REVISION_KEY);
+  if (profileSyncEnabled && (!revisionKey || revisionKey.length < 32 || !affiliateProvisioningEnabled || localPreviewEnabled)) {
+    throw new Error("Bonda profile synchronization requires a dedicated revision key and affiliate provisioning");
+  }
+  const pointsSendEnabled = parseBoolean("BONDA_POINTS_SEND_ENABLED", environment.BONDA_POINTS_SEND_ENABLED ?? "false");
+  const pointsBalanceEnabled = parseBoolean("BONDA_POINTS_BALANCE_ENABLED", environment.BONDA_POINTS_BALANCE_ENABLED ?? "false");
+  const pointsToken = optionalValue(environment.BONDA_POINTS_TOKEN);
+  const sourceWalletId = optionalValue(environment.BONDA_POINTS_SOURCE_WALLET_ID);
+  if ((pointsSendEnabled || pointsBalanceEnabled) && (!pointsToken || /[\r\n]/.test(pointsToken) || !micrositeId || localPreviewEnabled)) {
+    throw new Error("Bonda points require dedicated configuration and no local preview");
+  }
+  if (pointsSendEnabled && (!sourceWalletId || !/^[1-9][0-9]{0,19}$/.test(sourceWalletId))) {
+    throw new Error("Bonda points require a source wallet ID");
+  }
   const config: BondaConfig = {
+    points: { sendEnabled: pointsSendEnabled, balanceEnabled: pointsBalanceEnabled,
+      ...(pointsToken ? { token: pointsToken } : {}), ...(sourceWalletId ? { sourceWalletId } : {}) },
+    profileSync: { enabled: profileSyncEnabled, contract: pendingAffiliateProfileContract, ...(revisionKey ? { revisionKey } : {}) },
+    giftCardAccess: {
+      status: "LINK_ONLY",
+      enabled: true,
+      micrositeUrl: "https://carobrarewards.bonda.com",
+      loginMethod: null,
+      identifierField: "rewards_id",
+      minimumLevel: "GOLD",
+    },
     baseUrl,
     allowedHosts,
     allowedImageHosts: parseHostList(

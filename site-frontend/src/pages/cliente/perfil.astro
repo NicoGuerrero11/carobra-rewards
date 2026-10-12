@@ -1,4 +1,5 @@
 ---
+import RewardsMemberNumber from "../../components/RewardsMemberNumber.astro";
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import ClientNavIcon from "../../components/ClientNavIcon.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
@@ -48,6 +49,7 @@ const preferenceOptions = [
             <div><dt>Nombre completo</dt><dd>{fullName || "No disponible"}</dd></div>
             <div><dt>Correo electrónico</dt><dd>{user?.email || "No disponible"}</dd></div>
           </dl>
+          <RewardsMemberNumber rewardsId={user?.rewardsId} />
           <a class="customer-account__link" href="/cliente/ayuda#soporte">Ayuda con mis datos <span aria-hidden="true">→</span></a>
         </section>
 

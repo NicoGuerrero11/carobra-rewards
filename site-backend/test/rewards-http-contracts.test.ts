@@ -137,7 +137,7 @@ test("authenticated customer portal routes bind reads and commands to API sessio
 
   const cachedContextRead = await fetch(`${bff}/api/v1/rewards/customer-context`, { headers });
   assert.equal(cachedContextRead.status, 200);
-  assert.equal(portal.readCount, 1);
+  assert.equal(portal.readCount, 2);
 
   const read = await fetch(`${bff}/api/v1/rewards/portal`, { headers });
   assert.equal(read.status, 200);
@@ -162,7 +162,7 @@ test("authenticated customer portal routes bind reads and commands to API sessio
   assert.equal(portal.preferencesCustomerId, customerId);
   const refreshedContextRead = await fetch(`${bff}/api/v1/rewards/customer-context`, { headers });
   assert.equal(refreshedContextRead.status, 200);
-  assert.equal(portal.readCount, 3);
+  assert.equal(portal.readCount, 4);
 
   for (const [path, body] of [
     ["notifications/read", { notification_id: "notice:registration:1" }],
@@ -494,3 +494,29 @@ function config(apiBaseUrl: string): SiteBackendConfig {
     },
   };
 }
+
+test('navigation rechecks sessions and balance endpoint binds to API identity without portal side effects', async (t) => {
+  let revoked = false;
+  const upstream = await profileServer(t);
+  const portal = new StubCustomerPortalApplication();
+  const balanceReads: string[] = [];
+  const unknown = {status:'UNAVAILABLE' as const,available:null,observed_at:null,pending:null,verification_required:null};
+  const bff = await start(t, createSiteBackendServer(config(upstream), async (url, init) => {
+    if (revoked) return Response.json({detail:{code:'unauthenticated',message:'expired'}},{status:401});
+    return fetch(url, init);
+  },undefined,undefined,undefined,portal,undefined,undefined,undefined,{
+    getBalance:async id=>{balanceReads.push(id);return unknown;}, getStoredBalance:async()=>unknown,
+  }));
+  const headers={cookie:'carobra_session=synthetic'};
+  for (let i=0;i<2;i++) {
+    const response = await fetch(`${bff}/api/v1/rewards/customer-context`,{headers});
+    assert.equal(response.status,200); assert.match(response.headers.get('cache-control')??'',/no-store/);
+  }
+  assert.equal(portal.readCount,2);
+  const balance=await fetch(`${bff}/api/v1/rewards/bonda-balance?customer_id=someone-else`,{headers});
+  assert.deepEqual(await balance.json(),unknown); assert.deepEqual(balanceReads,[customerId]);
+  assert.equal(portal.readCount,2);
+  revoked=true;
+  for(const path of ['customer-context','bonda-balance']) assert.equal((await fetch(`${bff}/api/v1/rewards/${path}`,{headers})).status,401);
+  assert.equal(portal.readCount,2); assert.equal(balanceReads.length,1);
+});

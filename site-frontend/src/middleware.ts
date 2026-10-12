@@ -64,6 +64,7 @@ interface CustomerContextResponse {
   customer: CustomerProfileResponse;
   validation: ValidationStatusResponse;
   portal: RewardsCustomerPortal | null;
+  navigation_modules?: App.Locals["navigationModules"];
 }
 
 function mapCustomer(customer: CustomerProfileResponse) {
@@ -99,10 +100,12 @@ async function fetchSession(cookieHeader: string | null) {
   }
 }
 
-async function fetchCustomerContext(cookieHeader: string | null) {
+async function fetchCustomerContext(cookieHeader: string | null, pathname: string) {
+  const page = ({"/cliente/recompensas": "home", "/cliente/beneficios": "benefits", "/cliente/cursos": "courses"} as Record<string, string>)[pathname];
+  const query = page ? `?include=${page}` : "";
   if (!cookieHeader) return null;
   try {
-    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/customer-context`, {
+    const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/customer-context${query}`, {
       method: "GET",
       headers: { cookie: cookieHeader },
     });
@@ -112,6 +115,7 @@ async function fetchCustomerContext(cookieHeader: string | null) {
       user: mapCustomer(context.customer),
       validation: context.validation,
       portal: context.portal,
+      navigationModules: context.navigation_modules,
     };
   } catch {
     return null;
@@ -163,7 +167,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const cookieHeader = context.request.headers.get("cookie");
   const authContextStartedAt = performance.now();
   const customerContext = !bypassRequested && isProtected
-    ? await fetchCustomerContext(cookieHeader)
+    ? await fetchCustomerContext(cookieHeader, pathname)
     : null;
   const [user, validation] = bypassRequested
     ? [e2eClientUser, null] as const
@@ -192,6 +196,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   context.locals.user = user;
   if (customerContext) context.locals.rewardsPortal = customerContext.portal;
+  if (customerContext?.navigationModules) context.locals.navigationModules = customerContext.navigationModules;
   const bypassRole = context.request.headers.get(e2eUserRoleHeader)?.toLowerCase();
   const validated = validation?.status === "VALIDATED";
   const rewardsEligibility: RewardsEligibilityResponse | null = bypassRequested
@@ -224,6 +229,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
   const pageStartedAt = performance.now();
   const response = await next();
+  response.headers.set("Cache-Control", "private, no-store");
   const pageDuration = performance.now() - pageStartedAt;
   const totalDuration = performance.now() - requestStartedAt;
   response.headers.append(

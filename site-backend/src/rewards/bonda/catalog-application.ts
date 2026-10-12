@@ -184,10 +184,12 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
       const offset = (page - 1) * pageSize;
       return assertBondaCouponCatalogContract({
         current_level: context.journey!.currentLevel,
-        access_state: "AVAILABLE",
+        access_state: "freshness" in snapshot && snapshot.freshness === "STALE" && items.length === 0
+          ? "PARTNER_UNAVAILABLE" : "AVAILABLE",
         affiliate_state: context.affiliateState,
         items: items.slice(offset, offset + pageSize),
         refreshed_at: snapshot.refreshedAt.toISOString(),
+        ...("freshness" in snapshot && snapshot.freshness === "STALE" ? { freshness: "STALE" as const } : {}),
         page,
         page_size: pageSize,
         total: items.length,
@@ -229,6 +231,7 @@ export class BondaCouponApplication implements BondaCouponHttpApplication {
         access_state: "AVAILABLE",
         affiliate_state: context.affiliateState,
         item: applyPolicy({ ...live, branches: [] }, policy),
+        ...(snapshot?.freshness === "STALE" ? { freshness: "STALE" as const } : {}),
       });
     } catch (error) {
       if (error instanceof BondaGatewayError) {

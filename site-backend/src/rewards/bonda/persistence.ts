@@ -21,7 +21,8 @@ export type BondaAffiliateFailureCode =
   | "partner_unavailable"
   | "invalid_credentials"
   | "invalid_partner_response"
-  | "affiliate_identity_conflict";
+  | "affiliate_identity_conflict"
+  | "affiliate_dispatch_unverified";
 
 export interface BondaAffiliateProvisioningStore {
   ensurePending(

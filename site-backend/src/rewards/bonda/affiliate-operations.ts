@@ -32,9 +32,12 @@ export class PostgresBondaBackfillSource implements BondaBackfillSource {
     const rows = (await this.database.query<CustomerRow>(`
       SELECT customer.id::text, customer.rewards_id
       FROM customers AS customer
+      JOIN rewards_v2_journeys AS journey ON journey.customer_id = customer.id
       LEFT JOIN bonda_affiliate_provisioning AS provisioning
         ON provisioning.customer_id = customer.id
       WHERE provisioning.customer_id IS NULL
+        AND customer.customer_status = 'ACTIVE' AND journey.state = 'ACTIVE'
+        AND journey.current_level IN ('BRONZE','SILVER','GOLD','PLATINUM','TITANIUM')
       ORDER BY customer.id
       LIMIT $1
     `, [limit])).rows;

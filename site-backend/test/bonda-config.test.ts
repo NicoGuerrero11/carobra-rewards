@@ -90,3 +90,21 @@ test("Bonda capabilities can be enabled independently", () => {
   assert.equal(bonda.catalogAffiliateCode, "990910001");
   assert.deepEqual(bonda.allowedHosts, ["bonda-test.example"]);
 });
+
+// Public navigation does not activate profile transmission or partner permissions.
+test("gift card configuration describes the confirmed public link and local Gold visibility", () => {
+  const bonda = loadConfig({ BONDA_GIFT_CARD_ACCESS_ENABLED: "true" }).bonda;
+  assert.deepEqual(bonda?.giftCardAccess, {
+    status: "LINK_ONLY", enabled: true, loginMethod: null,
+    micrositeUrl: "https://carobrarewards.bonda.com",
+    identifierField: "rewards_id", minimumLevel: "GOLD",
+  });
+});
+
+test('shared affiliate credential requires explicit opt-in and never overrides a dedicated token', () => {
+  const environment={BONDA_MICROSITE_ID:'microsite-test',BONDA_COUPON_API_KEY:'synthetic-shared-key',BONDA_AFFILIATE_PROVISIONING_ENABLED:'true'};
+  assert.throws(()=>loadConfig(environment), /AFFILIATE_TOKEN/);
+  assert.equal(loadConfig({...environment,BONDA_AFFILIATE_USE_SHARED_KEY:'true'}).bonda?.affiliateToken,'synthetic-shared-key');
+  assert.equal(loadConfig({...environment,BONDA_AFFILIATE_USE_SHARED_KEY:'true',BONDA_AFFILIATE_TOKEN:'dedicated-test'}).bonda?.affiliateToken,'dedicated-test');
+  assert.equal(loadConfig({BONDA_AFFILIATE_USE_SHARED_KEY:'true',BONDA_COUPON_API_KEY:'synthetic-shared-key'}).bonda?.affiliateProvisioningEnabled,false);
+});

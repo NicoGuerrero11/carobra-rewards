@@ -1,4 +1,5 @@
 ---
+import GiftCardAccess from "../../components/GiftCardAccess.astro";
 import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
 import CouponCard from '../../components/CouponCard.astro';
 import HomeLearningCard from '../../components/HomeLearningCard.astro';
@@ -17,8 +18,8 @@ const [accountResult, couponResult, learningResult] = await Promise.all([
   Astro.locals.rewardsPortal !== undefined
     ? Promise.resolve({status:200, data:Astro.locals.rewardsPortal})
     : readHomeModule<RewardsCustomerPortal>(base, '/api/v1/rewards/portal', cookie),
-  readHomeModule<BondaCouponCatalog>(base, '/api/v1/rewards/coupons?page_size=4&preview=true', cookie),
-  readHomeModule<CoursesCatalog>(base, '/api/v1/rewards/courses', cookie),
+  Astro.locals.navigationModules?.coupons ?? readHomeModule<BondaCouponCatalog>(base, '/api/v1/rewards/coupons?page_size=4&preview=true', cookie),
+  Astro.locals.navigationModules?.courses ?? readHomeModule<CoursesCatalog>(base, '/api/v1/rewards/courses', cookie),
 ]);
 if ([accountResult, couponResult, learningResult].some(result => result.status === 401)) return Astro.redirect('/login?error=unauthenticated');
 Astro.response.headers.set('Cache-Control', 'private, no-store');
@@ -68,12 +69,14 @@ const learningEmpty = !learning ? 'No pudimos cargar estos contenidos. Puedes vo
         {invited ? <a href="/cliente/productos">Descubrir productos <span aria-hidden="true">→</span></a> : restricted && <a href="/cliente/ayuda">Ir a Ayuda <span aria-hidden="true">→</span></a>}
       </div>
       <div class="home-balance">
-        <div><p class="home-eyebrow">Tus puntos Rewards</p><p class="home-balance__amount">{points(journey.points.available)} <span>pts</span></p>{expiry && <p class="home-expiry">Próximo vencimiento: {expiry}</p>}<a class="home-text-link" href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a></div>
+        <div><p class="home-eyebrow">Tus puntos</p><p class="home-balance__amount">{points(journey.points.available)} <span>pts</span></p><p class="home-recorded-points">Registrados en Carobra Rewards</p>{expiry && <p class="home-expiry">Próximo vencimiento: {expiry}</p>}<a class="home-text-link" href="/cliente/activities">Ver movimientos <span aria-hidden="true">→</span></a></div>
         {requirements.length > 0 ? <div class="home-next-level"><strong>Tu camino a {levelLabel(target!)}</strong><p>Te faltan:</p><ul>{requirements.map(item => <li>{item.remaining} {item.remaining === 1 ? item.singular : item.plural}</li>)}</ul></div> : <div class="home-balance__note"><span aria-hidden="true">✦</span><p>{state === 'ACTIVE' ? 'Tus cupones y descuentos no consumen puntos.' : 'Consulta el detalle de tu saldo y los movimientos de tu cuenta.'}</p></div>}
       </div>
     </section> : <section class="home-notice" role="status"><h2>No pudimos actualizar tu cuenta</h2><p>No podemos mostrar tu nivel y saldo en este momento. Puedes seguir explorando las secciones disponibles.</p><a class="home-text-link" href="/cliente/recompensas">Volver a intentar →</a></section>}
 
     {pendingHref && !restricted && <aside class="home-pending"><div><strong>{action!.title}</strong><p>{action!.description}</p></div><a class="home-text-link" href={pendingHref}>Continuar →</a></aside>}
+
+    <GiftCardAccess journey={journey} rewardsId={Astro.locals.user?.rewardsId} />
 
     <section class="home-section" aria-labelledby="home-benefits-title">
       <div class="home-section-heading"><div><p class="home-eyebrow">Más para tu día a día</p><h2 id="home-benefits-title">Aprovecha tus beneficios</h2></div><a class="home-text-link" href="/cliente/beneficios">Ver todos <span aria-hidden="true">→</span></a></div>

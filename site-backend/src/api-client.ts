@@ -31,6 +31,7 @@ export class SiteApiError extends Error {
 }
 
 export class RewardsApiClient {
+  private readonly contextReads = new Map<string, Promise<ApiResult<AuthenticatedCustomerContext>>>();
   constructor(
     private readonly config: SiteBackendConfig,
     private readonly fetchImplementation: FetchImplementation = fetch,
@@ -44,8 +45,15 @@ export class RewardsApiClient {
     return this.request("POST", "/api/v1/auth/login", payload);
   }
 
-  logout(cookieHeader: string | undefined): Promise<ApiResult<undefined>> {
-    return this.request("POST", "/api/v1/auth/logout", undefined, cookieHeader);
+  async logout(cookieHeader: string | undefined): Promise<ApiResult<undefined>> {
+    const key = selectCookie(cookieHeader, this.config.sessionCookie.name);
+    if (key) this.contextReads.delete(key);
+    try {
+      return await this.request<undefined>("POST", "/api/v1/auth/logout", undefined, cookieHeader);
+    } finally {
+      // A navigation begun before/during logout cannot authorize the next one.
+      if (key) this.contextReads.delete(key);
+    }
   }
 
   getCurrentCustomer(
@@ -68,7 +76,8 @@ export class RewardsApiClient {
   async getRewardsIdentityEvidence(
     cookieHeader: string | undefined,
   ): Promise<ApiResult<RewardsIdentityEvidence>> {
-    const context = await this.getAuthenticatedCustomerContext(cookieHeader);
+    // Commands and focused reads always recheck API-owned authority.
+    const context = await this.readAuthenticatedCustomerContext(cookieHeader);
     return {
       status: context.status,
       data: context.data.evidence,
@@ -76,7 +85,27 @@ export class RewardsApiClient {
     };
   }
 
-  async getAuthenticatedCustomerContext(
+  // Only for side-effect-free reads. Share pending work, never a resolved authority.
+  async getReadOnlyRewardsIdentityEvidence(cookieHeader: string | undefined): Promise<ApiResult<RewardsIdentityEvidence>> {
+    const context = await this.getAuthenticatedCustomerContext(cookieHeader);
+    return { status: context.status, data: context.data.evidence, setCookies: context.setCookies };
+  }
+
+  getAuthenticatedCustomerContext(cookieHeader: string | undefined): Promise<ApiResult<AuthenticatedCustomerContext>> {
+    // Only overlapping reads of the exact session; no resolved identity or
+    // permissions are retained across navigations.
+    const key = selectCookie(cookieHeader, this.config.sessionCookie.name);
+    if (!key) return this.readAuthenticatedCustomerContext(cookieHeader);
+    const existing = this.contextReads.get(key);
+    if (existing) return existing;
+    const result = this.readAuthenticatedCustomerContext(cookieHeader).finally(() => {
+      if (this.contextReads.get(key) === result) this.contextReads.delete(key);
+    });
+    this.contextReads.set(key, result);
+    return result;
+  }
+
+  private async readAuthenticatedCustomerContext(
     cookieHeader: string | undefined,
   ): Promise<ApiResult<AuthenticatedCustomerContext>> {
     const [profile, validation] = await Promise.all([

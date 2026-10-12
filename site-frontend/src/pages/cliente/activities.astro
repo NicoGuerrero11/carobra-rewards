@@ -1,12 +1,14 @@
 ---
+import BondaPointsBalance from "../../components/BondaPointsBalance.astro";
 import ClientShellLayout from "../../layouts/ClientShellLayout.astro";
 import { getSiteBackendBaseUrl } from "../../lib/api";
 import type { RewardsCustomerPortal } from "../../lib/rewards-customer-portal-contract";
 import "../../styles/customer-activity.css";
 
 const cookie = Astro.request.headers.get("cookie") ?? "";
-let portal: RewardsCustomerPortal | null = null;
-let unavailable = false;
+let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
+let unavailable = Astro.locals.rewardsPortal === null;
+if (Astro.locals.rewardsPortal === undefined) {
 try {
   const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, { headers: { cookie } });
   if (response.status === 401) return Astro.redirect("/login?error=unauthenticated");
@@ -15,6 +17,8 @@ try {
 } catch {
   unavailable = true;
 }
+}
+Astro.response.headers.set("Cache-Control", "private, no-store");
 const timeline = portal?.timeline ?? [];
 const movements = portal?.movement_details.movements ?? [];
 const dateTime = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -41,9 +45,11 @@ const movementTitle = (code: string) => ({ V2_INVITED_REGISTRATION: "Bienvenida 
       </section>
     ) : portal && (
       <>
+        <BondaPointsBalance balance={portal.journey.points.bonda} />
+        <p>Este historial muestra los movimientos registrados en Carobra. Consulta tus compras de gift cards en Bonda.</p>
         <dl class="customer-activity__summary" aria-label="Resumen de tu actividad">
           <div class="customer-activity__balance">
-            <dt>Saldo disponible</dt>
+            <dt>Puntos registrados en Carobra</dt>
             <dd>{points(portal.journey.points.available)} <span>pts</span></dd>
           </div>
           <div>

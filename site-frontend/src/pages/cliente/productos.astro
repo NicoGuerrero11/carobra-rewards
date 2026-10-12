@@ -7,8 +7,8 @@ import type { RewardsV2ProductStatus } from "../../lib/rewards-v2-contract";
 import "../../styles/products-showcase.css";
 
 let portal: RewardsCustomerPortal | null = Astro.locals.rewardsPortal ?? null;
-let unavailable = false;
-if (!portal) {
+let unavailable = Astro.locals.rewardsPortal === null;
+if (Astro.locals.rewardsPortal === undefined) {
   try {
     const response = await fetch(`${getSiteBackendBaseUrl()}/api/v1/rewards/portal`, {
       headers: { cookie: Astro.request.headers.get("cookie") ?? "" },
@@ -18,6 +18,7 @@ if (!portal) {
     else unavailable = true;
   } catch { unavailable = true; }
 }
+Astro.response.headers.set("Cache-Control", "private, no-store");
 const products = portal?.products ?? [];
 const activeProducts = products.filter((product) => product.status === "ACTIVE").length;
 const date = (value: string) => new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(value));

@@ -1,3 +1,4 @@
+import type { BondaPointsView } from "../bonda/points-application.js";
 import type {
   RewardsJourneyState,
   RewardsLevel,
@@ -17,6 +18,7 @@ export interface RewardsJourneySummaryHttpResponse {
     reason: "NO_ACTIVE_PRODUCT" | "REDEMPTION_DISABLED" | null;
   };
   points: {
+    bonda?: BondaPointsView;
     available: string;
     reserved: string;
     next_expiration_at: string | null;

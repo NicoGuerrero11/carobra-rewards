@@ -99,3 +99,83 @@ function config(): SiteBackendConfig {
     },
   };
 }
+
+test('overlapping identity reads coalesce per session, then revalidate changes and revocations', async () => {
+  let calls = 0, revoked = false, inactive = false;
+  const client = new RewardsApiClient(config(), async (input, init) => {
+    calls++;
+    const cookie = new Headers(init?.headers).get('cookie');
+    const id = cookie === 'carobra_session=alice' ? 'alice' : 'bob';
+    await new Promise(resolve => setTimeout(resolve, 10));
+    if (revoked) return Response.json({detail:{code:'unauthenticated',message:'expired'}},{status:401});
+    return String(input).endsWith('validation-status')
+      ? Response.json({customer_id:id,status:inactive?'PENDING':'VALIDATED'})
+      : Response.json({id,customer_status:inactive?'INACTIVE':'ACTIVE'});
+  });
+  const [alice, sameAlice, bob] = await Promise.all([
+    client.getAuthenticatedCustomerContext('carobra_session=alice; theme=one'),
+    client.getAuthenticatedCustomerContext('theme=two; carobra_session=alice'),
+    client.getAuthenticatedCustomerContext('carobra_session=bob'),
+  ]);
+  assert.equal(calls,4); assert.equal(alice.data.customer.id,'alice');
+  assert.equal(sameAlice.data.customer.id,'alice'); assert.equal(bob.data.customer.id,'bob');
+  inactive = true;
+  assert.equal((await client.getAuthenticatedCustomerContext('carobra_session=alice')).data.customer.customer_status,'INACTIVE');
+  assert.equal(calls,6);
+  revoked = true;
+  await assert.rejects(client.getAuthenticatedCustomerContext('carobra_session=alice'),{status:401});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  revoked = false;
+  assert.equal((await client.getAuthenticatedCustomerContext('carobra_session=alice')).data.customer.id,'alice');
+  assert.equal(calls,10);
+});
+
+test('command evidence does not reuse an overlapping navigation authorization', async () => {
+  let calls=0;
+  const client=new RewardsApiClient(config(),async input=>{
+    calls++; await new Promise(resolve=>setTimeout(resolve,10));
+    return Response.json(String(input).endsWith('validation-status')?{customer_id:'alice',status:'VALIDATED'}:{id:'alice',customer_status:'ACTIVE'});
+  });
+  await Promise.all([client.getAuthenticatedCustomerContext('carobra_session=alice'),client.getRewardsIdentityEvidence('carobra_session=alice')]);
+  assert.equal(calls,4);
+});
+
+test('logout invalidates an unresolved navigation so a later request cannot reuse pre-logout identity', async () => {
+  let release!:()=>void;
+  const gate=new Promise<void>(resolve=>release=resolve);
+  let revoked=false,reads=0;
+  const client=new RewardsApiClient(config(),async input=>{
+    if(String(input).endsWith('/auth/logout')) {revoked=true;return new Response(null,{status:204});}
+    reads++;
+    if(revoked) return Response.json({detail:{code:'unauthenticated'}},{status:401});
+    await gate;
+    return Response.json(String(input).endsWith('validation-status')?{customer_id:'alice',status:'VALIDATED'}:{id:'alice',customer_status:'ACTIVE'});
+  });
+  const earlier=client.getAuthenticatedCustomerContext('carobra_session=alice');
+  assert.equal(reads,2);
+  await client.logout('carobra_session=alice');
+  await assert.rejects(client.getAuthenticatedCustomerContext('carobra_session=alice'),{status:401});
+  assert.equal(reads,4);
+  release();await earlier;
+  await assert.rejects(client.getAuthenticatedCustomerContext('carobra_session=alice'),{status:401});
+  assert.equal(reads,6);
+});
+
+test('parallel read-only modules share pending authority by exact session, then revalidate', async () => {
+  let calls=0;
+  const client=new RewardsApiClient(config(),async(input,init)=>{
+    calls++;
+    const id=new Headers(init?.headers).get('cookie')==='carobra_session=alice'?'alice':'bob';
+    await new Promise(resolve=>setTimeout(resolve,10));
+    return Response.json(String(input).endsWith('validation-status')?{customer_id:id,status:'VALIDATED'}:{id,customer_status:'ACTIVE'});
+  });
+  const values=await Promise.all([
+    client.getReadOnlyRewardsIdentityEvidence('carobra_session=alice'),
+    client.getReadOnlyRewardsIdentityEvidence('carobra_session=alice; theme=ignored'),
+    client.getReadOnlyRewardsIdentityEvidence('carobra_session=bob'),
+  ]);
+  assert.deepEqual(values.map(value=>value.data.customer_id),['alice','alice','bob']);
+  assert.equal(calls,4);
+  await client.getReadOnlyRewardsIdentityEvidence('carobra_session=alice');
+  assert.equal(calls,6);
+});

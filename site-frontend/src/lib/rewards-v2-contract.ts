@@ -8,6 +8,12 @@ export interface RewardsV2ScenarioListItem {
   description: string;
 }
 
+export interface BondaPointsView {
+  status: "DISABLED" | "FRESH" | "STALE" | "UNAVAILABLE";
+  available: string | null; observed_at: string | null;
+  pending: string | null; verification_required: string | null;
+}
+
 export interface RewardsJourneySummary {
   customer_id: string;
   journey: {
@@ -21,6 +27,7 @@ export interface RewardsJourneySummary {
     reason: "NO_ACTIVE_PRODUCT" | "REDEMPTION_DISABLED" | null;
   };
   points: {
+    bonda?: BondaPointsView;
     available: string;
     reserved: string;
     next_expiration_at: string | null;

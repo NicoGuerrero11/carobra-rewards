@@ -1,0 +1,28 @@
+---
+import type { BondaPointsView } from "../lib/rewards-v2-contract";
+interface Props { balance?: BondaPointsView; }
+const { balance } = Astro.props;
+const status = balance?.status ?? 'DISABLED';
+const amount = balance?.available;
+const known = (status === 'FRESH' || status === 'STALE') && amount != null && /^\d+$/.test(amount);
+const format = (value: string) => new Intl.NumberFormat('es-MX').format(BigInt(value));
+const positive = (value: string | null | undefined): value is string => value != null && /^\d+$/.test(value) && BigInt(value) > 0n;
+const timestamp = balance?.observed_at ? new Date(balance.observed_at) : null;
+const observed = timestamp && Number.isFinite(timestamp.getTime()) ? timestamp : null;
+---
+<div class="bonda-balance" data-bonda-status={status} aria-label="Puntos para gift cards">
+  <p class="bonda-balance__label">{status === 'STALE' ? 'Último saldo consultado' : 'Puntos para gift cards'}</p>
+  <p class="bonda-balance__amount" hidden={!known}><span data-balance-amount>{known ? format(amount!) : ''}</span> <span>pts</span></p>
+  <p class="bonda-balance__status" role="status">{status === 'STALE' ? 'Puede haber cambiado desde la última consulta. Actualiza para confirmar.' : status === 'DISABLED' ? 'Consulta tu saldo para gift cards al ingresar.' : !known ? 'No pudimos consultar tu saldo. Intenta de nuevo más tarde.' : 'Saldo confirmado para gift cards.'}</p>
+  <p class="bonda-balance__time" hidden={!known || !observed}>Última consulta: <time datetime={observed?.toISOString()}>{observed ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Mexico_City' }).format(observed) : ''}</time> (CDMX)</p>
+  <p class="bonda-balance__pending" data-balance-pending hidden={!positive(balance?.pending)}>{positive(balance?.pending) ? format(balance.pending) : ''} puntos pendientes de acreditar.</p>
+  <p class="bonda-balance__pending" data-balance-review hidden={!positive(balance?.verification_required)}>{positive(balance?.verification_required) ? format(balance.verification_required) : ''} puntos en revisión. Pueden estar incluidos en el saldo consultado.</p>
+  <button type="button" data-balance-retry hidden={status === 'DISABLED' || status === 'FRESH'}>Actualizar saldo</button>
+</div>
+<script>
+  import { attachBalanceRefresh } from "../lib/bonda-balance";
+  attachBalanceRefresh();
+</script>
+<style>
+.bonda-balance [hidden]{display:none!important}.bonda-balance [data-balance-amount]{font:inherit}.bonda-balance button{color:inherit;font:inherit;text-decoration:underline;cursor:pointer}.bonda-balance{padding:.8rem 0;color:inherit;min-width:0}.bonda-balance p{margin:.3rem 0}.bonda-balance__label{font-size:.75rem;font-weight:700}.bonda-balance .bonda-balance__amount{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;line-height:1.2;overflow-wrap:anywhere}.bonda-balance__amount span{font-size:.85rem;font-weight:600}.bonda-balance .bonda-balance__status,.bonda-balance .bonda-balance__time,.bonda-balance .bonda-balance__pending{font-size:.75rem;line-height:1.55;max-width:55ch}.bonda-balance__time{opacity:.8}.bonda-balance__pending{font-weight:600}
+</style>

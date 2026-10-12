@@ -140,3 +140,106 @@ Versionar este procedimiento y el diagnóstico ayuda a detectar y resolver la re
 ## Trabajo futuro separado
 
 Afiliar clientes, solicitar códigos y consultar historial requiere otro OpenSpec con un ambiente de prueba aprobado, comportamiento idempotente, manejo de resultados ambiguos, auditoría, consentimiento operativo y rollout explícito. Este cierre de lectura no autoriza ninguna de esas acciones.
+
+### Respuesta inválida de contenido: diagnóstico del 2026-10-08
+
+Preflight desde la consola oficial de `site-backend`, producción, commit
+`5761c9f052d153f3ee8385c91b48aca32c5ccabd`, micrositio `913085`:
+
+- Afiliado técnico `990910001`: HTTP 200, OK.
+- Cupón aprobado `9510`: HTTP 200, INVALID_RESPONSE; el JSON contenía sólo
+  `error` de tipo texto, sin identidad ni nombre de cupón.
+- Curso y bienestar de control: HTTP 500, PARTNER_UNAVAILABLE.
+
+No se recuperó ni modificó la identidad técnica: existe. El diagnóstico ampliado
+usó los 12 IDs habilitados en `catalog_items` (no sólo el control 9510):
+Bronce 9510/12490/11208/9471; Plata 5850/5849/4749/8344/11919;
+Oro 14220; Platino 14806; Titanio 14799. Todos tienen fecha local de inicio
+2026-09-10, sin fin local. Los 25 candidatos sin ID siguen deshabilitados.
+9510 proviene de la aprobación versionada 024; no es solamente un ID de fixture.
+
+A las 17:02 UTC los 12 detalles respondieron HTTP 200 con el mismo texto
+`Cupon no existente o desactivado`. El listado soportado `/api/cupones`,
+primera página, respondió HTTP 403. A las 17:02:44 se leyó el mensaje sanitizado:
+`Algo no salió bien, intentá nuevamente en unos minutos`.
+La consulta V2 del afiliado confirmó success, code y ambos campos de micrositio
+correctos, con deleted_at vacío (17:05:53). Se usó también loadConfig del runtime;
+no hubo diferencia por normalización de variables.
+
+La colección oficial Bonda Public API V2.3 documenta el lector de sólo información
+00698115. Un contraste acotado con ese lector, sin modificar configuración,
+respondió igual para 9510 y el listado (17:09:13). No se usó para emitir órdenes.
+Cupones usa key/micrositio_id/codigo_afiliado en query; nómina V2 usa header token.
+No se inventó un esquema Bearer ni se rotaron credenciales.
+
+Esto **no prueba retiro de las 12 ofertas**, ni rechazo de toda la API, ni identifica
+la causa de los HTTP 500 de cursos/bienestar. Por eso incluso ese texto genérico
+se conserva como INVALID_RESPONSE: no debe vaciar un catálogo validado.
+Restaurar o recrear un afiliado que existe no tiene fundamento. El siguiente paso
+externo es que Bonda confirme acceso de contenido del micrositio 913085 con la clave
+existente y la discrepancia entre nómina y catálogo; no enviar claves en tickets.
+No se contactó al proveedor ni se sustituyeron ofertas. La recuperación operativa
+no está confirmada. El comando `bonda:reconcile` puede consultar la lista vigente
+cuando el endpoint vuelva a responder; no aprueba ni publica ofertas por nombre.
+
+El adaptador rechaza errores desconocidos, success:false, respuestas inválidas y
+404 ambiguos. Ninguno demuestra retirada. Sólo resultados válidos se publican;
+la vigencia y el nivel se filtran por política actual.
+
+Ante una respuesta inválida o fallo transitorio, la caché conserva metadatos
+validados hasta su límite original (30 minutos por defecto), sin renovar su
+fecha. La respuesta marca `freshness: STALE` y la interfaz informa del fallo de
+actualización. Fallos de autorización/configuración no permiten ese fallback.
+Las retiradas confirmadas por el adaptador se quitan incluso si otras lecturas
+fallan. Un vacío válido sustituye al catálogo previo; un fallo no lo vacía.
+
+La caché sigue en memoria: después de reiniciar, o vencido el límite, se muestra
+un error reintentable. No se promete continuidad durante una caída prolongada.
+La política de nivel y vencimiento se aplica en cada lectura, y solicitar un
+código vuelve a validar la oferta en vivo, sin usar la caché de presentación.
+
+### Diagnóstico con cobertura temporal y propuesta de continuidad (2026-10-08)
+
+Railway Log Explorer, filtrado al despliegue `f2507dbe-077a-422b-a8af-1c75bb30a14c`,
+mostró ambos extremos del intervalo 2026-10-07 23:16:07.703 UTC a
+2026-10-08 17:37:37.020 UTC. Sólo aparecieron siete líneas del arranque de las
+23:17:50 UTC, sin otro arranque ni `site_backend_warmup_failed`. El código
+productivo no registra el resultado de cada refresco. Ausencia de log de fallo
+no demuestra éxito: esos registros no permiten fechar último catálogo correcto
+ni primer error, ni correlacionar los cinco POST de afiliados de revisión.
+La frecuencia diaria sigue siendo reportada, no medida. El POST individual
+implementado añade un código; no existe una operación local de reemplazo de
+nómina o borrado del lector técnico. Su existencia posterior ya fue confirmada.
+
+Se añade `bonda_catalog_refresh` por refresco real (también el inicial), con hora,
+resultado `SUCCESS`/`STALE`/`UNAVAILABLE`, conteos, fecha original de validación y
+código de error tipado. No registra credenciales, URLs, afiliados, clientes,
+mensajes arbitrarios ni payloads. Los hits frescos y las consultas concurrentes
+coalescidas no agregan llamadas al proveedor ni generan un monitor. Una caída
+del logger no cambia el resultado de lectura. Tras desplegarlo, estos eventos
+permitirán correlacionar transiciones con los arranques existentes; no reconstruyen
+el pasado ni corrigen por sí mismos la respuesta actual del servicio externo.
+
+**Propuesta pendiente: snapshot durable en PostgreSQL existente.** No hay una
+tabla de cache de catálogo reutilizable. Escribir un archivo en el contenedor
+no garantiza supervivencia a redeploy; añadir un volumen introduce configuración
+operativa. La opción mínima durable requiere una tabla y migración nueva,
+revisadas por separado. No se implementa ni ejecuta esa migración en este PR.
+El diseño debe conservar sólo metadatos públicos normalizados, con lista explícita
+de campos; excluir respuestas crudas, credenciales, datos de afiliado, códigos,
+recibos, historial y saldos. La clave debe aislar versión de esquema/normalizador,
+proveedor y origen, micrositio, lector técnico, revisión de configuración y
+conjunto de políticas aprobadas; nunca usar ni guardar una credencial como clave.
+
+Al arrancar, intentar lectura viva antes de usar el snapshot persistido. Permitir
+fallback sólo para errores transitorios/ambiguos ya admitidos, dentro del máximo
+actual desde validación original; no renovar su antigüedad al cargarlo o fallar.
+Autorización/configuración rechazada, cambio de ámbito o payload corrupto impiden
+su uso. Vacío válido y bajas confirmadas deben invalidar el snapshot previo,
+incluso ante otros fallos parciales; actualizar atómicamente evitando que una
+respuesta tardía sobrescriba una más reciente. Reaplicar vigencia y políticas
+actuales por cliente en cada respuesta; solicitudes de códigos siguen en vivo.
+Pruebas necesarias: reinicio simulado, expiración, concurrencia, aislamiento de
+ámbitos, invalidación y ausencia de datos privados. Esto cubriría reinicios dentro
+de la ventana aprobada (default 30 minutos), no una interrupción de un día ni el
+problema actual sin una última respuesta válida guardada.

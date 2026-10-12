@@ -31,7 +31,8 @@ test("concise customer rewards home and BFF expose only V2 rewards contracts", a
 test("protected middleware loads one authenticated customer context and exposes safe timing", async () => {
   const middleware = await readFile(new URL("../../src/middleware.ts", import.meta.url), "utf8");
 
-  assert.match(middleware, /fetchCustomerContext\(cookieHeader\)/);
+  assert.match(middleware, /fetchCustomerContext\(cookieHeader, pathname\)/);
+  assert.match(middleware, /context\.locals\.navigationModules = customerContext\.navigationModules/);
   assert.match(middleware, /\/api\/v1\/rewards\/customer-context/);
   assert.match(middleware, /context\.locals\.rewardsPortal = customerContext\.portal/);
   assert.match(middleware, /auth-context;dur=/);

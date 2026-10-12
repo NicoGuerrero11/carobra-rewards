@@ -49,7 +49,7 @@ test("creates affiliates with Rewards ID only and disables Bonda email", async (
     captured.requestHeaders = new Headers(init?.headers);
     return jsonResponse(JSON.stringify({
       success: true,
-      data: { member: { id: "3051465", code: "RWD-TEST" } },
+      data: { member: { id: "3051465", code: "RWD-TEST", company_id: "microsite-test" }, company: { id: "microsite-test" } },
     }));
   });
 
@@ -159,9 +159,47 @@ function fixtureText(name: string): string {
   return readFileSync(`test/fixtures/bonda/${name}`, "utf8");
 }
 
+test("the generic inactive detail message does not prove removal during a catalog failure", async () => {
+  const gateway = new BondaHttpGateway(config, async () => jsonResponse('{"error":"Cupon no existente o desactivado"}'));
+  await assert.rejects(gateway.getCoupon("RWD-TEST", "9510"), (error: unknown) =>
+    error instanceof BondaGatewayError && error.code === "INVALID_RESPONSE");
+  await assert.rejects(gateway.listCoupons("RWD-TEST"), BondaGatewayError);
+});
+
+for (const status of [200, 400, 404]) {
+  test(`unknown partner error HTTP ${status} cannot erase an approved coupon`, async () => {
+    const gateway = new BondaHttpGateway(config, async () => jsonResponse(JSON.stringify({ error: "Unexpected upstream failure" }), status));
+    await assert.rejects(gateway.getCoupon("RWD-TEST", "9510"), (error: unknown) =>
+      error instanceof BondaGatewayError && error.code === "INVALID_RESPONSE");
+  });
+}
+
+test("generic HTML 404 and false success are failures, not missing coupons", async () => {
+  for (const response of [new Response("not found", { status: 404 }), jsonResponse('{"success":false}')]) {
+    const gateway = new BondaHttpGateway(config, async () => response);
+    await assert.rejects(gateway.getCoupon("RWD-TEST", "9510"), BondaGatewayError);
+  }
+});
+
+test("only explicit affiliate USER_NOT_FOUND proves affiliate absence", async () => {
+  const missing = new BondaHttpGateway(config, async () => jsonResponse('{"success":false,"error":{"code":"USER_NOT_FOUND"}}', 404));
+  assert.equal(await missing.affiliateExists("RWD-TEST"), false);
+  await assert.rejects(missing.getCoupon("RWD-TEST", "9510"), BondaGatewayError);
+  const ambiguous = new BondaHttpGateway(config, async () => jsonResponse('{}', 404));
+  await assert.rejects(ambiguous.affiliateExists("RWD-TEST"), BondaGatewayError);
+});
+
 function jsonResponse(body: string, status = 200): Response {
   return new Response(body, {
     status,
     headers: { "content-type": "application/json" },
+  });
+}
+
+for (const member of [{id:'1',code:'OTHER',company_id:'microsite-test'}, {id:'1',code:'RWD-TEST',company_id:'OTHER'}]) {
+  test(`affiliate success cannot confirm unrelated identity ${member.code}/${member.company_id}`, async()=>{
+    const gateway=new BondaHttpGateway(config,async()=>jsonResponse(JSON.stringify({success:true,data:{member,company:{id:'microsite-test'}}})));
+    await assert.rejects(gateway.affiliateExists('RWD-TEST'), BondaGatewayError);
+    await assert.rejects(gateway.createAffiliate('RWD-TEST'), BondaGatewayError);
   });
 }

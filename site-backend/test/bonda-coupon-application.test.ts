@@ -385,3 +385,20 @@ class MemoryRequestStore implements BondaCouponRequestStore {
       && item.status === "VERIFICATION_REQUIRED");
   }
 }
+
+test('stale public metadata still applies live tier and expiration policy; redemption rereads provider', async () => {
+  const gateway = new FakeBondaGateway();
+  let reads = 0;
+  gateway.getCoupon = async () => { reads++; throw new BondaGatewayError('PARTNER_UNAVAILABLE', 'offline', true); };
+  const application = new BondaCouponApplication(gateway, {listEffective:async()=>policies},
+    {get:async()=>({state:'ACTIVE',currentLevel:'BRONZE'})}, {ensureForBenefits:async()=>({state:'ACTIVE',can_request_codes:true,retry_scheduled:false})},
+    new MemoryRequestStore(), new EnabledRuleLookup(), new FixedClock(now), ()=>'id', {
+      read: async()=>({freshness:'STALE',refreshedAt:now,items:[fakeBondaCoupon({id:'bronze'}),fakeBondaCoupon({id:'gold'}),fakeBondaCoupon({id:'silver',expirationAt:'2020-01-01T00:00:00Z'})]}),
+      readBranches:async()=>[],
+    }, '990910001');
+  const result = await application.getCatalog(identity);
+  assert.equal(result.freshness, 'STALE');
+  assert.deepEqual(result.items.map(item=>item.id), ['bronze']);
+  assert.equal((await application.requestCode(identity, 'bronze', 'live-check')).status, 'UNAVAILABLE');
+  assert.equal(reads,1);
+});

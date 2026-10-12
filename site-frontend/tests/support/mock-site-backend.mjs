@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 
 const host = "127.0.0.1";
-const port = 3002;
+const port = Number(process.env.MOCK_SITE_BACKEND_PORT ?? 3002);
 const pendingSessionCookie = "carobra_session=e2e-pending";
 const eligibleSessionCookie = "carobra_session=e2e-eligible";
 const inactiveSessionCookie = "carobra_session=e2e-inactive";
@@ -27,13 +27,15 @@ function progressFor(request,courseId) {
 }
 function homeCookie(request,name) {return request.headers.cookie?.match(new RegExp(`(?:^|; )${name}=([^;]+)`))?.[1];}
 function homePortal(request,candidate) {
-  const portal=portalFor(candidate);
+  // Context and focused portal reads represent the same customer data.
+  // Keep activity scenarios when pages reuse the middleware's portal.
+  const portal=activityPortal(request,candidate);
   if (homeCookie(request, 'account-test')) {
     portal.preferences = accountPreferences.get(accountKey(request, candidate)) ?? {
       activity_updates: true, learning_updates: false, product_updates: true, updated_at: null,
     };
   }
-  const level=homeCookie(request,'home-level');
+  const level=homeCookie(request,'home-level') ?? (process.env.GIFT_CARD_PREVIEW === 'true' ? 'GOLD' : undefined);
   if(['BRONZE','SILVER','GOLD','PLATINUM','TITANIUM'].includes(level)) portal.journey.journey.current_level=level;
   const state=homeCookie(request,'home-state');
   if(['BLOCKED','INACTIVE'].includes(state)) portal.journey.journey.state=state;
@@ -50,6 +52,13 @@ function homePortal(request,candidate) {
   }
   if (homeCookie(request, 'help-fixture') === 'empty') portal.help = [];
   if (homeCookie(request, 'help-fixture') === 'markup') portal.help = [{ id: 'untrusted', title: '<img src=x onerror=alert(1)>', body: '<script>alert(1)</script>' }];
+  const balanceMode = homeCookie(request, 'bonda-balance') ?? process.env.BONDA_POINTS_PREVIEW;
+  if (balanceMode) portal.journey.points.bonda = {
+    status: ({fresh:'FRESH',zero:'FRESH',stale:'STALE',unavailable:'UNAVAILABLE',disabled:'DISABLED'})[balanceMode] ?? 'UNAVAILABLE',
+    available: balanceMode === 'zero' ? '0' : ['fresh','stale'].includes(balanceMode) ? '900' : null,
+    observed_at: ['fresh','zero','stale'].includes(balanceMode) ? '2026-10-07T12:00:00Z' : null,
+    pending: balanceMode === 'disabled' ? null : '300', verification_required: balanceMode === 'disabled' ? null : '150',
+  };
   return notificationPortal(request, candidate, portal);
 }
 function homeProgress(request,id) {
@@ -220,17 +229,49 @@ const server = createServer(async (request, response) => {
       : siteError(response, 401, "unauthenticated", "Authentication is required");
   }
 
+  if (method === "GET" && path === "/api/v1/rewards/bonda-balance") {
+    const authenticated = authenticatedProfile(request);
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication required");
+    const delay = Math.min(10000, Math.max(0, Number(process.env.BONDA_POINTS_PREVIEW_DELAY_MS) || 0));
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    const refreshMode = process.env.BONDA_POINTS_REFRESH_PREVIEW;
+    const balanceRequest = refreshMode ? {headers:{cookie:`bonda-balance=${refreshMode}; ${request.headers.cookie ?? ''}`}} : request;
+    return json(response, 200, homePortal(balanceRequest, authenticated).journey.points.bonda ?? {
+      status: 'DISABLED', available: null, observed_at: null, pending: null, verification_required: null,
+    });
+  }
+
   if (method === "GET" && path === "/api/v1/rewards/customer-context") {
     const authenticated = authenticatedProfile(request);
+    let navigationModules;
+    const include = new URL(request.url, `http://${host}:${port}`).searchParams.get('include');
+    if (authenticated && process.env.NAVIGATION_BUNDLE_PREVIEW === 'true' && ['home','benefits','courses'].includes(include)) {
+      // Test-only same-origin composition; never use a real BFF/provider here.
+      const read = async resource => {
+        const result = await fetch(`http://${host}:${port}/api/v1/rewards/${resource}`, {headers:{cookie:request.headers.cookie ?? ''}});
+        return {status:result.status,data:result.ok?await result.json():null};
+      };
+      if (include === 'home') {
+        const [coupons,courses]=await Promise.all([read('coupons?page_size=4&preview=true'),read('courses')]);
+        navigationModules={coupons,courses};
+      } else if (include === 'courses') navigationModules={courses:await read('courses')};
+      else if (request.headers.cookie?.includes('products-failure=true')) navigationModules={coupons:{status:503,data:null}};
+      else {
+        const coupons=await read('coupons?page_size=50');
+        navigationModules={coupons};
+        if(coupons.data?.access_state==='AVAILABLE'&&coupons.data?.affiliate_state==='ACTIVE'&&coupons.data.items.length) navigationModules.history=await read('coupons/history');
+      }
+    }
     return authenticated
       ? json(response, 200, {
-          customer: homeCookie(request, 'account-identity') === 'long' ? {
+          customer: (homeCookie(request, 'gift-identity') || process.env.GIFT_CARD_PREVIEW === 'true') ? { ...authenticated, rewards_id: { numeric: '123456789', missing: '', legacy: 'RWD-synthetic', malformed: '123 456 789' }[homeCookie(request, 'gift-identity') ?? 'numeric'] ?? '' } : homeCookie(request, 'account-identity') === 'long' ? {
             ...authenticated,
             first_name: 'María Fernanda Alejandra',
             last_name: 'Guerrero Fernández de la Concepción',
             email: 'maria.fernanda.alejandra.guerrero.fernandez@clientes.ejemplo.test',
           } : authenticated,
           validation: { status: validationFor(authenticated).status },
+          ...(navigationModules ? {navigation_modules:navigationModules} : {}),
           portal: request.headers.cookie?.includes('products-failure=true') ? null : homePortal(request,authenticated),
         })
       : siteError(response, 401, "unauthenticated", "Authentication is required");
@@ -294,6 +335,7 @@ const server = createServer(async (request, response) => {
       affiliate_state: active ? "ACTIVE" : "DISABLED",
       items: ['disabled','empty'].includes(mode) ? [] : active ? mode==='many'?Array.from({length:6},(_,i)=>({...bronzeCoupons[0],id:`example-${i}`})):bronzeCoupons : [],
       refreshed_at: active ? "2026-09-10T12:00:00.000Z" : null,
+      freshness: mode === "stale" ? "STALE" : "FRESH",
       page: 1,
       page_size: 50,
       total: active ? bronzeCoupons.length : 0,
@@ -349,6 +391,7 @@ const server = createServer(async (request, response) => {
     const item = bronzeCoupons.find((candidate) => candidate.id === detailMatch[1]);
     return json(response, 200, {
       access_state: item ? "AVAILABLE" : "COUPON_UNAVAILABLE",
+      freshness: homeCookie(request, "home-coupons") === "stale" ? "STALE" : "FRESH",
       affiliate_state: "ACTIVE",
       item: item ? {
         ...item,
@@ -373,9 +416,11 @@ const server = createServer(async (request, response) => {
   if (method === "GET" && path === "/api/v1/rewards/portal") {
     if (request.headers.cookie?.includes('products-failure=true')) return siteError(response, 503, 'portal_unavailable', 'Unavailable');
     const authenticated = authenticatedProfile(request);
-    return authenticated
-      ? json(response, 200, activityPortal(request, authenticated))
-      : siteError(response, 401, "unauthenticated", "Authentication is required");
+    if (!authenticated) return siteError(response, 401, "unauthenticated", "Authentication is required");
+    const portal = activityPortal(request, authenticated);
+    const balance = homePortal(request, authenticated).journey.points.bonda;
+    if (balance) portal.journey.points.bonda = balance;
+    return json(response, 200, portal);
   }
 
   if (method === 'POST' && path === '/api/v1/rewards/portal/notifications/read') {

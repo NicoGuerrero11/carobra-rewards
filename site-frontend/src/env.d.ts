@@ -20,6 +20,11 @@ declare namespace App {
       sisca_validation_status: string | null;
       afore_relation_status: string | null;
     };
+    navigationModules?: {
+      coupons?: {status: number; data: import("./lib/bonda-coupon-contract").BondaCouponCatalog | null};
+      history?: {status: number; data: import("./lib/bonda-coupon-contract").BondaCouponHistory | null};
+      courses?: {status: number; data: import("./lib/courses").CoursesCatalog | null};
+    };
     rewardsPortal?: import("./lib/rewards-customer-portal-contract").RewardsCustomerPortal | null;
   }
 }
