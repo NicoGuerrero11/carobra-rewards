@@ -99,6 +99,29 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     const home = await request('/'); const homeHtml = await home.text();
     for (const product of ['skandia', 'qualitas']) assert.match(homeHtml, new RegExp(`public-offer--${product}[^>]*href="/cliente/productos/${product}"`));
   });
+  await t.test("both product pages reuse shared auth context without portal or wallet reads", async () => {
+    for (const [product, plans] of [['skandia', ['ahorro', 'retiro']], ['qualitas', ['cotizar', 'mejorar']]]) {
+      const before = requests.length;
+      const page = await request(`/cliente/productos/${product}`, { headers: { cookie: 'carobra_session=portal-failure' } });
+      assert.equal(page.status, 200);
+      assert.equal(page.headers.get('cache-control'), 'private, no-store');
+      assert.match(page.headers.get('server-timing'), /auth-context;dur=/);
+      const html = await page.text();
+      assert.match(html, /No se ha enviado ninguna solicitud/);
+      assert.doesNotMatch(html, /type="file"/);
+      assert.deepEqual(requests.slice(before).map(row => [row.method, row.url]), [['GET', '/api/v1/rewards/customer-context']]);
+      for (const plan of plans) {
+        const destination = `/cliente/productos/${product}?plan=${plan}`;
+        const next = encodeURIComponent(destination);
+        for (const auth of ['login', 'registro']) {
+          const response = await request(`/${auth}?next=${next}`, { headers: { cookie } });
+          assert.equal(response.status, 302);
+          assert.equal(response.headers.get('location'), destination);
+          await response.text();
+        }
+      }
+    }
+  });
   await t.test("forwards JSON bodies and preserves multiple Set-Cookie headers", async () => {
     const body = JSON.stringify({ email: "fixture@example.test", password: "test-only" });
     const response = await request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4323" }, body });

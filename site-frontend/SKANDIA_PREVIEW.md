@@ -30,7 +30,7 @@ SITE_BACKEND_BASE_URL=http://127.0.0.1:3002 pnpm run dev --host 127.0.0.1 --port
 
 Para este entorno se instalaron herramientas solo en `/tmp/carobra-skandia-tooling`; pueden seleccionarse con `export PATH=/tmp/carobra-skandia-tooling/node_modules/.bin:$PATH`. Las dependencias del frontend se copiaron al worktree, sin modificar el lockfile.
 
-Ruta integrada: `/cliente/productos/skandia`, accesible desde el botón de Skandia en Productos. El doble local acepta `ada@example.com` / `correct-horse-7`. No son credenciales reales. No iniciar servicios reales ni smoke live para esta revisión.
+Ruta integrada: `/cliente/productos/skandia`, accesible desde el botón de Skandia en Productos. El doble local incluye cuentas ficticias definidas en el fixture de pruebas. Para revisar sin sesión, utiliza la ruta `/preview/skandia`. No iniciar servicios reales ni smoke live para esta revisión.
 
 Las entradas `?plan=ahorro` y `?plan=retiro` conservan solo esa intención durante login/registro. No pasan respuestas, contactos o montos en URLs. La redirección usa una lista cerrada de tres destinos internos para evitar redirects abiertos.
 

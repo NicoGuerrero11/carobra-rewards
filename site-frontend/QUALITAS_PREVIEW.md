@@ -2,7 +2,6 @@
 
 Sitio completo: http://127.0.0.1:4330/
 
-- Cuenta ficticia del backend local: `ada@example.com` / `correct-horse-7`.
 - Productos integrado: http://127.0.0.1:4330/cliente/productos
 - Skandia sin iniciar sesión: http://127.0.0.1:4330/preview/skandia
 - Quálitas sin iniciar sesión: http://127.0.0.1:4330/preview/qualitas
@@ -12,7 +11,7 @@ Las rutas `/preview/` funcionan únicamente en desarrollo y devuelven 404 en bui
 ## Checkout y alcance
 
 Worktree recuperado: `/Users/nicolasguerrero/work/carobra-rewards/.tmp/carobra-products-preview`.
-Rama: `codex/skandia-product-preview`. HEAD: `65d330f9ac39314204ae19d184004803041b70ab`, sobre base `522abab0585efb8371ad50cef5a7667a4606ca21`. Los cambios de Quálitas permanecen sin commit. La integración posterior con main queda pendiente; no hubo merge, rebase, push, PR ni despliegue. Se conservó el checkout principal y el worktree anterior dañado.
+Rama: `codex/skandia-product-preview`. Base original de Skandia: `522abab0585efb8371ad50cef5a7667a4606ca21`. Tras la aprobación visual de Nicolás, se registró Quálitas y se integró `origin/main` en `a5633a896fd5314f653efb4eb5b46e36b1096992`, sin conflictos. La entrega es un PR en borrador: no incluye merge a main ni despliegue. Se conservó el checkout principal y el worktree anterior dañado. La aprobación visual del usuario no sustituye la QA automatizada del agente.
 
 Quálitas incluye información libre y dos cuestionarios de cinco pasos: Cotizar mi auto y Mejorar mi seguro actual. Recogen contexto del vehículo, código postal, uso, conductor por rangos, cobertura e intención; mejorar incluye aseguradora actual (también otra aseguradora), cobertura, vencimiento y cambio buscado. Contacto fijo Alex Ejemplo / alex@example.test. Validaciones de formato y campos, resumen, atrás, cierre/reapertura, descarte y bloqueo de doble avance. Cerrar conserva el ejercicio en memoria; recargar o salir lo descarta.
 
@@ -37,12 +36,12 @@ En esta Mac se usó Node 24 de `/tmp/carobra-skandia-tooling/node_modules/node/b
 
 ## Verificaciones actuales
 
-- Build completo equivalente al script `build`: verificación Node 24, Astro check (112 archivos, cero errores/warnings/hints), Astro build y runtime generado `nodejs24.x`: pasó.
-- Contratos y runtime: 19 pruebas pasadas, cero fallidas.
-- SSR del entrypoint generado: 8 pruebas pasadas (incluido contenedor), cero fallidas. Incluye protección de ambas fichas, preview 404 en build, continuidad de intención y contenido simulado.
+- Build completo equivalente al script `build`: verificación Node 24, Astro check (127 archivos, cero errores/warnings; dos hints de `execCommand` heredados de main), Astro build y runtime generado `nodejs24.x`: pasó.
+- Contratos y runtime: 23 pruebas pasadas, cero fallidas. El primer intento tras integrar main no pudo abrir el servidor del fixture por el sandbox; repetido con acceso local permitido, pasó completo.
+- SSR del entrypoint generado: 12 pruebas pasadas (incluido contenedor), cero fallidas. Incluye protección de ambas fichas, preview 404 en build, continuidad de intención y contenido simulado. Ambas fichas reutilizan una única lectura del contexto compartido, con caché privada/no-store y sin lecturas del portal o saldo.
 - `git diff --check`: pasó.
 - HTTP local: inicio, login, ambas previews y logo Quálitas respondieron 200. Productos sin sesión redirigió a login; login ficticio y catálogo/ambas fichas autenticadas respondieron 200.
-- Se añadieron pruebas E2E de Quálitas y actualizaron expectativas del catálogo/landing. **No ejecutadas**: el control IAB del navegador integrado de la Mac no está disponible en esta sesión. Abrir una pestaña de Codex no acredita QA visual. No hay capturas nuevas ni verificación interactiva actual de escritorio/móvil, pasos, foco o navegación atrás/adelante. Las pruebas unitarias verifican el modelo y las validaciones, no la interacción DOM.
+- Se añadieron pruebas E2E de Quálitas y actualizaron expectativas del catálogo/landing. **No ejecutadas localmente**: el control IAB del navegador integrado de la Mac no está disponible en esta sesión. Abrir una pestaña de Codex no acredita QA visual. No hay capturas nuevas ni verificación interactiva actual de escritorio/móvil, pasos, foco o navegación atrás/adelante. Las pruebas unitarias verifican el modelo y las validaciones, no la interacción DOM.
 - No ejecutados: smoke live, servicios de producción y suites de backend/API sin cambios.
 
-Antes de integrar: realizar QA interactiva en el navegador integrado disponible y revisar contenido/condiciones con el responsable del producto. Integrar main en una etapa posterior, tal como se solicitó.
+Antes del merge: verificar CI sobre el SHA publicado y revisar contenido/condiciones con el responsable del producto. El control IAB sigue pendiente de disponibilidad. Main ya está integrado en esta rama; ningún flujo comercial o de producción fue habilitado. Los resultados remotos de CI deben consultarse en el PR, no inferirse de las pruebas locales.
