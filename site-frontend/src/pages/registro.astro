@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { skandiaDestination } from '../lib/skandia-navigation';
-const next = skandiaDestination(Astro.url.searchParams.get('next'));
+import { productDestination } from '../lib/product-navigation';
+const next = productDestination(Astro.url.searchParams.get('next'));
 
 const referralCandidate = Astro.url.searchParams.get("ref")?.trim() ?? "";
 const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
@@ -119,8 +119,8 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
   </main>
 
   <script>
-    import { skandiaDestination } from '../lib/skandia-navigation';
-    const destination = skandiaDestination(new URLSearchParams(window.location.search).get('next'));
+    import { productDestination } from '../lib/product-navigation';
+    const destination = productDestination(new URLSearchParams(window.location.search).get('next'));
     type StableErrorCode =
       | "duplicate_email"
       | "duplicate_curp"

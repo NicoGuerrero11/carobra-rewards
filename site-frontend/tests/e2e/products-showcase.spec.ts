@@ -72,10 +72,9 @@ test('each product shows only its owner-confirmed reward amount above contact', 
   await expect(page.locator('.showcase-card button, .showcase-card form')).toHaveCount(0);
 });
 
-test('all products offer direct keyboard accessible contact with correct context', async ({ page }) => {
+test('remaining contact action is keyboard accessible with correct context', async ({ page }) => {
   await openProducts(page);
   for (const [name, label] of [
-    ['Quálitas', 'Quiero proteger mi auto'],
     ['Modalidad 40', 'Quiero planear mi retiro'],
   ]) {
     const panel = page.getByRole('article', { name, exact: true });

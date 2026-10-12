@@ -1,0 +1,6 @@
+---
+import ClientShellLayout from '../../layouts/ClientShellLayout.astro';
+import QualitasProduct from '../../components/qualitas/QualitasProduct.astro';
+if (!import.meta.env.DEV) return new Response('Not found', { status: 404 });
+---
+<ClientShellLayout title="Vista local Quálitas | Carobra Rewards" currentPath="/cliente/productos/qualitas" sectionLabel="Productos" preview><QualitasProduct /></ClientShellLayout>

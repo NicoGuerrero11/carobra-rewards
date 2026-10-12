@@ -1,7 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { skandiaDestination } from '../lib/skandia-navigation';
-const next = skandiaDestination(Astro.url.searchParams.get('next'));
+import { productDestination } from '../lib/product-navigation';
+const next = productDestination(Astro.url.searchParams.get('next'));
 ---
 
 <BaseLayout title="Iniciar sesión | Carobra Rewards" description="Accede a tu cuenta y consulta tu validación AFORE.">
@@ -43,7 +43,7 @@ const next = skandiaDestination(Astro.url.searchParams.get('next'));
   </main>
 
   <script>
-    import { skandiaDestination } from '../lib/skandia-navigation';
+    import { productDestination } from '../lib/product-navigation';
     type StableErrorCode =
       | "duplicate_email"
       | "duplicate_curp"
@@ -105,7 +105,7 @@ const next = skandiaDestination(Astro.url.searchParams.get('next'));
     }
 
     const query = new URLSearchParams(window.location.search);
-    const destination = skandiaDestination(query.get('next'));
+    const destination = productDestination(query.get('next'));
     if (query.get("registered") === "1") {
       setFeedback("Tu cuenta fue creada. Inicia sesión para consultar tu validación AFORE.", false);
       window.history.replaceState({}, "", destination ? `/login?next=${encodeURIComponent(destination)}` : '/login');

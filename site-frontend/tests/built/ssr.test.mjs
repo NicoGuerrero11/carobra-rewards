@@ -67,6 +67,26 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     await product.text();
     assert.equal(requests.length, count);
   });
+  await t.test("Qualitas remains authenticated, preserves intent and exposes only a demo", async () => {
+    const preview = await request('/preview/qualitas');
+    assert.equal(preview.status, 404); await preview.text();
+    const response = await request('/cliente/productos/qualitas?plan=mejorar');
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('location'), '/login?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar');
+    await response.text();
+    const login = await request('/login?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar');
+    assert.match(await login.text(), /registro\?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar/);
+    const page = await request('/cliente/productos/qualitas', { headers: { cookie } });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /data-demo-wizard="cotizar"/);
+    assert.match(html, /data-demo-wizard="mejorar"/);
+    assert.match(html, /No se ha enviado ninguna solicitud/);
+    assert.match(html, /alex@example.test/);
+    assert.doesNotMatch(html, /type="file"/);
+    const home = await request('/'); const homeHtml = await home.text();
+    for (const product of ['skandia', 'qualitas']) assert.match(homeHtml, new RegExp(`public-offer--${product}[^>]*href="/cliente/productos/${product}"`));
+  });
   await t.test("forwards JSON bodies and preserves multiple Set-Cookie headers", async () => {
     const body = JSON.stringify({ email: "fixture@example.test", password: "test-only" });
     const response = await request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4323" }, body });

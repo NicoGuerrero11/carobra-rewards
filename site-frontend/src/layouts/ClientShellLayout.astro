@@ -15,6 +15,7 @@ interface Props {
   description?: string;
   currentPath?: string;
   sectionLabel?: string;
+  preview?: boolean;
 }
 
 const {
@@ -22,6 +23,7 @@ const {
   description = "Experiencia cliente con navegación lateral y flujo operativo claro.",
   currentPath = "/cliente",
   sectionLabel = "Cliente",
+  preview = false,
 } = Astro.props as Props;
 
 const navItems: NavItem[] = [
@@ -99,7 +101,7 @@ function isActive(item: NavItem) {
             </svg>
             {unreadCount > 0 && <span class="client-shell__notification-count" aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </a>
-          <div id="client-shell-user" class="client-shell__user">
+          {!preview && <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
               <span class="client-shell__user-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" role="presentation">
@@ -114,7 +116,7 @@ function isActive(item: NavItem) {
               <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </header>

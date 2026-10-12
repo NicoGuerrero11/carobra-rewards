@@ -1,5 +1,7 @@
 # Skandia: primera vista funcional
 
+> Actualización 2026-10-12: el checkout y servidor originales de esta guía dejaron de funcionar. La copia recuperada está en `.tmp/carobra-products-preview` del repositorio principal y el sitio completo responde en `http://127.0.0.1:4330/`. Consulta [la guía actual de revisión](QUALITAS_PREVIEW.md) para las rutas y verificaciones vigentes. Las capturas y pruebas de navegador del 7 de octubre descritas abajo son históricas; no se repitieron hoy.
+
 Implementación local para revisar contenido, diseño y navegación. No es una cotización ni un flujo de solicitud comercial.
 
 ## Rama y referencia

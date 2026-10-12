@@ -7,14 +7,15 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://i.ytimg.com/**", (route) => route.abort());
 });
 
-test("compact product cards show existing logos, short copy and registration links", async ({ page }) => {
+test("compact product cards show existing logos, short copy and product context", async ({ page }) => {
   await page.goto("/#productos");
   const section = page.getByRole("region", { name: "Conoce lo que puedes contratar" });
   await expect(section.locator(".public-offer")).toHaveCount(4);
   for (const product of products) {
-    const card = section.getByRole("link", { name: `${product}: ir al registro para conocer esta solución` });
+    const hasPreview = ["Skandia", "Quálitas"].includes(product);
+    const card = section.getByRole("link", { name: hasPreview ? `${product}: explorar esta solución` : `${product}: ir al registro para conocer esta solución` });
     await expect(card).toBeVisible();
-    await expect(card).toHaveAttribute("href", "/registro");
+    await expect(card).toHaveAttribute("href", hasPreview ? `/cliente/productos/${product === "Skandia" ? "skandia" : "qualitas"}` : "/registro");
     await expect(card.getByRole("heading", { name: product, exact: true })).toBeVisible();
     await expect(card.locator("p")).toHaveCount(1);
     expect((await card.locator("p").innerText()).length).toBeLessThan(65);

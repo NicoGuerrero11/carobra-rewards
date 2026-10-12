@@ -1,7 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 
 import { getSiteBackendBaseUrl } from "./lib/api";
-import { skandiaDestination } from "./lib/skandia-navigation";
+import { productDestination } from "./lib/product-navigation";
 import type { RewardsCustomerPortal } from "./lib/rewards-customer-portal-contract";
 
 const authPages = new Set(["/login", "/registro"]);
@@ -19,6 +19,7 @@ const customerEntryPaths = new Set([
   "/cliente/ganar-puntos",
   "/cliente/productos",
   "/cliente/productos/skandia",
+  "/cliente/productos/qualitas",
   "/cliente/activities",
   "/cliente/notificaciones",
   "/cliente/perfil",
@@ -175,15 +176,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const authContextDuration = performance.now() - authContextStartedAt;
 
   if (isAuthPage && user) {
-    return context.redirect(skandiaDestination(context.url.searchParams.get('next')) ?? "/cliente");
+    return context.redirect(productDestination(context.url.searchParams.get('next')) ?? "/cliente");
   }
   if (!isProtected) {
     return next();
   }
   if (!user) {
-    if (pathname === '/cliente/productos/skandia') {
+    if (productDestination(pathname)) {
       const plan = context.url.searchParams.get('plan');
-      const destination = pathname + (plan === 'ahorro' || plan === 'retiro' ? `?plan=${plan}` : '');
+      const destination = productDestination(`${pathname}?plan=${plan}`) ?? pathname;
       return context.redirect(`/login?next=${encodeURIComponent(destination)}`);
     }
     return context.redirect("/login");

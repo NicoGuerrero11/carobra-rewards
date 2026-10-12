@@ -49,8 +49,8 @@ const statusLabel = (status: RewardsV2ProductStatus) => ({ ACTIVE: "Activo", PEN
               <p class="showcase-card__description">{offer.description}</p>
               <div class="showcase-card__action">
                 <p class="showcase-card__reward"><span aria-hidden="true">✦</span><strong>+{offer.displayRewardPoints}</strong><span>puntos Rewards</span></p>
-                <a class="showcase-primary" href={offer.id === 'skandia' ? '/cliente/productos/skandia' : offer.contactHref} aria-label={offer.id === 'skandia' ? 'Explorar Skandia' : `${offer.contactLabel} (${offer.name}), contactar por correo`}>{offer.id === 'skandia' ? 'Explorar Skandia' : offer.contactLabel} <span aria-hidden="true">→</span></a>
-                <span>{offer.id === 'skandia' ? 'Ahorro y retiro · Vista de prueba' : 'Contacto por correo'}</span>
+                <a class="showcase-primary" href={['skandia', 'qualitas'].includes(offer.id) ? `/cliente/productos/${offer.id}` : offer.contactHref} aria-label={['skandia', 'qualitas'].includes(offer.id) ? `Explorar ${offer.name}` : `${offer.contactLabel} (${offer.name}), contactar por correo`}>{['skandia', 'qualitas'].includes(offer.id) ? `Explorar ${offer.name}` : offer.contactLabel} <span aria-hidden="true">→</span></a>
+                <span>{['skandia', 'qualitas'].includes(offer.id) ? 'Explora una vista de prueba' : 'Contacto por correo'}</span>
               </div>
             </div>
           </article>

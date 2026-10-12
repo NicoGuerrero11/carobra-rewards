@@ -17,7 +17,7 @@ const products = [
     <ul class="public-products__grid">
       {products.map((product) => (
         <li>
-          <a class:list={["public-offer", `public-offer--${product.id}`]} href="/registro" aria-label={`${product.name}: ir al registro para conocer esta solución`}>
+          <a class:list={["public-offer", `public-offer--${product.id}`]} href={['skandia', 'qualitas'].includes(product.id) ? `/cliente/productos/${product.id}` : '/registro'} aria-label={['skandia', 'qualitas'].includes(product.id) ? `${product.name}: explorar esta solución` : `${product.name}: ir al registro para conocer esta solución`}>
             <h3 class="public-offer__mark">
               {product.logo ? (
                 <img src={product.logo} alt={product.name} width={product.width} height={product.height} loading="lazy" decoding="async" />
