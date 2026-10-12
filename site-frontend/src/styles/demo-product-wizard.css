@@ -52,7 +52,7 @@ body.pw-modal-open { overflow: hidden; }
 .pw-success .pw-button { margin-top: 18px; }
 .pw-dialog :focus-visible { outline: 3px solid #008bbb; outline-offset: 4px; }
 @media (max-width: 767px) {
-  .pw-dialog { width: 100%; max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: max(22px, env(safe-area-inset-top)) 22px max(20px, env(safe-area-inset-bottom)); }
+  .pw-dialog { position: fixed; inset: 0; width: 100vw; max-width: 100vw; min-width: 0; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding: max(22px, env(safe-area-inset-top)) 22px max(20px, env(safe-area-inset-bottom)); }
   .pw-dialog h2 { font-size: 22px; }
   .pw-progress li > span:last-child { display: none; }
   .pw-progress li { flex: 1; }

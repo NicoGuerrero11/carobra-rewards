@@ -76,7 +76,7 @@ function isActive(item: NavItem) {
           }
         </nav>
 
-        <div class="client-shell__right">
+        <div class:list={["client-shell__right", { "client-shell__right--preview": preview }]}>
           <a
             class:list={["client-shell__utility-link", currentPath === "/cliente/ayuda" && "is-active"]}
             href="/cliente/ayuda"
@@ -192,3 +192,16 @@ function isActive(item: NavItem) {
     }
   </script>
 </BaseLayout>
+
+<style>
+  /* With no account menu in previews, keep the last utility tooltip inside the viewport. */
+  .client-shell__right--preview .client-shell__utility-link::after {
+    left: auto;
+    right: 0;
+    transform: translateY(-0.2rem);
+  }
+  .client-shell__right--preview .client-shell__utility-link:hover::after,
+  .client-shell__right--preview .client-shell__utility-link:focus-visible::after {
+    transform: translateY(0);
+  }
+</style>

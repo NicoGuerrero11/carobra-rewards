@@ -123,7 +123,11 @@ test("validated customer sees a complete portal and a truthful rewards catalog",
   for (const product of ["Skandia", "Quálitas", "Modalidad 40"]) {
     const card = page.getByRole("article", { name: product, exact: true });
     await expect(card.getByRole("heading", { name: product })).toBeVisible();
-    await expect(card.getByRole("link", { name: /Quiero.*contactar por correo/ })).toHaveAttribute("href", `mailto:soporte@carobra.mx?subject=${encodeURIComponent(`Quiero información sobre ${product}`)}`);
+    if (product === 'Modalidad 40') {
+      await expect(card.getByRole("link", { name: /Quiero.*contactar por correo/ })).toHaveAttribute("href", `mailto:soporte@carobra.mx?subject=${encodeURIComponent(`Quiero información sobre ${product}`)}`);
+    } else {
+      await expect(card.getByRole('link', { name: `Explorar ${product}`, exact: true })).toHaveAttribute('href', `/cliente/productos/${product === 'Skandia' ? 'skandia' : 'qualitas'}`);
+    }
   }
   await expect(page.getByRole("button", { name: /contratar|solicitar/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Contactar a un asesor por correo" })).toBeVisible();
