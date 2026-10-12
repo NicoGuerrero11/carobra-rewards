@@ -1,0 +1,11 @@
+---
+import ClientShellLayout from '../../../layouts/ClientShellLayout.astro';
+import SkandiaProduct from '../../../components/skandia/SkandiaProduct.astro';
+---
+<ClientShellLayout title="Skandia | Productos | Carobra Rewards" description="Explora tus metas de ahorro y retiro con una simulación de prueba." currentPath="/cliente/productos/skandia" sectionLabel="Productos">
+  <SkandiaProduct />
+  <script>
+    import { attachLogoutHandler, requireElement } from '../../../lib/client-page-utils';
+    attachLogoutHandler(requireElement<HTMLButtonElement>('#logout'), '');
+  </script>
+</ClientShellLayout>

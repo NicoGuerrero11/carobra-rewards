@@ -72,11 +72,9 @@ test('each product shows only its owner-confirmed reward amount above contact', 
   await expect(page.locator('.showcase-card button, .showcase-card form')).toHaveCount(0);
 });
 
-test('all products offer direct keyboard accessible contact with correct context', async ({ page }) => {
+test('remaining contact action is keyboard accessible with correct context', async ({ page }) => {
   await openProducts(page);
   for (const [name, label] of [
-    ['Skandia', 'Quiero empezar a ahorrar'],
-    ['Quálitas', 'Quiero proteger mi auto'],
     ['Modalidad 40', 'Quiero planear mi retiro'],
   ]) {
     const panel = page.getByRole('article', { name, exact: true });
@@ -120,7 +118,7 @@ test('320px panels stack without overflow and retain contact actions', async ({ 
     const visual = (await panel.locator('.showcase-card__brand').boundingBox())!;
     const body = (await panel.locator('.showcase-card__body').boundingBox())!;
     expect(body.y).toBeGreaterThanOrEqual(visual.y + visual.height - 1);
-    const contact = panel.getByRole('link', { name: /Quiero/ });
+    const contact = panel.locator('.showcase-primary');
     expect(await contact.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     await contact.scrollIntoViewIfNeeded();
     await expect(contact).toBeInViewport();

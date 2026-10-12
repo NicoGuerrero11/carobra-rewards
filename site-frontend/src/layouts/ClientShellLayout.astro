@@ -15,6 +15,7 @@ interface Props {
   description?: string;
   currentPath?: string;
   sectionLabel?: string;
+  preview?: boolean;
 }
 
 const {
@@ -22,6 +23,7 @@ const {
   description = "Experiencia cliente con navegación lateral y flujo operativo claro.",
   currentPath = "/cliente",
   sectionLabel = "Cliente",
+  preview = false,
 } = Astro.props as Props;
 
 const navItems: NavItem[] = [
@@ -74,7 +76,7 @@ function isActive(item: NavItem) {
           }
         </nav>
 
-        <div class="client-shell__right">
+        <div class:list={["client-shell__right", { "client-shell__right--preview": preview }]}>
           <a
             class:list={["client-shell__utility-link", currentPath === "/cliente/ayuda" && "is-active"]}
             href="/cliente/ayuda"
@@ -99,7 +101,7 @@ function isActive(item: NavItem) {
             </svg>
             {unreadCount > 0 && <span class="client-shell__notification-count" aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>}
           </a>
-          <div id="client-shell-user" class="client-shell__user">
+          {!preview && <div id="client-shell-user" class="client-shell__user">
             <button id="client-shell-user-toggle" class="client-shell__user-toggle" type="button" aria-expanded="false" aria-label="Abrir menú de cuenta">
               <span class="client-shell__user-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" role="presentation">
@@ -114,7 +116,7 @@ function isActive(item: NavItem) {
               <a class="client-shell__user-menu-link" href="/cliente/perfil">Mi cuenta</a>
               <button id="logout" class="client-shell__user-menu-button" type="button">Cerrar sesión</button>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </header>
@@ -190,3 +192,16 @@ function isActive(item: NavItem) {
     }
   </script>
 </BaseLayout>
+
+<style>
+  /* With no account menu in previews, keep the last utility tooltip inside the viewport. */
+  .client-shell__right--preview .client-shell__utility-link::after {
+    left: auto;
+    right: 0;
+    transform: translateY(-0.2rem);
+  }
+  .client-shell__right--preview .client-shell__utility-link:hover::after,
+  .client-shell__right--preview .client-shell__utility-link:focus-visible::after {
+    transform: translateY(0);
+  }
+</style>

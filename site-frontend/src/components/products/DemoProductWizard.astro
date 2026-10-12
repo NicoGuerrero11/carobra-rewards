@@ -1,0 +1,31 @@
+---
+import type { DemoStep } from '../../lib/demo-product-wizard';
+import '../../styles/demo-product-wizard.css';
+interface Props { id: string; title: string; steps: DemoStep[] }
+const { id, title, steps } = Astro.props;
+---
+<dialog class="pw-dialog" data-demo-wizard={id} aria-labelledby={`${id}-title`}>
+  <header class="pw-header"><div><p class="pw-eyebrow">Quálitas · Vista de prueba</p><h2 id={`${id}-title`}>{title}</h2></div><button type="button" data-close class="pw-close" aria-label="Cerrar cuestionario">✕</button></header>
+  <p class="pw-banner">Usa solo datos ficticios. No se envía una solicitud ni se genera una cotización.</p>
+  <ol class="pw-progress" aria-label="Pasos">{steps.map((step, i) => <li data-progress={i} aria-label={`Paso ${i + 1}: ${step.title}`}><span aria-hidden="true">{i + 1}</span><span aria-hidden="true">{step.title}</span></li>)}</ol>
+  <form method="dialog" novalidate autocomplete="off">
+    {steps.map((step, i) => <section data-step={i} hidden={i !== 0} aria-labelledby={`${id}-step-${i}`}>
+      <p class="pw-step-count">Paso {i + 1} de {steps.length}</p><h3 id={`${id}-step-${i}`} tabindex="-1">{step.title}</h3><p class="pw-description">{step.description}</p>
+      <div class="pw-fields">{step.fields.map(field => <div class="pw-field">
+        <label for={`${id}-${field.name}`}>{field.label}{field.optional && <span> · Opcional</span>}</label>
+        {field.type === 'select' ? <select id={`${id}-${field.name}`} name={field.name} required={!field.optional} aria-describedby={`${id}-${field.name}-hint ${id}-${field.name}-error`}>
+          <option value="">Selecciona una opción</option>{field.options?.map(option => <option value={option}>{option}</option>)}
+        </select> : <input id={`${id}-${field.name}`} name={field.name} type={field.type} inputmode={field.inputmode} maxlength={field.maxLength ?? 80} placeholder={field.placeholder} required={!field.optional} aria-describedby={`${id}-${field.name}-hint ${id}-${field.name}-error`} />}
+        <p class="pw-hint" id={`${id}-${field.name}-hint`}>{field.hint}</p>
+        <p class="pw-field-error" id={`${id}-${field.name}-error`} data-error-for={field.name} hidden></p>
+      </div>)}</div>
+      {step.note && <p class="pw-note">{step.note}</p>}
+      {step.contact && <><div class="pw-contact"><span>Contacto ficticio</span><strong>Alex Ejemplo</strong><span>alex@example.test</span><p>En esta prueba usamos un contacto fijo. No ingreses datos personales.</p></div><label class="pw-consent"><input type="checkbox" name="consent" aria-describedby={`${id}-consent-error`} /><span>Acepto continuar este ejercicio con datos ficticios. No autorizo contacto comercial ni contratación.</span></label><p class="pw-field-error" id={`${id}-consent-error`} data-error-for="consent" hidden></p></>}
+    </section>)}
+    <section data-summary hidden aria-labelledby={`${id}-summary`}><p class="pw-step-count">Revisa tu ejercicio</p><h3 id={`${id}-summary`} tabindex="-1">Todo en un solo lugar.</h3><p class="pw-description">Puedes volver y cambiar tus respuestas antes de terminar.</p><div class="pw-summary-note"><strong>Sin precio ni propuesta comercial</strong><p>Esta vista no calcula una prima, garantiza una mejora ni confirma coberturas. Las opciones definitivas requieren una evaluación.</p></div><dl class="pw-summary" data-answers></dl><p class="pw-note">Al terminar solo verás una confirmación de prueba. No se contactará a nadie.</p></section>
+    <p class="pw-error" role="alert" data-error hidden></p>
+    <footer class="pw-footer"><button type="button" class="pw-button pw-button--secondary" data-back>Atrás</button><button type="submit" class="pw-button" data-next>Continuar →</button></footer>
+    <p class="pw-session">Puedes cerrar y retomar mientras sigas en esta página. Al recargar o salir se borra el ejercicio. <button type="button" data-discard>Descartar y salir</button></p>
+  </form>
+  <section class="pw-success" data-success hidden aria-labelledby={`${id}-done`}><span class="pw-success-icon" aria-hidden="true">✓</span><p class="pw-eyebrow">Recorrido completado</p><h3 id={`${id}-done`} tabindex="-1">Simulación completada</h3><p>No se ha enviado ninguna solicitud.</p><p>No se genera una cotización, una póliza ni una asignación de asesor. Este ejercicio no otorga puntos ni cambia tu nivel.</p><button type="button" class="pw-button" data-finish>Volver a Quálitas</button></section>
+</dialog>

@@ -1,5 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { productDestination } from '../lib/product-navigation';
+const next = productDestination(Astro.url.searchParams.get('next'));
 ---
 
 <BaseLayout title="Iniciar sesión | Carobra Rewards" description="Accede a tu cuenta y consulta tu validación AFORE.">
@@ -35,12 +37,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       </form>
 
       <p class="mt-4 text-sm text-[#4c637f]">
-        ¿No tienes cuenta? <a class="font-bold text-[#0c3d75]" href="/registro">Regístrate aquí</a>
+        ¿No tienes cuenta? <a class="font-bold text-[#0c3d75]" href={next ? `/registro?next=${encodeURIComponent(next)}` : '/registro'}>Regístrate aquí</a>
       </p>
     </section>
   </main>
 
   <script>
+    import { productDestination } from '../lib/product-navigation';
     type StableErrorCode =
       | "duplicate_email"
       | "duplicate_curp"
@@ -102,12 +105,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
 
     const query = new URLSearchParams(window.location.search);
+    const destination = productDestination(query.get('next'));
     if (query.get("registered") === "1") {
       setFeedback("Tu cuenta fue creada. Inicia sesión para consultar tu validación AFORE.", false);
-      window.history.replaceState({}, "", "/login");
+      window.history.replaceState({}, "", destination ? `/login?next=${encodeURIComponent(destination)}` : '/login');
     } else if (query.get("error") === "unauthenticated") {
       setFeedback(stableMessages.unauthenticated, true);
-      window.history.replaceState({}, "", "/login");
+      window.history.replaceState({}, "", destination ? `/login?next=${encodeURIComponent(destination)}` : '/login');
     }
 
     showPassword.addEventListener("change", () => {
@@ -167,7 +171,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         }
 
         setFeedback("Acceso correcto. Redirigiendo...", false);
-        window.location.href = "/cliente";
+        window.location.href = destination ?? "/cliente";
       } catch {
         setFeedback(stableMessages.api_unavailable, true);
       } finally {

@@ -68,6 +68,60 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     assert.equal(protectedPage.headers.get("location"), "/login");
     await protectedPage.text();
   });
+  await t.test("Skandia local preview is unavailable in builds and product remains authenticated", async () => {
+    const count = requests.length;
+    const preview = await request("/preview/skandia");
+    assert.equal(preview.status, 404);
+    await preview.text();
+    const product = await request("/cliente/productos/skandia?plan=ahorro");
+    assert.equal(product.status, 302);
+    assert.equal(product.headers.get("location"), "/login?next=%2Fcliente%2Fproductos%2Fskandia%3Fplan%3Dahorro");
+    await product.text();
+    assert.equal(requests.length, count);
+  });
+  await t.test("Qualitas remains authenticated, preserves intent and exposes only a demo", async () => {
+    const preview = await request('/preview/qualitas');
+    assert.equal(preview.status, 404); await preview.text();
+    const response = await request('/cliente/productos/qualitas?plan=mejorar');
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('location'), '/login?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar');
+    await response.text();
+    const login = await request('/login?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar');
+    assert.match(await login.text(), /registro\?next=%2Fcliente%2Fproductos%2Fqualitas%3Fplan%3Dmejorar/);
+    const page = await request('/cliente/productos/qualitas', { headers: { cookie } });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /data-demo-wizard="cotizar"/);
+    assert.match(html, /data-demo-wizard="mejorar"/);
+    assert.match(html, /No se ha enviado ninguna solicitud/);
+    assert.match(html, /alex@example.test/);
+    assert.doesNotMatch(html, /type="file"/);
+    const home = await request('/'); const homeHtml = await home.text();
+    for (const product of ['skandia', 'qualitas']) assert.match(homeHtml, new RegExp(`public-offer--${product}[^>]*href="/cliente/productos/${product}"`));
+  });
+  await t.test("both product pages reuse shared auth context without portal or wallet reads", async () => {
+    for (const [product, plans] of [['skandia', ['ahorro', 'retiro']], ['qualitas', ['cotizar', 'mejorar']]]) {
+      const before = requests.length;
+      const page = await request(`/cliente/productos/${product}`, { headers: { cookie: 'carobra_session=portal-failure' } });
+      assert.equal(page.status, 200);
+      assert.equal(page.headers.get('cache-control'), 'private, no-store');
+      assert.match(page.headers.get('server-timing'), /auth-context;dur=/);
+      const html = await page.text();
+      assert.match(html, /No se ha enviado ninguna solicitud/);
+      assert.doesNotMatch(html, /type="file"/);
+      assert.deepEqual(requests.slice(before).map(row => [row.method, row.url]), [['GET', '/api/v1/rewards/customer-context']]);
+      for (const plan of plans) {
+        const destination = `/cliente/productos/${product}?plan=${plan}`;
+        const next = encodeURIComponent(destination);
+        for (const auth of ['login', 'registro']) {
+          const response = await request(`/${auth}?next=${next}`, { headers: { cookie } });
+          assert.equal(response.status, 302);
+          assert.equal(response.headers.get('location'), destination);
+          await response.text();
+        }
+      }
+    }
+  });
   await t.test("forwards JSON bodies and preserves multiple Set-Cookie headers", async () => {
     const body = JSON.stringify({ email: "fixture@example.test", password: "test-only" });
     const response = await request("/api/v1/auth/login", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4323" }, body });
