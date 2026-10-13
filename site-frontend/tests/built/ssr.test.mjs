@@ -162,6 +162,7 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
       assert.match(response.headers.get('server-timing'),/auth-context;dur=/);
       const html = await response.text();
       assert.match(html,/No pudimos/);
+      if (path === '/cliente/productos') assert.match(html, /id="producto-modalidad"[\s\S]*?<strong>\+950<\/strong>/);
       assert.equal(requests.slice(before).filter(row=>row.url==='/api/v1/rewards/portal').length,0);
       assert.equal(requests.slice(before).filter(row=>row.url==='/api/v1/rewards/customer-context').length,1);
       if (path.endsWith('activities')) assert.doesNotMatch(html,/class="bonda-balance__amount"/);
@@ -184,6 +185,7 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
       const response=await request(path,{headers:{cookie:'carobra_session=bundle'}});
       assert.equal(response.status,200);
       const html=await response.text();assert.match(html,/No pudimos/);
+      if (path === '/cliente/recompensas') assert.match(html, /home-product--modalidad[\s\S]*?\+950 puntos Rewards/);
       assert.equal(requests.length-before,1);
       assert.match(requests.at(-1).url,/customer-context\?include=/);
     }

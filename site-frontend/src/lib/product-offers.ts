@@ -27,7 +27,8 @@ export const productOffers = [
     description: "Más tiempo para ti y para lo que disfrutas. Descubre si Modalidad 40 puede formar parte de tus planes de retiro.",
     themes: ["Tu retiro", "Tus próximos años"],
     contactLabel: "Quiero planear mi retiro",
-    displayRewardPoints: 600,
+    // Master V3.0 MVP1 slides 10/34/35 and Skandia module slides 21/23: display-only correction.
+    displayRewardPoints: 950,
   },
 ].map((offer) => ({
   ...offer,

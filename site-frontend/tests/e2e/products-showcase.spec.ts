@@ -58,7 +58,7 @@ test('compact catalog fits three desktop cards and adapts to tablet', async ({ p
 test('each product shows only its owner-confirmed reward amount above contact', async ({ page }) => {
   await openProducts(page);
   await expect(page.locator('.showcase-card__reward')).toHaveCount(3);
-  for (const [name, amount] of [['Skandia', 600], ['Quálitas', 150], ['Modalidad 40', 600]] as const) {
+  for (const [name, amount] of [['Skandia', 600], ['Quálitas', 150], ['Modalidad 40', 950]] as const) {
     const card = page.getByRole('article', { name, exact: true });
     const reward = card.locator('.showcase-card__reward');
     await expect(reward).toBeVisible();
