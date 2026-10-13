@@ -24,7 +24,7 @@ test('home discovers real eligible modules and retains working destinations with
   await expect(page.getByRole('link',{name:'Ver video: Rutina de relajación cervical'})).toHaveAttribute('href','/cliente/cursos/1500');
   await expect(page.getByRole('link',{name:/Leer artículo:/})).toHaveAttribute('href','/cliente/cursos/61');
   await expect(page.locator('.home-product')).toHaveCount(3);
-  await expect(page.locator('.home-product__points')).toHaveText(['✦ +600 puntos Rewards','✦ +150 puntos Rewards','✦ +600 puntos Rewards']);
+  await expect(page.locator('.home-product__points')).toHaveText(['✦ +600 puntos Rewards','✦ +150 puntos Rewards','✦ +950 puntos Rewards']);
   await expect(page.locator('main')).not.toContainText(/Gift Cards|Sin contenido asignado|se habilitan|Fundamentos para tu retiro/);
   await expect(page.locator('.home-account')).not.toContainText(/%/);
   await expect(page.locator('.home-learning-grid')).not.toContainText(/%/);
