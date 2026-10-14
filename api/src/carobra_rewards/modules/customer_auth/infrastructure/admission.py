@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import math
-from datetime import datetime
 from threading import BoundedSemaphore
 from typing import Literal
 
@@ -18,8 +16,47 @@ from carobra_rewards.modules.customer_auth.application.models import (
 )
 
 _ADMISSION_SLOTS = BoundedSemaphore(16)
-
 GLOBAL_KEY = hashlib.sha256(b"auth:global:v1").hexdigest()
+
+# This statement runs AFTER the global lock has been acquired in a separate
+# statement. Under READ COMMITTED it therefore sees the previous owner's commit.
+# Combining lock acquisition and this snapshot into one statement would lose
+# that guarantee when another replica was already waiting for the lock.
+_DECIDE = text("""
+    WITH instant AS MATERIALIZED (SELECT clock_timestamp() AS now),
+    dimensions(key, budget) AS (VALUES
+        (CAST(:global_key AS varchar), CAST(:global_limit AS integer)),
+        (CAST(:peer_key AS varchar), CAST(:peer_limit AS integer)),
+        (CAST(:account_key AS varchar), CAST(:account_limit AS integer))
+    ),
+    decision AS MATERIALIZED (
+        SELECT COALESCE(MAX(CEIL(EXTRACT(EPOCH FROM (c.expires_at - i.now))))
+            FILTER (WHERE c.expires_at > i.now AND c.attempts >= d.budget), 0)::integer
+            AS retry_after
+        FROM dimensions d CROSS JOIN instant i
+        LEFT JOIN auth_admission_counters c ON c.key = d.key
+    ),
+    consumed AS (
+        INSERT INTO auth_admission_counters (key, attempts, expires_at)
+        SELECT d.key, 1, i.now + make_interval(secs => CAST(:window AS double precision))
+        FROM dimensions d CROSS JOIN instant i CROSS JOIN decision verdict
+        WHERE verdict.retry_after = 0
+        ON CONFLICT (key) DO UPDATE SET
+            attempts = CASE WHEN auth_admission_counters.expires_at <= (SELECT now FROM instant)
+                THEN 1 ELSE auth_admission_counters.attempts + 1 END,
+            expires_at = CASE WHEN auth_admission_counters.expires_at <= (SELECT now FROM instant)
+                THEN EXCLUDED.expires_at ELSE auth_admission_counters.expires_at END
+    ),
+    cleaned AS (
+        DELETE FROM auth_admission_counters WHERE key IN (
+            SELECT c.key FROM auth_admission_counters c CROSS JOIN instant i
+            WHERE c.expires_at <= i.now AND c.key NOT IN (SELECT key FROM dimensions)
+                AND (SELECT retry_after FROM decision) = 0
+            ORDER BY c.expires_at LIMIT 32
+        )
+    )
+    SELECT retry_after FROM decision
+""")
 
 
 class AuthAdmission:
@@ -39,93 +76,52 @@ class AuthAdmission:
 
     async def _admit(self, operation: Literal["login", "register"], email: str, peer: str) -> None:
         settings = self._settings
-        account_limit = (
-            settings.auth_login_account_limit
-            if operation == "login"
-            else settings.auth_register_account_limit
-        )
-        dimensions = [
-            (GLOBAL_KEY, settings.auth_global_limit),
-            (_key("connection", peer), settings.auth_connection_limit),
-            (_key(operation, email.strip().lower()), account_limit),
-        ]
-        retry_after = 0
+        parameters = {
+            "global_key": GLOBAL_KEY,
+            "global_limit": settings.auth_global_limit,
+            "peer_key": _key("connection", peer),
+            "peer_limit": settings.auth_connection_limit,
+            "account_key": _key(operation, email.strip().lower()),
+            "account_limit": (
+                settings.auth_login_account_limit
+                if operation == "login"
+                else settings.auth_register_account_limit
+            ),
+            "window": settings.auth_admission_window_seconds,
+        }
         try:
-            # Bound connection acquisition, locking and queries, not only hash work.
+            # Three SQL executions; driver setup, prepare, BEGIN and COMMIT
+            # also need network round trips within this same bounded budget.
             async with asyncio.timeout(settings.auth_admission_timeout_seconds):
                 async with self._session_factory() as session, session.begin():
-                    await session.execute(text("SET LOCAL lock_timeout = '200ms'"))
-                    await session.execute(text("SET LOCAL statement_timeout = '500ms'"))
+                    await session.execute(
+                        text("""
+                        SELECT set_config('lock_timeout', '200ms', true),
+                               set_config('statement_timeout', '500ms', true)
+                    """)
+                    )
+                    # The no-op update acquires the same row lock on both cold and
+                    # warm starts without changing its window or consumption.
                     await session.execute(
                         text("""
                         INSERT INTO auth_admission_counters (key, attempts, expires_at)
-                        VALUES (:key, 0, clock_timestamp()) ON CONFLICT (key) DO NOTHING
+                        VALUES (:key, 0, clock_timestamp())
+                        ON CONFLICT (key) DO UPDATE SET key = EXCLUDED.key
                     """),
                         {"key": GLOBAL_KEY},
                     )
-                    # All replicas lock this same row before touching other dimensions.
-                    await session.execute(
-                        text("""
-                        SELECT key FROM auth_admission_counters WHERE key = :key FOR UPDATE
-                    """),
-                        {"key": GLOBAL_KEY},
-                    )
-                    now = (await session.execute(text("SELECT clock_timestamp()"))).scalar_one()
-                    # Check every budget before writing any consumption, while
-                    # holding the shared lock. A rejected account/peer cannot
-                    # drain the budget reserved for admitted work.
-                    for key, limit in reversed(dimensions):
-                        retry_after = await self._retry_after(session, key, limit, now)
-                        if retry_after:
-                            break
-                    if not retry_after:
-                        for key, _ in dimensions:
-                            await self._consume(session, key, now)
-                    # Bounded cleanup, under the same lock. The global budget bounds
-                    # new keys even when an attacker varies account and connection.
-                    await session.execute(
-                        text("""
-                        DELETE FROM auth_admission_counters WHERE key IN (
-                            SELECT key FROM auth_admission_counters
-                            WHERE expires_at <= :now AND key <> :global_key
-                            ORDER BY expires_at LIMIT 32
-                        )
-                    """),
-                        {"now": now, "global_key": GLOBAL_KEY},
-                    )
-                # All consumptions commit together; cancellation/errors roll back all.
-        except (SQLAlchemyError, TimeoutError) as exc:
+                    retry_after = await self._decide(session, parameters)
+                # Decision, consumption and bounded cleanup commit together.
+                # Cancellation/errors roll back; rejected work consumes nothing.
+        except (SQLAlchemyError, TimeoutError, OSError) as exc:
             raise CustomerAuthPersistenceError() from exc
         if retry_after:
             raise AuthAdmissionRejectedError(retry_after)
 
-    async def _retry_after(self, session: AsyncSession, key: str, limit: int, now: datetime) -> int:
-        row = (
-            await session.execute(
-                text("""
-            SELECT attempts, expires_at FROM auth_admission_counters WHERE key = :key
-        """),
-                {"key": key},
-            )
-        ).one_or_none()
-        if row is not None and row.expires_at > now and row.attempts >= limit:
-            return max(1, math.ceil((row.expires_at - now).total_seconds()))
-        return 0
-
-    async def _consume(self, session: AsyncSession, key: str, now: datetime) -> None:
-        await session.execute(
-            text("""
-            INSERT INTO auth_admission_counters (key, attempts, expires_at)
-            VALUES (:key, 1, CAST(:now AS timestamptz)
-                + make_interval(secs => CAST(:window AS double precision)))
-            ON CONFLICT (key) DO UPDATE SET
-                attempts = CASE WHEN auth_admission_counters.expires_at <= :now
-                    THEN 1 ELSE auth_admission_counters.attempts + 1 END,
-                expires_at = CASE WHEN auth_admission_counters.expires_at <= :now
-                    THEN EXCLUDED.expires_at ELSE auth_admission_counters.expires_at END
-        """),
-            {"key": key, "now": now, "window": self._settings.auth_admission_window_seconds},
-        )
+    async def _decide(self, session: AsyncSession, parameters: dict[str, str | int]) -> int:
+        # Cleanup excludes ALL consumed keys: two data-changing CTEs must never
+        # modify the same row in one statement, including an expired account.
+        return int((await session.execute(_DECIDE, parameters)).scalar_one())
 
 
 def _key(dimension: str, value: str) -> str:

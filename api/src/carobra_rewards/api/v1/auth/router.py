@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, NoReturn
+from time import monotonic
+from typing import Annotated, Literal, NoReturn
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 
@@ -32,6 +33,7 @@ from carobra_rewards.modules.customer_auth.application.models import (
 )
 from carobra_rewards.modules.customer_auth.application.service import CustomerAuthService
 from carobra_rewards.modules.customer_auth.infrastructure.admission import AuthAdmission
+from carobra_rewards.modules.customer_auth.infrastructure.diagnostics import log_auth_failure
 
 router = APIRouter(tags=["customer-auth"])
 
@@ -51,13 +53,19 @@ async def register(
     settings: Annotated[Settings, Depends(get_settings)],
     service: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
 ) -> RegistrationResponse:
+    started = monotonic()
+    stage: Literal["admission", "login", "register"] = "admission"
     try:
         async with asyncio.timeout(settings.auth_request_timeout_seconds):
             await admission.admit("register", request.email, _connection_origin(connection))
+            stage = "register"
             result = await service.register(request.to_command())
-    except TimeoutError:
+    except TimeoutError as exc:
+        log_auth_failure(exc, stage=stage, started=started)
         _raise_http_error(AuthAdmissionRejectedError())
     except Exception as exc:
+        if isinstance(exc, CustomerAuthPersistenceError):
+            log_auth_failure(exc, stage=stage, started=started)
         _raise_http_error(exc)
     background_tasks.add_task(service.run_initial_validation, result)
     return RegistrationResponse.from_result(result)
@@ -77,13 +85,19 @@ async def login(
     service: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LoginResponse:
+    started = monotonic()
+    stage: Literal["admission", "login", "register"] = "admission"
     try:
         async with asyncio.timeout(settings.auth_request_timeout_seconds):
             await admission.admit("login", request.email, _connection_origin(connection))
+            stage = "login"
             result = await service.login(request.to_command())
-    except TimeoutError:
+    except TimeoutError as exc:
+        log_auth_failure(exc, stage=stage, started=started)
         _raise_http_error(AuthAdmissionRejectedError())
     except Exception as exc:
+        if isinstance(exc, CustomerAuthPersistenceError):
+            log_auth_failure(exc, stage=stage, started=started)
         _raise_http_error(exc)
     response.set_cookie(
         key=settings.auth_session_cookie_name,

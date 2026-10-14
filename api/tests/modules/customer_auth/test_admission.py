@@ -165,7 +165,7 @@ async def test_rejection_has_no_partial_consumption_or_new_keys(
 
 
 @pytest.mark.integration
-async def test_cancel_between_consumptions_rolls_back_and_releases_capacity(
+async def test_cancel_after_consumption_before_commit_rolls_back_and_releases_capacity(
     postgres_session_factory,
 ):
     gate = AuthAdmission(postgres_session_factory, settings())
@@ -174,10 +174,11 @@ async def test_cancel_between_consumptions_rolls_back_and_releases_capacity(
     wrote = asyncio.Event()
 
     class PausedAdmission(AuthAdmission):
-        async def _consume(self, session, key, now):
-            await super()._consume(session, key, now)
+        async def _decide(self, session, parameters):
+            result = await super()._decide(session, parameters)
             wrote.set()
             await asyncio.Event().wait()
+            return result
 
     paused = PausedAdmission(postgres_session_factory, settings())
     task = asyncio.create_task(paused.admit("login", "two@example.test", "peer-two"))
@@ -196,14 +197,90 @@ async def test_storage_timeout_rolls_back_partial_consumption(postgres_session_f
     before = await snapshot(postgres_session_factory)
 
     class PausedAdmission(AuthAdmission):
-        async def _consume(self, session, key, now):
-            await super()._consume(session, key, now)
+        async def _decide(self, session, parameters):
+            result = await super()._decide(session, parameters)
             await asyncio.Event().wait()
+            return result
 
     paused = PausedAdmission(
         postgres_session_factory, settings(AUTH_ADMISSION_TIMEOUT_SECONDS=0.05)
     )
     with pytest.raises(CustomerAuthPersistenceError):
         await paused.admit("login", "two@example.test", "peer-two")
+    assert await snapshot(postgres_session_factory) == before
+    await gate.admit("login", "two@example.test", "peer-two")
+
+
+@pytest.mark.integration
+async def test_sql_failure_after_consumption_rolls_back_every_dimension(postgres_session_factory):
+    gate = AuthAdmission(postgres_session_factory, settings())
+    await gate.admit("login", "one@example.test", "peer-one")
+    before = await snapshot(postgres_session_factory)
+
+    class FailedAdmission(AuthAdmission):
+        async def _decide(self, session, parameters):
+            await super()._decide(session, parameters)
+            await session.execute(text("SELECT * FROM deliberately_missing_auth_test_table"))
+            pytest.fail("invalid SQL must fail closed")
+
+    with pytest.raises(CustomerAuthPersistenceError):
+        await FailedAdmission(postgres_session_factory, settings()).admit(
+            "login", "two@example.test", "peer-two"
+        )
+    assert await snapshot(postgres_session_factory) == before
+    await gate.admit("login", "two@example.test", "peer-two")
+
+
+@pytest.mark.integration
+async def test_waiting_replica_reads_latest_committed_budget(postgres_session_factory):
+    config = settings(AUTH_GLOBAL_LIMIT=2)
+    gate = AuthAdmission(postgres_session_factory, config)
+    await gate.admit("login", "one@example.test", "peer-one")
+    consumed = asyncio.Event()
+    release = asyncio.Event()
+
+    class HoldingAdmission(AuthAdmission):
+        async def _decide(self, session, parameters):
+            result = await super()._decide(session, parameters)
+            consumed.set()
+            await release.wait()
+            return result
+
+    holder = asyncio.create_task(
+        HoldingAdmission(postgres_session_factory, config).admit(
+            "login", "two@example.test", "peer-two"
+        )
+    )
+    await asyncio.wait_for(consumed.wait(), 2)
+    waiter = asyncio.create_task(gate.admit("login", "three@example.test", "peer-three"))
+    try:
+        await asyncio.sleep(0.05)
+        assert not waiter.done()
+        release.set()
+        await holder
+        with pytest.raises(AuthAdmissionRejectedError):
+            await waiter
+        after = await snapshot(postgres_session_factory)
+        assert len(after) == 5
+        assert max(row.attempts for row in after) == 2
+    finally:
+        release.set()
+        await asyncio.gather(holder, waiter, return_exceptions=True)
+
+
+@pytest.mark.integration
+async def test_database_lock_timeout_fails_closed_and_recovers(postgres_session_factory):
+    from carobra_rewards.modules.customer_auth.infrastructure.admission import GLOBAL_KEY
+
+    gate = AuthAdmission(postgres_session_factory, settings())
+    await gate.admit("login", "one@example.test", "peer-one")
+    before = await snapshot(postgres_session_factory)
+    async with postgres_session_factory() as holder, holder.begin():
+        await holder.execute(
+            text("SELECT key FROM auth_admission_counters WHERE key = :key FOR UPDATE"),
+            {"key": GLOBAL_KEY},
+        )
+        with pytest.raises(CustomerAuthPersistenceError):
+            await asyncio.wait_for(gate.admit("login", "two@example.test", "peer-two"), 2)
     assert await snapshot(postgres_session_factory) == before
     await gate.admit("login", "two@example.test", "peer-two")

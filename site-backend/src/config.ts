@@ -102,10 +102,10 @@ export function loadConfig(
       120_000,
     ),
     authApiResponseBudgetMs: parseInteger(
-      "AUTH_API_RESPONSE_BUDGET_MS", environment.AUTH_API_RESPONSE_BUDGET_MS ?? "4000", 1000, 10000,
+      "AUTH_API_RESPONSE_BUDGET_MS", environment.AUTH_API_RESPONSE_BUDGET_MS ?? "7000", 1000, 10000,
     ),
     authRequestTimeoutMs: parseInteger(
-      "AUTH_REQUEST_TIMEOUT_MS", environment.AUTH_REQUEST_TIMEOUT_MS ?? "6000", 2000, 15000,
+      "AUTH_REQUEST_TIMEOUT_MS", environment.AUTH_REQUEST_TIMEOUT_MS ?? "9000", 2000, 15000,
     ),
     bonda: loadBondaConfig(environment),
     sessionCookie,
@@ -344,8 +344,8 @@ function parseInteger(
 
 
 export function authRequestTimeout(config: SiteBackendConfig): number {
-  const budget = config.authApiResponseBudgetMs ?? 4000;
-  const timeout = config.authRequestTimeoutMs ?? 6000;
+  const budget = config.authApiResponseBudgetMs ?? 7000;
+  const timeout = config.authRequestTimeoutMs ?? 9000;
   if (!Number.isInteger(budget) || budget < 1000 || budget > 10000
       || !Number.isInteger(timeout) || timeout < budget + 1000 || timeout > 15000) {
     throw new Error("Auth BFF timeout must exceed the API response budget by at least 1000ms (max 15000ms)");

@@ -41,10 +41,10 @@ class Settings(BaseSettings):
     auth_connection_limit: int = Field(default=240, ge=1, le=10000, alias="AUTH_CONNECTION_LIMIT")
     auth_global_limit: int = Field(default=300, ge=1, le=10000, alias="AUTH_GLOBAL_LIMIT")
     auth_admission_timeout_seconds: float = Field(
-        default=1, gt=0, le=2, alias="AUTH_ADMISSION_TIMEOUT_SECONDS"
+        default=4, gt=0, le=4, alias="AUTH_ADMISSION_TIMEOUT_SECONDS"
     )
     auth_request_timeout_seconds: float = Field(
-        default=4, ge=1, le=10, alias="AUTH_REQUEST_TIMEOUT_SECONDS"
+        default=7, ge=1, le=10, alias="AUTH_REQUEST_TIMEOUT_SECONDS"
     )
     auth_hash_workers: int = Field(default=2, ge=1, le=8, alias="AUTH_HASH_WORKERS")
     auth_hash_queue_size: int = Field(default=8, ge=0, le=64, alias="AUTH_HASH_QUEUE_SIZE")

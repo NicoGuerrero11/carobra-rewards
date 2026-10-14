@@ -5,12 +5,12 @@ import { authRequestTimeout, loadConfig } from "../src/config.js";
 test("auth has a bounded dedicated timeout beyond the API budget", () => {
   const config = loadConfig({});
   assert.equal(config.apiRequestTimeoutMs, 5000);
-  assert.equal(config.authApiResponseBudgetMs, 4000);
-  assert.equal(authRequestTimeout(config), 6000);
-  assert.equal(authRequestTimeout(loadConfig({ API_REQUEST_TIMEOUT_MS: "50" })), 6000);
+  assert.equal(config.authApiResponseBudgetMs, 7000);
+  assert.equal(authRequestTimeout(config), 9000);
+  assert.equal(authRequestTimeout(loadConfig({ API_REQUEST_TIMEOUT_MS: "50" })), 9000);
 });
 
-for (const timeout of ["4000", "4999", "16000"]) {
+for (const timeout of ["7000", "7999", "16000"]) {
   test(`rejects unsafe auth timeout ${timeout}`, () => {
     assert.throws(() => loadConfig({ AUTH_REQUEST_TIMEOUT_MS: timeout }));
   });

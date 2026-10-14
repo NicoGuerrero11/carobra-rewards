@@ -404,3 +404,45 @@ def test_forwarded_headers_cannot_select_connection_bucket(client):
             assert response.status_code == 429
     assert {peer for _, _, peer in peers} == {"testclient"}
     assert service.registration_command is None
+
+
+@pytest.mark.parametrize("kind", ["timeout", "sql", "ssl"])
+@pytest.mark.parametrize("endpoint", ["login", "register"])
+def test_admission_failures_are_503_with_sanitized_diagnostics(client, caplog, kind, endpoint):
+    import logging
+    import ssl
+    from unittest.mock import Mock
+
+    from sqlalchemy.exc import OperationalError
+
+    from carobra_rewards.core.config import Settings
+    from carobra_rewards.modules.customer_auth.infrastructure.admission import AuthAdmission
+
+    http, service = client
+    marker = "sensitive-synthetic-account-parameter"
+    errors = {
+        "timeout": TimeoutError(marker),
+        "sql": OperationalError(marker, {"sensitive": marker}, Exception(marker)),
+        "ssl": ssl.SSLCertVerificationError(marker),
+    }
+    gate = AuthAdmission(Mock(side_effect=errors[kind]), Settings())
+    http.app.dependency_overrides[get_auth_admission] = lambda: gate
+    payload = (
+        _payload()
+        if endpoint == "register"
+        else {
+            "email": "synthetic@example.test",
+            "password": marker,
+        }
+    )
+    with caplog.at_level(logging.WARNING):
+        response = http.post(f"/api/v1/auth/{endpoint}", json=payload)
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": {"code": "service_unavailable", "message": "Service unavailable"}
+    }
+    assert "retry-after" not in response.headers
+    assert "set-cookie" not in response.headers
+    assert marker not in response.text + caplog.text
+    assert f"stage=admission category={kind}" in caplog.text
+    assert service.registration_command is None
