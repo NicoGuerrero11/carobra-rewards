@@ -4,7 +4,7 @@ import { createDemoWizard } from '../../src/lib/demo-product-wizard.ts';
 import { qualitasSteps, validateQualitas } from '../../src/lib/qualitas-questionnaire.ts';
 import { productDestination } from '../../src/lib/product-navigation.ts';
 
-const sample = { brand: 'Toyota', model: 'Corolla', year: '2023', postalCode: '01010', use: 'Particular', driver: 'Yo', ageGroup: '25 a 39 años', coverage: 'Amplia', priority: 'Proteger mi auto', urgency: 'Solo estoy explorando', insurer: 'Otra aseguradora', currentCoverage: 'Limitada', expiry: '2026-12-31', change: 'Coberturas', consent: 'on' };
+const sample = { brand: 'Toyota', model: 'Corolla', year: '2023', postalCode: '01010', use: 'Particular', driver: 'Yo', ageGroup: '25 a 39 años', coverage: 'Básica', priority: 'Proteger mi auto', urgency: 'Solo estoy explorando', insurer: 'Otra aseguradora', currentCoverage: 'Limitada', expiry: '2026-12-31', change: 'Coberturas', consent: 'on' };
 
 for (const journey of ['cotizar', 'mejorar']) {
   test(`${journey}: complete synthetic journey reaches review then simulation, back and restart work`, () => {

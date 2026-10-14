@@ -20,7 +20,7 @@ const driver: DemoStep = {
   ],
   note: 'No necesitas ingresar nombre, licencia, placas ni número de serie del vehículo para esta prueba.',
 };
-const coverageOptions = ['Amplia', 'Limitada', 'Responsabilidad civil', 'Necesito orientación'];
+const coverageOptions = ['Amplia', 'Limitada', 'Básica', 'Necesito orientación'];
 const urgency = { name: 'urgency', label: '¿Cuándo te gustaría contar con protección?', type: 'select' as const, options: ['Lo antes posible', 'Al vencer mi póliza', 'Más adelante', 'Solo estoy explorando'] };
 const contact: DemoStep = { title: 'Contacto de prueba', description: 'Así se vería el contacto al terminar el recorrido.', fields: [], contact: true };
 export const qualitasSteps: Record<QualitasJourney, DemoStep[]> = {

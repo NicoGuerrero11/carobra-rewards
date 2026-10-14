@@ -95,6 +95,16 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     assert.match(html, /data-demo-wizard="mejorar"/);
     assert.match(html, /No se ha enviado ninguna solicitud/);
     assert.match(html, /alex@example.test/);
+    for (const journey of ['cotizar', 'mejorar']) {
+      const select = html.match(new RegExp(`<select[^>]*id="${journey}-coverage"[^>]*>([\\s\\S]*?)</select>`))?.[1];
+      assert.ok(select, `${journey}: desired coverage is rendered`);
+      assert.deepEqual([...select.matchAll(/<option[^>]*>(.*?)<\/option>/g)].map(match => match[1]),
+        ['Selecciona una opción', 'Amplia', 'Limitada', 'Básica', 'Necesito orientación']);
+    }
+    const currentCoverage = html.match(/<select[^>]*id="mejorar-currentCoverage"[^>]*>([\s\S]*?)<\/select>/)?.[1];
+    assert.ok(currentCoverage);
+    assert.match(currentCoverage, /Responsabilidad civil/);
+    assert.doesNotMatch(currentCoverage, /Básica/);
     assert.doesNotMatch(html, /type="file"/);
     const home = await request('/'); const homeHtml = await home.text();
     for (const product of ['skandia', 'qualitas']) assert.match(homeHtml, new RegExp(`public-offer--${product}[^>]*href="/cliente/productos/${product}"`));

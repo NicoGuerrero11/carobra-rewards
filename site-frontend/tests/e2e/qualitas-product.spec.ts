@@ -12,8 +12,8 @@ async function vehicle(dialog: Locator) {
   await dialog.locator('[name=use]').selectOption('Particular');
 }
 
-for (const journey of ['cotizar', 'mejorar'] as const) {
-  test(`${journey}: full demo validates, survives closing, reviews and clears after completion`, async ({ page }, info) => {
+for (const journey of ['cotizar', 'mejorar'] as const) for (const coverage of ['Básica', 'Necesito orientación']) {
+  test(`${journey} / ${coverage}: full demo validates, survives closing, reviews and clears after completion`, async ({ page }, info) => {
     const writes: string[] = [];
     page.on('request', request => { if (['POST', 'PUT', 'PATCH'].includes(request.method())) writes.push(request.url()); });
     await page.goto(`/preview/qualitas?plan=${journey}`);
@@ -37,7 +37,8 @@ for (const journey of ['cotizar', 'mejorar'] as const) {
     await expect(dialog.locator('[name=driver]')).toHaveValue('Yo');
     await next(dialog);
     if (journey === 'cotizar') {
-      await dialog.locator('[name=coverage]').selectOption('Amplia');
+      await expect(dialog.locator('[name=coverage] option')).toHaveText(['Selecciona una opción', 'Amplia', 'Limitada', 'Básica', 'Necesito orientación']);
+      await dialog.locator('[name=coverage]').selectOption(coverage);
       await dialog.locator('[name=priority]').selectOption('Proteger mi auto');
     } else {
       await dialog.locator('[name=insurer]').selectOption('Otra aseguradora');
@@ -47,7 +48,8 @@ for (const journey of ['cotizar', 'mejorar'] as const) {
     await next(dialog);
     if (journey === 'mejorar') {
       await dialog.locator('[name=change]').selectOption('Coberturas');
-      await dialog.locator('[name=coverage]').selectOption('Amplia');
+      await expect(dialog.locator('[name=coverage] option')).toHaveText(['Selecciona una opción', 'Amplia', 'Limitada', 'Básica', 'Necesito orientación']);
+      await dialog.locator('[name=coverage]').selectOption(coverage);
     }
     await dialog.locator('[name=urgency]').selectOption('Solo estoy explorando');
     await next(dialog); await next(dialog);
@@ -55,6 +57,7 @@ for (const journey of ['cotizar', 'mejorar'] as const) {
     await dialog.locator('[name=consent]').check(); await next(dialog);
     await expect(dialog.locator('[data-summary]')).toBeVisible();
     await expect(dialog.locator('[data-answers]')).toContainText('01010');
+    await expect(dialog.locator('[data-answers] > div').filter({ has: page.getByText('Cobertura que te interesa', { exact: true }) }).locator('dd')).toHaveText(coverage);
     await expect(dialog.locator('[data-summary]')).toContainText('Sin precio ni propuesta comercial');
     await dialog.locator('[data-back]').click();
     await page.waitForTimeout(420); await dialog.locator('[data-next]').dblclick();
