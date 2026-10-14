@@ -43,7 +43,9 @@ const next = productDestination(Astro.url.searchParams.get('next'));
   </main>
 
   <script>
+    import { authRetrySeconds, authRetryMessage } from "../lib/auth-retry";
     import { productDestination } from '../lib/product-navigation';
+    let authRetryUntil = 0;
     type StableErrorCode =
       | "duplicate_email"
       | "duplicate_curp"
@@ -120,6 +122,7 @@ const next = productDestination(Astro.url.searchParams.get('next'));
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (Date.now() < authRetryUntil) return;
       clearErrors();
       const formData = new FormData(form);
       const payload = {
@@ -160,12 +163,19 @@ const next = productDestination(Astro.url.searchParams.get('next'));
           error?: { code?: StableErrorCode };
         };
 
+        if (response.status === 429) {
+          const seconds = authRetrySeconds(response);
+          authRetryUntil = Date.now() + seconds * 1000;
+          setFeedback(authRetryMessage(seconds), true);
+          window.setTimeout(() => { submitButton.disabled = false; }, seconds * 1000);
+          return;
+        }
         if (!response.ok) {
           const code = data.error?.code ?? "api_unavailable";
           if (code === "invalid_credentials") {
             setFieldError("password", stableMessages.invalid_credentials);
           }
-          setFeedback(stableMessages[code], true);
+          setFeedback(stableMessages[code] ?? stableMessages.api_unavailable, true);
           if (code === "invalid_credentials") passwordInput.focus();
           return;
         }
@@ -175,7 +185,7 @@ const next = productDestination(Astro.url.searchParams.get('next'));
       } catch {
         setFeedback(stableMessages.api_unavailable, true);
       } finally {
-        submitButton.disabled = false;
+        submitButton.disabled = Date.now() < authRetryUntil;
         submitButton.removeAttribute("aria-busy");
       }
     });

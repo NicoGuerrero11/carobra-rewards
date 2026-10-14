@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from carobra_rewards.api.v1.auth.dependencies import get_customer_auth_service
@@ -132,3 +133,64 @@ async def test_customer_auth_http_flow_and_stable_errors(
         logged_out = await client.post("/api/v1/auth/logout")
         assert logged_out.status_code == 204
         assert (await client.get("/api/v1/me")).status_code == 401
+
+
+@pytest.mark.integration
+async def test_failed_credentials_consume_budget_and_recovery_allows_valid_login(
+    postgres_session_factory, monkeypatch
+):
+    monkeypatch.setenv("AUTH_LOGIN_ACCOUNT_LIMIT", "2")
+    monkeypatch.setenv("AUTH_REGISTER_ACCOUNT_LIMIT", "2")
+    monkeypatch.setenv("AUTH_SESSION_COOKIE_SECURE", "false")
+    reset_settings_cache()
+    service = CustomerAuthService(
+        postgres_session_factory,
+        session_ttl=timedelta(days=7),
+        rewards_id_generator=FixedRewardsIdGenerator(),
+    )
+    app = create_application()
+    app.dependency_overrides[get_customer_auth_service] = lambda: service
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        assert (await client.post("/api/v1/auth/register", json=_payload())).status_code == 201
+        assert (await client.post("/api/v1/auth/register", json=_payload())).status_code == 409
+        limited_register = await client.post("/api/v1/auth/register", json=_payload())
+        assert limited_register.status_code == 429
+        for email in ("ada@example.com", "absent@example.test"):
+            for _ in range(2):
+                response = await client.post(
+                    "/api/v1/auth/login",
+                    json={
+                        "email": email,
+                        "password": "wrong-password",
+                    },
+                )
+                assert response.status_code == 401
+            limited = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": email.upper(),
+                    "password": "correct-horse-7",
+                },
+                headers={"X-Forwarded-For": "203.0.113.7"},
+            )
+            assert limited.status_code == 429
+            assert limited.json() == limited_register.json()
+            assert 1 <= int(limited.headers["retry-after"]) <= 60
+            assert limited.headers["cache-control"] == "no-store"
+            assert "set-cookie" not in limited.headers
+        async with postgres_session_factory() as session:
+            await session.execute(
+                text("UPDATE auth_admission_counters SET expires_at = now() - interval '1 second'")
+            )
+            await session.commit()
+        recovered = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "ada@example.com",
+                "password": "correct-horse-7",
+            },
+        )
+        assert recovered.status_code == 200
+        assert "HttpOnly" in recovered.headers["set-cookie"]

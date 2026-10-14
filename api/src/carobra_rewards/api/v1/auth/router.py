@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Annotated, NoReturn
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 
-from carobra_rewards.api.v1.auth.dependencies import get_customer_auth_service
+from carobra_rewards.api.v1.auth.dependencies import get_auth_admission, get_customer_auth_service
 from carobra_rewards.api.v1.auth.schemas import (
     ERROR_RESPONSES,
     CustomerProfileResponse,
@@ -16,6 +17,7 @@ from carobra_rewards.api.v1.auth.schemas import (
 )
 from carobra_rewards.core.config import Settings, get_settings
 from carobra_rewards.modules.customer_auth.application.models import (
+    AuthAdmissionRejectedError,
     CustomerAuthPersistenceError,
     CustomerValidationNotFoundError,
     DuplicateCurpError,
@@ -29,6 +31,7 @@ from carobra_rewards.modules.customer_auth.application.models import (
     UnauthenticatedError,
 )
 from carobra_rewards.modules.customer_auth.application.service import CustomerAuthService
+from carobra_rewards.modules.customer_auth.infrastructure.admission import AuthAdmission
 
 router = APIRouter(tags=["customer-auth"])
 
@@ -42,11 +45,18 @@ router = APIRouter(tags=["customer-auth"])
 )
 async def register(
     request: RegisterRequest,
+    connection: Request,
+    admission: Annotated[AuthAdmission, Depends(get_auth_admission)],
     background_tasks: BackgroundTasks,
+    settings: Annotated[Settings, Depends(get_settings)],
     service: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
 ) -> RegistrationResponse:
     try:
-        result = await service.register(request.to_command())
+        async with asyncio.timeout(settings.auth_request_timeout_seconds):
+            await admission.admit("register", request.email, _connection_origin(connection))
+            result = await service.register(request.to_command())
+    except TimeoutError:
+        _raise_http_error(AuthAdmissionRejectedError())
     except Exception as exc:
         _raise_http_error(exc)
     background_tasks.add_task(service.run_initial_validation, result)
@@ -61,12 +71,18 @@ async def register(
 )
 async def login(
     request: LoginRequest,
+    connection: Request,
+    admission: Annotated[AuthAdmission, Depends(get_auth_admission)],
     response: Response,
     service: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> LoginResponse:
     try:
-        result = await service.login(request.to_command())
+        async with asyncio.timeout(settings.auth_request_timeout_seconds):
+            await admission.admit("login", request.email, _connection_origin(connection))
+            result = await service.login(request.to_command())
+    except TimeoutError:
+        _raise_http_error(AuthAdmissionRejectedError())
     except Exception as exc:
         _raise_http_error(exc)
     response.set_cookie(
@@ -155,6 +171,12 @@ async def get_my_validation_status(
 
 
 def _raise_http_error(exc: Exception) -> NoReturn:
+    if isinstance(exc, AuthAdmissionRejectedError):
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "auth_rate_limited", "message": "Try again later"},
+            headers={"Retry-After": str(exc.retry_after), "Cache-Control": "no-store"},
+        ) from exc
     if isinstance(exc, DuplicateEmailError):
         raise _safe_error(409, "duplicate_email", "Email is already registered") from exc
     if isinstance(exc, DuplicateCurpError):
@@ -188,3 +210,10 @@ def _raise_http_error(exc: Exception) -> NoReturn:
 
 def _safe_error(status_code: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+
+
+def _connection_origin(request: Request) -> str:
+    # The API server must run with --no-proxy-headers (see Dockerfile).
+    # This is the TCP peer, often a shared Railway proxy, NOT the browser's IP.
+    # Missing peer information shares one bucket; never trust a forwarded header.
+    return request.client.host if request.client else "shared-unknown-peer"

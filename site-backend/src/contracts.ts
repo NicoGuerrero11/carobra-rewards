@@ -88,6 +88,7 @@ export interface AuthenticatedCustomerContext {
 }
 
 export type SiteErrorCode =
+  | "auth_rate_limited"
   | "duplicate_email"
   | "duplicate_curp"
   | "rewards_id_collision_exhausted"

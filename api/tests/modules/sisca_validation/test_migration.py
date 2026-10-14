@@ -9,7 +9,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 
 
 def _config(database_url: str) -> Config:
@@ -23,7 +24,7 @@ async def _seed_and_assert(database_url: str, *, assert_validation_table: bool) 
     customer_id = uuid4()
     intake_id = uuid4()
     now = datetime.now(UTC)
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.begin() as connection:
             if not assert_validation_table:
@@ -97,7 +98,7 @@ def test_upgrade_preserves_legacy_intake_and_downgrade_is_safe(
 
         # Re-query with stable seeded IDs through a generic preservation count.
         async def assert_preserved() -> None:
-            engine = create_async_engine(postgres_database_url)
+            engine = create_database_engine(postgres_database_url)
             try:
                 async with engine.connect() as connection:
                     assert (
@@ -123,7 +124,7 @@ def test_upgrade_preserves_legacy_intake_and_downgrade_is_safe(
 
 
 async def assert_preserved_legacy_only(database_url: str) -> None:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.connect() as connection:
             legacy_count = await connection.scalar(

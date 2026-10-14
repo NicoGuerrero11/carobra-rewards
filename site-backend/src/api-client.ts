@@ -1,4 +1,4 @@
-import type { SiteBackendConfig } from "./config.js";
+import { authRequestTimeout, type SiteBackendConfig } from "./config.js";
 import type {
   AuthenticatedCustomerContext,
   CustomerProfile,
@@ -24,6 +24,7 @@ export class SiteApiError extends Error {
     readonly status: number,
     readonly code: SiteErrorCode,
     message: string,
+    readonly retryAfter?: number,
   ) {
     super(message);
     this.name = "SiteApiError";
@@ -156,7 +157,11 @@ export class RewardsApiClient {
       const requestInit: RequestInit = {
         method,
         headers,
-        signal: AbortSignal.timeout(this.config.apiRequestTimeoutMs),
+        signal: AbortSignal.timeout(
+          path === "/api/v1/auth/login" || path === "/api/v1/auth/register"
+            ? authRequestTimeout(this.config)
+            : this.config.apiRequestTimeoutMs,
+        ),
       };
       if (body !== undefined) {
         requestInit.body = JSON.stringify(body);
@@ -222,6 +227,12 @@ const stableApiCodes = new Set<SiteErrorCode>([
 ]);
 
 async function mapApiError(response: Response): Promise<SiteApiError> {
+  if (response.status === 429) {
+    await response.body?.cancel();
+    const raw = response.headers.get("retry-after") ?? "";
+    const seconds = /^\d{1,3}$/.test(raw) ? Number(raw) : 1;
+    return new SiteApiError(429, "auth_rate_limited", "Try again later", Math.min(300, Math.max(1, seconds)));
+  }
   let code: unknown;
   let message: unknown;
   try {

@@ -119,3 +119,11 @@ class CustomerValidationNotFoundError(CustomerAuthError):
 
 class CustomerAuthPersistenceError(CustomerAuthError):
     pass
+
+
+class AuthAdmissionRejectedError(Exception):
+    """Temporary overload, independent of whether the account exists."""
+
+    def __init__(self, retry_after: int = 1) -> None:
+        super().__init__("Authentication temporarily limited")
+        self.retry_after = retry_after

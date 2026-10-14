@@ -11,10 +11,10 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from carobra_rewards.core.config import get_settings, reset_settings_cache
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 from carobra_rewards.infrastructure.database.session import reset_engine_cache
 from carobra_rewards.infrastructure.database.url import normalize_async_database_url
 
@@ -81,7 +81,7 @@ def migrated_postgres_database(postgres_database_url: str) -> Iterator[str]:
 
 @pytest.fixture
 async def postgres_engine(migrated_postgres_database: str) -> AsyncIterator[AsyncEngine]:
-    engine = create_async_engine(migrated_postgres_database, pool_pre_ping=True)
+    engine = create_database_engine(migrated_postgres_database, pool_pre_ping=True)
     try:
         yield engine
     finally:

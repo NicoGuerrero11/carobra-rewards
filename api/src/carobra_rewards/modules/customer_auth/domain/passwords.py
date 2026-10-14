@@ -56,3 +56,10 @@ def verify_password(password: str, encoded_hash: str) -> bool:
     except (ValueError, TypeError):
         return False
     return hmac.compare_digest(actual, expected)
+
+
+# Public dummy verifier: same current scrypt cost for unknown and existing users.
+# Its digest is deliberately invalid; it never authenticates an account.
+DUMMY_PASSWORD_HASH = (
+    "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+)

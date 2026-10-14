@@ -5,10 +5,10 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from carobra_rewards.core.config import get_settings
 from carobra_rewards.infrastructure.database.base import Base
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 from carobra_rewards.infrastructure.database.url import normalize_async_database_url
 from carobra_rewards.modules.customer_intake.infrastructure.persistence import (
     models as _customer_intake_models,  # noqa: F401
@@ -29,7 +29,7 @@ if database_url is None:
 
 config.set_main_option(
     "sqlalchemy.url",
-    normalize_async_database_url(database_url.get_secret_value()),
+    normalize_async_database_url(database_url.get_secret_value()).replace("%", "%%"),
 )
 
 target_metadata = Base.metadata
@@ -50,10 +50,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section, {})
-    connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = create_database_engine(
+        config.get_main_option("sqlalchemy.url"),
         poolclass=pool.NullPool,
     )
 

@@ -453,6 +453,10 @@ async function routeRequest(
       return;
     }
     if (error instanceof SiteApiError) {
+      if (error.status === 429 && error.retryAfter !== undefined) {
+        response.setHeader("Retry-After", String(error.retryAfter));
+        response.setHeader("Cache-Control", "no-store");
+      }
       const payload: SiteErrorEnvelope = {
         error: { code: error.code, message: error.message },
       };

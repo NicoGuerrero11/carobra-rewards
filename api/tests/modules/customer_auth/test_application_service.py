@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
@@ -8,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from carobra_rewards.modules.customer_auth.application.models import (
+    AuthAdmissionRejectedError,
     DuplicateCurpError,
     DuplicateEmailError,
     InvalidCredentialsError,
@@ -19,7 +22,8 @@ from carobra_rewards.modules.customer_auth.application.models import (
     UnauthenticatedError,
 )
 from carobra_rewards.modules.customer_auth.application.service import CustomerAuthService
-from carobra_rewards.modules.customer_auth.domain.passwords import verify_password
+from carobra_rewards.modules.customer_auth.domain.passwords import hash_password, verify_password
+from carobra_rewards.modules.customer_auth.infrastructure.password_worker import PasswordWorker
 from carobra_rewards.modules.customer_intake.infrastructure.persistence.models import (
     AuthSessionModel,
     AuthUserModel,
@@ -433,3 +437,85 @@ async def test_customer_updates_preserve_versioned_consent_history(
         customer = await session.get(CustomerModel, registered.customer.id)
     assert versions == ("2026-07", "2026-08")
     assert customer is not None and customer.city == "Coyoacan"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_cancelled_registration_keeps_capacity_without_persisting(
+    postgres_session_factory, monkeypatch
+):
+    worker = PasswordWorker(workers=1, queue_size=0)
+    started, release = threading.Event(), threading.Event()
+
+    def blocked_hash(password):
+        started.set()
+        release.wait(3)
+        return hash_password(password)
+
+    monkeypatch.setattr(
+        "carobra_rewards.modules.customer_auth.application.service.hash_password", blocked_hash
+    )
+    service = CustomerAuthService(
+        postgres_session_factory, session_ttl=timedelta(days=7), password_worker=worker
+    )
+    task = asyncio.create_task(service.register(_command()))
+    try:
+        while not started.is_set():
+            await asyncio.sleep(0.001)
+        for _ in range(20):
+            with pytest.raises(AuthAdmissionRejectedError):
+                await service.register(_command())
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        with pytest.raises(AuthAdmissionRejectedError):
+            await service.register(_command())
+        release.set()
+    finally:
+        release.set()
+        await asyncio.to_thread(worker.close)
+    async with postgres_session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(AuthUserModel)) == 0
+        assert await session.scalar(select(func.count()).select_from(AuthSessionModel)) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_unknown_account_uses_the_same_worker_cost_without_a_database_connection(
+    postgres_session_factory, postgres_engine, monkeypatch
+):
+    await _service(postgres_session_factory).register(_command())
+    started, release = threading.Event(), threading.Event()
+    hashes = []
+
+    def blocked_verify(password, encoded):
+        hashes.append(encoded)
+        started.set()
+        release.wait(3)
+        return verify_password(password, encoded)
+
+    monkeypatch.setattr(
+        "carobra_rewards.modules.customer_auth.application.service.verify_password", blocked_verify
+    )
+    worker = PasswordWorker(workers=1, queue_size=0)
+    service = CustomerAuthService(
+        postgres_session_factory, session_ttl=timedelta(days=7), password_worker=worker
+    )
+    try:
+        for email in ("ada@example.com", "absent@example.test"):
+            started.clear()
+            release.clear()
+            task = asyncio.create_task(service.login(LoginCommand(email, "wrong-password")))
+            while not started.is_set():
+                await asyncio.sleep(0.001)
+            assert postgres_engine.pool.checkedout() == 0
+            release.set()
+            with pytest.raises(InvalidCredentialsError):
+                await task
+        assert [encoded.split("$")[:4] for encoded in hashes] == [
+            ["scrypt", "16384", "8", "1"],
+            ["scrypt", "16384", "8", "1"],
+        ]
+    finally:
+        release.set()
+        await asyncio.to_thread(worker.close)

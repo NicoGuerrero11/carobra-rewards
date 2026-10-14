@@ -520,3 +520,32 @@ test('navigation rechecks sessions and balance endpoint binds to API identity wi
   for(const path of ['customer-context','bonda-balance']) assert.equal((await fetch(`${bff}/api/v1/rewards/${path}`,{headers})).status,401);
   assert.equal(portal.readCount,2); assert.equal(balanceReads.length,1);
 });
+
+
+for (const endpoint of ["login", "register"]) {
+  for (const [upstreamRetry, expectedRetry] of [["17", "17"], ["999", "300"], ["bad", "1"]]) {
+    test(`${endpoint} preserves a safe 429 contract (${upstreamRetry})`, async (t) => {
+      const upstream = await start(t, createServer((_request, response) => {
+        response.writeHead(429, { "content-type": "application/json", "retry-after": upstreamRetry! });
+        response.end(JSON.stringify({ detail: { code: "unsafe", message: "private upstream detail" } }));
+      }));
+      const bff = await start(t, createSiteBackendServer(config(upstream)));
+      const response = await fetch(`${bff}/api/v1/auth/${endpoint}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "synthetic@example.test", password: "synthetic-password",
+          confirm_password: "synthetic-password", curp: "ABCD123456HMNLRS09",
+          first_name: "Ada", last_name: "Test", phone: "5551234567",
+          postal_code: "01010", state: "CDMX", city: "CDMX",
+          terms_accepted: true, terms_version: "2026-10",
+        }),
+      });
+      assert.equal(response.status, 429);
+      assert.equal(response.headers.get("retry-after"), expectedRetry);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(response.headers.get("set-cookie"), null);
+      assert.deepEqual(await response.json(), { error: { code: "auth_rate_limited", message: "Try again later" } });
+    });
+  }
+}
