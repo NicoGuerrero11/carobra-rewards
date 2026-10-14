@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { Client } from "pg";
 
@@ -22,9 +23,12 @@ for (const mode of ["", "?ssl=require", "?sslmode=verify-full", "?sslmode=verify
 }
 
 test("preserves encoded credentials, asyncpg scheme, and supported application settings", () => {
-  const config = databasePoolConfig("postgresql+asyncpg://u%40ser:p%3Ass@db.example.test:5433/rewards?application_name=test&connect_timeout=2&statement_timeout=50");
-  assert.equal(config.user, "u@ser");
-  assert.equal(config.password, "p:ss");
+  // Generated only for this parser test; never used to open a database connection.
+  const user = `test@${randomUUID()}`;
+  const password = `${randomUUID()}:/%@`;
+  const config = databasePoolConfig(`postgresql+asyncpg://${encodeURIComponent(user)}:${encodeURIComponent(password)}@db.example.test:5433/rewards?application_name=test&connect_timeout=2&statement_timeout=50`);
+  assert.equal(config.user, user);
+  assert.equal(config.password, password);
   assert.equal(config.port, 5433);
   assert.equal(config.application_name, "test");
   assert.equal(config.connectionTimeoutMillis, 2000);
