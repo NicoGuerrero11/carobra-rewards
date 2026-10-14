@@ -41,6 +41,9 @@ export interface SiteBackendConfig {
   host: string;
   port: number;
   apiRequestTimeoutMs: number;
+  /** Must match API AUTH_REQUEST_TIMEOUT_SECONDS * 1000. */
+  authApiResponseBudgetMs?: number;
+  authRequestTimeoutMs?: number;
   bonda?: BondaConfig;
   referralIdentityHmacSecret?: string;
   rewardsV2TestMode?: {
@@ -98,9 +101,16 @@ export function loadConfig(
       1,
       120_000,
     ),
+    authApiResponseBudgetMs: parseInteger(
+      "AUTH_API_RESPONSE_BUDGET_MS", environment.AUTH_API_RESPONSE_BUDGET_MS ?? "4000", 1000, 10000,
+    ),
+    authRequestTimeoutMs: parseInteger(
+      "AUTH_REQUEST_TIMEOUT_MS", environment.AUTH_REQUEST_TIMEOUT_MS ?? "6000", 2000, 15000,
+    ),
     bonda: loadBondaConfig(environment),
     sessionCookie,
   };
+  authRequestTimeout(config); // Reject an incoherent auth deployment at startup.
   const nodeEnvironment = (environment.NODE_ENV ?? "development").trim().toLowerCase();
   const databaseUrl = environment.DATABASE_URL?.trim();
   if (databaseUrl) config.databaseUrl = databaseUrl;
@@ -330,4 +340,15 @@ function parseInteger(
     throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
   }
   return parsed;
+}
+
+
+export function authRequestTimeout(config: SiteBackendConfig): number {
+  const budget = config.authApiResponseBudgetMs ?? 4000;
+  const timeout = config.authRequestTimeoutMs ?? 6000;
+  if (!Number.isInteger(budget) || budget < 1000 || budget > 10000
+      || !Number.isInteger(timeout) || timeout < budget + 1000 || timeout > 15000) {
+    throw new Error("Auth BFF timeout must exceed the API response budget by at least 1000ms (max 15000ms)");
+  }
+  return timeout;
 }

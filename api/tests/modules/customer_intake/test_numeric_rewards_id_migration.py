@@ -10,7 +10,8 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import create_async_engine
+
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 
 PREVIOUS_REVISION = "20260814_sisca_uat_audit"
 NUMERIC_REVISION = "20260910_numeric_rewards_ids"
@@ -24,7 +25,7 @@ def _config(database_url: str) -> Config:
 
 
 async def _seed_previous_state(database_url: str) -> tuple[str, str]:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     legacy_customer_id = str(uuid4())
     numeric_customer_id = str(uuid4())
     now = datetime.now(UTC)
@@ -85,7 +86,7 @@ async def _assert_upgraded(
     legacy_customer_id: str,
     numeric_customer_id: str,
 ) -> str:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.connect() as connection:
             migrated = (
@@ -148,7 +149,7 @@ async def _assert_downgraded(
     legacy_customer_id: str,
     migrated_rewards_id: str,
 ) -> None:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.connect() as connection:
             restored = await connection.scalar(
@@ -178,7 +179,7 @@ async def _assert_downgraded(
 
 
 async def _drop_test_bonda_table(database_url: str) -> None:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.begin() as connection:
             await connection.execute(text("DROP TABLE IF EXISTS bonda_affiliate_provisioning"))

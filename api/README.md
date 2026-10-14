@@ -34,7 +34,7 @@ ejemplo `postgresql+asyncpg://...`. Nunca configures ambas con la misma base.
 
 ```bash
 uv run alembic upgrade head
-uv run uvicorn carobra_rewards.main:app --reload --host 127.0.0.1 --port 8000
+uv run uvicorn carobra_rewards.main:app --no-proxy-headers --reload --host 127.0.0.1 --port 8000
 ```
 
 - API: `http://127.0.0.1:8000`
@@ -172,3 +172,148 @@ Rewards registra al cliente, guarda el consentimiento y crea una validación
 SISCA `PENDING` en una sola transacción. Después del commit dispara una consulta
 inicial y el scheduler productivo procesa H24, D3 y D5 cuando corresponda. El
 intake anterior sigue deshabilitado y oculto de OpenAPI por defecto.
+
+
+## Admisión de login y registro
+
+La migración `20261014_auth_admission` agrega contadores temporales en PostgreSQL.
+Todos los procesos y réplicas de la API deben usar la misma base y estos mismos
+límites; el BFF no es la autoridad de admisión. Aplicar la migración antes de
+habilitar esta versión. Si el almacenamiento falla, la API devuelve 503 y no
+realiza el hash. Este cambio local no constituye autorización de despliegue.
+
+| Variable | Valor inicial | Alcance |
+| --- | ---: | --- |
+| `AUTH_ADMISSION_WINDOW_SECONDS` | 60 | Ventana fija; rechazar no prolonga el vencimiento |
+| `AUTH_LOGIN_ACCOUNT_LIMIT` | 10 | Email normalizado, login |
+| `AUTH_REGISTER_ACCOUNT_LIMIT` | 5 | Email normalizado, registro |
+| `AUTH_CONNECTION_LIMIT` | 240 | Conexión TCP compartida, login + registro |
+| `AUTH_GLOBAL_LIMIT` | 300 | Toda la API, login + registro |
+| `AUTH_HASH_WORKERS` | 2 | Hashes scrypt simultáneos por proceso |
+| `AUTH_HASH_QUEUE_SIZE` | 8 | Hashes en espera por proceso |
+| `AUTH_ADMISSION_TIMEOUT_SECONDS` | 1 | Adquisición/consulta de los contadores |
+| `AUTH_HASH_TIMEOUT_SECONDS` | 2 | Cola + cálculo del hash |
+| `AUTH_REQUEST_TIMEOUT_SECONDS` | 4 | Admisión + operación de login/registro |
+
+El servidor debe arrancar con `--no-proxy-headers`, incluido al usar comandos
+alternativos al Dockerfile. La clave de conexión es el peer TCP de ASGI, sin
+puerto; **no es la IP del navegador**. Railway puede agrupar muchos usuarios en
+un mismo proxy/BFF. `X-Forwarded-For`, `X-Real-IP` y `Forwarded` no se usan.
+Antes de desplegar se debe verificar la cadena real de proxies y calibrar los
+presupuestos según tráfico legítimo y capacidad, sin habilitar confianza amplia
+en cabeceras. Cambiar réplicas o workers multiplica la capacidad de hashing local,
+pero no el presupuesto global en PostgreSQL.
+
+Se comprueban los tres presupuestos antes de consumirlos, dentro de una sola
+transacción serializada. Si cuenta, conexión o global rechazan, no se consume
+ninguno ni se crean claves de cuenta/conexión. Las peticiones admitidas sí consumen
+los tres antes de autenticar, incluidas credenciales incorrectas, cuentas
+inexistentes y registros duplicados. No se reembolsa una admisión ya confirmada
+por cancelación posterior: el trabajo puede haber empezado. Cancelación o error
+antes del commit revierten todos los consumos. Las respuestas 429 son
+genéricas y llevan `Retry-After` y `Cache-Control: no-store`; el BFF, Astro y los
+formularios preservan la espera. No se agrega información sobre existencia de
+cuentas al 429. Los errores 409 preexistentes de registro conservan su contrato.
+Los límites por cuenta pueden afectar temporalmente a la víctima de intentos
+dirigidos; el vencimiento no se extiende por cada rechazo y no hay bloqueo
+permanente, aunque un ataque sostenido puede agotar cada ventana siguiente.
+
+Cada proceso admite hasta 16 operaciones concurrentes de contadores sin cola;
+la adquisición/consulta tiene un presupuesto predeterminado de 1 segundo, con timeout de lock de
+200 ms y de sentencia de 500 ms. Un bloqueo o error de DB falla cerrado con 503.
+Las transacciones serializan el presupuesto global, confirman todos los consumos
+juntos solo al admitir y limpian hasta 32 claves vencidas por intento. El
+presupuesto global limita las claves nuevas; no se almacenan identificadores
+en claro. Los hashes SHA-256 de email no deben considerarse anonimización y las
+filas vencidas restantes se eliminan al reanudarse el tráfico.
+
+Scrypt conserva sus parámetros y formatos. El trabajo corre fuera del event
+loop; cancelar o agotar la espera no libera capacidad hasta que la tarea sale
+realmente del ejecutor. Una tarea abandonada aún en cola se omite al extraerla.
+No se mantiene una conexión DB mientras se verifica la contraseña. Las cuentas
+inexistentes usan un verificador ficticio con el mismo costo actual.
+
+
+### Plazos coordinados y límites de la protección
+
+La API valida al arrancar que `AUTH_REQUEST_TIMEOUT_SECONDS` deje al menos 0.5 s
+sobre la suma de admisión y cola/hash. Sus valores iniciales son 4 > 1 + 2 + 0.5 s;
+el vencimiento del plazo de la operación devuelve 429 genérico con Retry-After.
+Los errores o timeouts propios del almacén siguen devolviendo 503. La cancelación
+no interrumpe un scrypt en ejecución ni libera su slot antes de finalizar.
+
+El BFF usa un timeout exclusivo para login/registro: `AUTH_REQUEST_TIMEOUT_MS=6000`.
+`AUTH_API_RESPONSE_BUDGET_MS=4000` debe coincidir con el plazo API en milisegundos.
+El BFF exige al menos 1000 ms de margen; los defaults dejan 2000 ms para transporte
+y entrega de respuesta. Límites superiores: API 10 s, BFF 15 s. No hay validación
+automática entre servicios: los valores deben coordinarse al desplegar. El timeout
+API general del BFF (`API_REQUEST_TIMEOUT_MS`, 5000 por defecto) se mantiene para
+otras rutas. Un transporte que no entrega respuesta dentro del plazo BFF devuelve
+503, sin inventar Retry-After. Estos márgenes no garantizan un SLA ante una red
+arbitrariamente lenta, event loop saturado o cancelación lenta del driver.
+
+Orden recomendado, sujeto a autorización de despliegue: BFF/UI compatibles con 429
+y timeout de auth coordinado; migración aditiva; API con los presupuestos iguales
+en todas sus réplicas. No bajar el plazo BFF ni retirar la tabla mientras haya
+instancias que dependan de ellos. Una respuesta perdida cerca del commit no prueba
+que el registro o la sesión no se hayan persistido; no se implementa reintento automático.
+
+El presupuesto global protege trabajo admitido, no es un control total de DoS.
+Ataques distribuidos entre cuentas/conexiones todavía pueden agotarlo; todos los
+usuarios detrás de un proxy comparten el límite de conexión. Los rechazos tampoco
+son gratis para PostgreSQL: persisten los 16 slots locales y los timeouts acotados,
+pero hace falta calibración con métricas y controles de entrada confiables. Las
+ventanas fijas permiten ráfagas; la cola acotada puede rechazar antes del cupo/minuto.
+
+Prueba HTTP entre ambos servicios, solo en entorno local y tras compilar el BFF:
+`AUTH_TEST_NODE=/ruta/a/node PYTHONDONTWRITEBYTECODE=1 uv run pytest tests/api/v1/auth/test_bff_deadlines.py`.
+Usa sockets loopback, un hash sintético bloqueado y transporte controlado; no
+requiere credenciales ni consultas externas. Sin AUTH_TEST_NODE se omite explícitamente.
+
+### TLS PostgreSQL de runtime y migraciones
+
+`create_database_engine` aplica la misma política a runtime, Alembic, scripts de
+demo y pruebas PostgreSQL. Por defecto crea un `SSLContext` con las raíces estándar
+del runtime, `CERT_REQUIRED` y `check_hostname=True`. `require`, `verify-ca`, `true`
+y `1` se refuerzan a verificación completa; declarar `sslmode=verify-full` expresa
+la política prevista. No hay fallback a texto plano ni certificados sin verificar.
+Solo se permite `sslmode=disable` (o `ssl=false`/`0`) explícito para las IP literales
+`127.0.0.1` y `::1`; incluso `localhost` requiere TLS salvo que se use su IP literal.
+Las pruebas aisladas PostgreSQL sin TLS deben especificar esa excepción.
+
+La URL solo admite `sslmode`/`ssl`, `channel_binding` y
+`prepared_statement_cache_size`. Rechaza parámetros desconocidos/duplicados,
+modos incompatibles, sockets Unix, hosts vacíos, sobrescrituras `host`/`port`,
+`dsn`, rutas de certificados y `direct_tls`; los argumentos explícitos de conexión
+transportan el contexto TLS al controlador SQLAlchemy/asyncpg.
+
+asyncpg 0.30 no implementa channel binding: `channel_binding=require` se rechaza
+antes de conectar. `prefer` y `disable` se aceptan como binding opcional no
+implementado, manteniendo siempre la verificación TLS. No se afirma que haya
+SCRAM-SHA-256-PLUS. Node puede usarlo de forma opcional, pero tampoco exige binding.
+
+**Configuración elegida para desplegar (plantilla sanitizada):**
+
+```text
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@DB_HOST:5432/DB_NAME?sslmode=verify-full
+```
+
+`USER`, `PASSWORD`, `DB_HOST` y `DB_NAME` son marcadores. Conservar las credenciales,
+el hostname DNS real, el puerto y la base de este servicio; sustituir la query
+reportada `sslmode=require&channel_binding=require` por exactamente
+`sslmode=verify-full`, sin parámetro de binding. No se cambia de controlador.
+`channel_binding=require` sigue siendo un error explícito. Node usa
+`sslmode=verify-full&channel_binding=prefer`, con binding únicamente opcional.
+
+Antes de un despliegue autorizado por separado, confirmar hostname y raíces del
+runtime y coordinar el cambio de variable con la publicación del código corregido.
+La query por sí sola no acredita esta política TLS en la versión anterior.
+Mantener los pasos de migración y timeouts de autenticación ya documentados. Este
+parche no cambia variables de Railway/Neon ni despliega código.
+Si se necesita una CA privada adicional, configurar `SSL_CERT_FILE` con un bundle
+revisado que incluya las raíces necesarias; no desactivar verificación ni instalar
+confianza global. No se ha probado una conexión real a Neon.
+
+`tests/test_database_tls.py` requiere OpenSSL y usa certificados temporales y un
+servidor exclusivamente local. Prueba aceptación válida y rechazo de CA desconocida,
+caducidad, identidad incorrecta y rechazo de TLS antes de enviar usuario/contraseña.

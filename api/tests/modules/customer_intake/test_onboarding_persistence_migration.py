@@ -9,7 +9,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 
 PREVIOUS_REVISION = "20260709_sisca_validation"
 
@@ -24,7 +25,7 @@ def _config(database_url: str) -> Config:
 async def _seed_legacy_customer(database_url: str) -> None:
     now = datetime.now(UTC)
     customer_id = uuid4()
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.begin() as connection:
             await connection.execute(
@@ -54,7 +55,7 @@ async def _seed_legacy_customer(database_url: str) -> None:
 
 
 async def _assert_upgraded(database_url: str) -> None:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.connect() as connection:
             tables = {
@@ -110,7 +111,7 @@ async def _assert_upgraded(database_url: str) -> None:
 
 
 async def _assert_downgraded(database_url: str) -> None:
-    engine = create_async_engine(database_url)
+    engine = create_database_engine(database_url)
     try:
         async with engine.connect() as connection:
             removed_tables = [

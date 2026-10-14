@@ -7,10 +7,11 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from carobra_rewards.api.v1.auth.dependencies import get_customer_auth_service
+from carobra_rewards.api.v1.auth.dependencies import get_auth_admission, get_customer_auth_service
 from carobra_rewards.core.config import reset_settings_cache
 from carobra_rewards.main import create_application
 from carobra_rewards.modules.customer_auth.application.models import (
+    AuthAdmissionRejectedError,
     CustomerProfile,
     CustomerValidationStatus,
     DuplicateCurpError,
@@ -128,6 +129,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient, FakeAuthService
     service = FakeAuthService()
     app = create_application()
     app.dependency_overrides[get_customer_auth_service] = lambda: service
+    app.dependency_overrides[get_auth_admission] = lambda: FakeAdmission()
     return TestClient(app), service
 
 
@@ -313,6 +315,7 @@ def test_cookie_attributes_are_environment_configurable(monkeypatch: pytest.Monk
     service = FakeAuthService()
     app = create_application()
     app.dependency_overrides[get_customer_auth_service] = lambda: service
+    app.dependency_overrides[get_auth_admission] = lambda: FakeAdmission()
 
     response = TestClient(app).post(
         "/api/v1/auth/login",
@@ -346,3 +349,58 @@ def test_openapi_exposes_canonical_auth_and_hides_legacy_intake(
         "customer-auth",
         "legacy-customer-intake",
     }
+
+
+@pytest.mark.parametrize("endpoint", ["login", "register"])
+def test_auth_overload_returns_safe_retry_contract(client, endpoint):
+    http, service = client
+    service.error = AuthAdmissionRejectedError(retry_after=17)
+    payload = (
+        _payload()
+        if endpoint == "register"
+        else {"email": "absent@example.test", "password": "synthetic-password"}
+    )
+    response = http.post(f"/api/v1/auth/{endpoint}", json=payload)
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "17"
+    assert response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in response.headers
+    assert response.json() == {
+        "detail": {"code": "auth_rate_limited", "message": "Try again later"}
+    }
+
+
+class FakeAdmission:
+    async def admit(self, operation, email, peer):
+        pass
+
+
+def test_forwarded_headers_cannot_select_connection_bucket(client):
+    http, service = client
+    peers = []
+
+    class RecordingAdmission:
+        async def admit(self, operation, email, peer):
+            peers.append((operation, email, peer))
+            raise AuthAdmissionRejectedError(5)
+
+    http.app.dependency_overrides[get_auth_admission] = lambda: RecordingAdmission()
+    for endpoint in ("login", "register"):
+        payload = (
+            _payload()
+            if endpoint == "register"
+            else {"email": "ada@example.com", "password": "synthetic-password"}
+        )
+        for fake_ip in ("198.51.100.1", "203.0.113.2"):
+            response = http.post(
+                f"/api/v1/auth/{endpoint}",
+                json=payload,
+                headers={
+                    "X-Forwarded-For": fake_ip,
+                    "X-Real-IP": fake_ip,
+                    "Forwarded": f"for={fake_ip}",
+                },
+            )
+            assert response.status_code == 429
+    assert {peer for _, _, peer in peers} == {"testclient"}
+    assert service.registration_command is None

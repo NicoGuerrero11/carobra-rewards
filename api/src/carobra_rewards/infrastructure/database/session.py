@@ -5,11 +5,10 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 
 from carobra_rewards.core.config import get_settings
-from carobra_rewards.infrastructure.database.url import normalize_async_database_url
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 
 
 @lru_cache(maxsize=1)
@@ -19,8 +18,8 @@ def _build_engine() -> AsyncEngine:
     if database_url is None:
         raise RuntimeError("DATABASE_URL is not configured.")
 
-    return create_async_engine(
-        normalize_async_database_url(database_url.get_secret_value()),
+    return create_database_engine(
+        database_url.get_secret_value(),
         pool_pre_ping=True,
     )
 

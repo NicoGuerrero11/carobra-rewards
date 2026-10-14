@@ -18,12 +18,12 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
-    create_async_engine,
 )
 from sqlalchemy.sql.dml import Delete
 
 from carobra_rewards.api.v1.customer_intake.schemas import CustomerIntakeRequest
 from carobra_rewards.core.config import get_settings, reset_settings_cache
+from carobra_rewards.infrastructure.database.engine import create_database_engine
 from carobra_rewards.infrastructure.database.session import reset_engine_cache
 from carobra_rewards.modules.customer_intake.domain.entities import (
     Customer,
@@ -580,7 +580,7 @@ async def run_single_approved_demo(keep_data: bool) -> int:
     payload = build_synthetic_payload()
     markers = build_execution_markers(payload)
     created_ids = CreatedRecordIds()
-    engine = create_async_engine(safe_environment.test_database_url, pool_pre_ping=True)
+    engine = create_database_engine(safe_environment.test_database_url, pool_pre_ping=True)
     session_factory = _build_session_factory(engine)
 
     try:
@@ -1503,7 +1503,7 @@ async def _run_seeded_incomplete_scenario(
 async def run_api_proof_demo(keep_data: bool) -> int:
     safe_environment = configure_demo_environment()
     created_ids = CreatedRecordIds()
-    engine = create_async_engine(safe_environment.test_database_url, pool_pre_ping=True)
+    engine = create_database_engine(safe_environment.test_database_url, pool_pre_ping=True)
     session_factory = _build_session_factory(engine)
 
     try:

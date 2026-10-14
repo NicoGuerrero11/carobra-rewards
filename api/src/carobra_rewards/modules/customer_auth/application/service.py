@@ -35,8 +35,13 @@ from carobra_rewards.modules.customer_auth.domain.birth_date import (
     parse_birth_date,
 )
 from carobra_rewards.modules.customer_auth.domain.passwords import (
+    DUMMY_PASSWORD_HASH,
     hash_password,
     verify_password,
+)
+from carobra_rewards.modules.customer_auth.infrastructure.password_worker import (
+    PasswordWorker,
+    get_password_worker,
 )
 from carobra_rewards.modules.customer_intake.domain.value_objects import normalize_curp
 from carobra_rewards.modules.customer_intake.infrastructure.persistence.models import (
@@ -85,6 +90,7 @@ class CustomerAuthService:
         validation_factory: ValidationFactory | None = None,
         initial_validation_check: InitialValidationCheck | None = None,
         clock: Clock = utc_now,
+        password_worker: PasswordWorker | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._session_ttl = session_ttl
@@ -92,6 +98,7 @@ class CustomerAuthService:
         self._validation_factory = validation_factory or _create_validation
         self._initial_validation_check = initial_validation_check
         self._clock = clock
+        self._password_worker = password_worker or get_password_worker()
 
     async def register(self, command: RegisterCustomerCommand) -> RegistrationResult:
         if command.password != command.confirm_password:
@@ -101,7 +108,7 @@ class CustomerAuthService:
 
         now = self._clock().astimezone(UTC)
         parse_birth_date(command.birth_date, today=now.astimezone(REGISTRATION_TIMEZONE).date())
-        password_hash = hash_password(command.password)
+        password_hash = await self._password_worker.run(hash_password, command.password)
         registration = None
         for attempt in range(_MAX_REWARDS_ID_ATTEMPTS):
             try:
@@ -239,11 +246,15 @@ class CustomerAuthService:
                 row = (await session.execute(statement)).one_or_none()
             except SQLAlchemyError as exc:
                 raise CustomerAuthPersistenceError() from exc
-            if row is None or not verify_password(
-                command.password, row.AuthUserModel.password_hash
-            ):
-                raise InvalidCredentialsError()
+        valid_password = await self._password_worker.run(
+            verify_password,
+            command.password,
+            row.AuthUserModel.password_hash if row is not None else DUMMY_PASSWORD_HASH,
+        )
+        if row is None or not valid_password:
+            raise InvalidCredentialsError()
 
+        async with self._session_factory() as session:
             session_token = secrets.token_urlsafe(32)
             expires_at = now + self._session_ttl
             session.add(

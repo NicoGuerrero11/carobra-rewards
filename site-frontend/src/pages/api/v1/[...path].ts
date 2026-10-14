@@ -63,7 +63,7 @@ const proxy: APIRoute = async ({ params, request }) => {
   }
 
   const responseHeaders = new Headers();
-  for (const name of ["content-type", "cache-control"]) {
+  for (const name of ["content-type", "cache-control", "retry-after"]) {
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);
   }

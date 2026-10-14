@@ -83,3 +83,67 @@ Rewards resource error and cursor-pagination contracts are documented in
 
 Release gates, rule/catalog/partner activation, rollback, backfill, and finance reconciliation
 are documented in [`docs/rewards-operations-runbook.md`](../docs/rewards-operations-runbook.md).
+
+
+### Timeout de autenticación
+
+Login y registro usan `AUTH_REQUEST_TIMEOUT_MS` (6000 ms), separado del timeout
+general `API_REQUEST_TIMEOUT_MS`. `AUTH_API_RESPONSE_BUDGET_MS` (4000 ms) debe
+reflejar `AUTH_REQUEST_TIMEOUT_SECONDS * 1000` de la API. Se rechaza al arrancar
+un timeout BFF menor que el presupuesto API + 1000 ms o mayor de 15000 ms.
+Los defaults dejan 2 s de margen; ambos servicios deben configurarse de forma
+coordinada. El 429 API conserva Retry-After; la falta de respuesta de transporte
+hasta el timeout BFF produce 503 sin Retry-After. Ningún cambio local despliega
+estos valores ni los calibra con tráfico real.
+
+### PostgreSQL TLS
+
+All runtime and CLI connections use `createDatabase`. TLS verifies the CA,
+certificate expiry, and destination DNS name/IP by default. `require`, `verify-ca`,
+`true`, and `1` are intentionally strengthened to full verification; use
+`sslmode=verify-full` to state the intended policy. Insecure modes (`prefer`,
+`allow`, `no-verify`) are rejected. Plaintext needs explicit `sslmode=disable`
+(or `ssl=false`/`0`) and a literal `127.0.0.1` or `::1` host; DNS `localhost`
+receives no plaintext exception. Isolated local tests must opt in explicitly.
+
+The URL is converted to validated driver fields, never passed to pg for a second
+parse. Duplicate/conflicting modes, destination overrides, certificate paths,
+`uselibpqcompat`, `sslnegotiation`, and unknown parameters fail before connecting.
+Allowed query parameters are `sslmode`/`ssl`, `channel_binding`, `application_name`,
+`options`, `client_encoding`, `statement_timeout`, `lock_timeout`,
+`idle_in_transaction_session_timeout`, and `connect_timeout` (seconds).
+
+`pg` 8.22 supports **optional** channel binding through `enableChannelBinding`,
+but does not enforce `channel_binding=require`. This application rejects
+`require`; it does not silently reinterpret it as `prefer`. The default and
+`channel_binding=prefer` enable opportunistic SCRAM-SHA-256-PLUS;
+`channel_binding=disable` explicitly disables that optional feature while keeping
+verified TLS. The Python API does not currently support channel binding at all.
+
+**Selected deployment configuration (sanitized template):**
+
+```text
+DATABASE_URL=postgresql://USER:PASSWORD@DB_HOST:5432/DB_NAME?sslmode=verify-full&channel_binding=prefer
+```
+
+`USER`, `PASSWORD`, `DB_HOST`, and `DB_NAME` are placeholders. Preserve the existing
+credentials, actual DNS hostname, port, and database for this service; replace the
+reported query `sslmode=require&channel_binding=require` with exactly
+`sslmode=verify-full&channel_binding=prefer`. Binding is optional, never required.
+An unchanged `channel_binding=require` remains an explicit configuration error.
+The Python service uses `sslmode=verify-full` without a binding parameter.
+
+Before a separately authorized deployment, verify the actual runtime's trusted
+roots and DNS identity, then coordinate the variable update with the corrected
+code release. Changing the query alone does not establish this code's full TLS
+policy on the old release. Keep the existing authentication migration and timeout
+release steps. This patch does not change Railway/Neon variables or deploy code.
+
+Node's standard trusted roots are used without certificate pinning. Only if an
+additional private CA is actually required, supply its reviewed PEM using
+`NODE_EXTRA_CA_CERTS` at process startup; do not disable validation or install a
+new OS-wide trust root. Confirm the actual DNS hostname and runtime trust store
+in an authorized predeployment environment. No production Neon connection has
+been tested. The local `database-tls` tests require OpenSSL and use temporary
+certificates trusted only by test child processes; they assert that invalid TLS
+sends neither startup identity nor password.

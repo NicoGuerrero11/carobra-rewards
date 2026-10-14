@@ -143,3 +143,29 @@ async function fillRegistration(page: Page, email = "ada@example.com") {
   await page.locator("#confirm_password").fill("correct-horse-7");
   await page.locator("#terms_accepted").check();
 }
+
+
+for (const endpoint of ["login", "register"]) {
+  test(`${endpoint} respects Retry-After and allows a later retry`, async ({ page }) => {
+    await page.goto(endpoint === "login" ? "/login" : "/registro");
+    if (endpoint === "register") await fillRegistration(page, "synthetic@example.test");
+    else {
+      await page.locator("#email").fill("synthetic@example.test");
+      await page.locator("#password").fill("synthetic-password");
+    }
+    let submissions = 0;
+    await page.route(`**/api/v1/auth/${endpoint}`, route => {
+      submissions++;
+      return route.fulfill({ status: 429, headers: { "retry-after": "2" },
+        contentType: "application/json", body: JSON.stringify({ error: { code: "auth_rate_limited" } }) });
+    });
+    await page.locator("#submit-button").click();
+    await expect(page.locator("#feedback")).toContainText("Espera 2 segundos");
+    await expect(page.locator("#submit-button")).toBeDisabled();
+    await page.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
+    expect(submissions).toBe(1);
+    await expect(page.locator("#submit-button")).toBeEnabled({ timeout: 4000 });
+    await page.locator("#submit-button").click();
+    await expect.poll(() => submissions).toBe(2);
+  });
+}

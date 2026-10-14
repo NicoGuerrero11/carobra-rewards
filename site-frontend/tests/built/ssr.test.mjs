@@ -26,6 +26,11 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
     if (req.url?.startsWith("/api/v1/rewards/customer-context?include=") && req.headers.cookie?.includes("carobra_session=bundle")) {
       return res.end(JSON.stringify({customer:fixture.eligibleProfile,validation:{status:'VALIDATED'},portal:fixture.homePortal({headers:{cookie:''}},fixture.eligibleProfile),navigation_modules:{coupons:{status:503,data:null},courses:{status:503,data:null}}}));
     }
+    if (["/api/v1/auth/login", "/api/v1/auth/register"].includes(req.url)
+        && requests.at(-1).body.includes("limited@example.test")) {
+      res.writeHead(429, { "retry-after": "17" });
+      return res.end(JSON.stringify({ error: { code: "auth_rate_limited", message: "Try again later" } }));
+    }
     if (req.url === "/api/v1/auth/login") {
       res.setHeader("set-cookie", ["carobra_session=test; Path=/; HttpOnly; SameSite=Lax", "preference=test; Path=/; SameSite=Lax"]);
       return res.end(JSON.stringify({ customer: { id: "fixture" } }));
@@ -130,6 +135,19 @@ test("generated Vercel SSR preserves authentication and proxy contracts", async 
           await response.text();
         }
       }
+    }
+  });
+  await t.test("preserves 429 and Retry-After for both auth routes", async () => {
+    for (const endpoint of ["login", "register"]) {
+      const response = await request(`/api/v1/auth/${endpoint}`, {
+        method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:4323" },
+        body: JSON.stringify({ email: "limited@example.test", password: "synthetic" }),
+      });
+      assert.equal(response.status, 429);
+      assert.equal(response.headers.get("retry-after"), "17");
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.equal(response.headers.get("set-cookie"), null);
+      assert.deepEqual(await response.json(), { error: { code: "auth_rate_limited", message: "Try again later" } });
     }
   });
   await t.test("forwards JSON bodies and preserves multiple Set-Cookie headers", async () => {

@@ -13,6 +13,7 @@ from carobra_rewards.api.v1.sisca_validation.dependencies import (
 from carobra_rewards.core.config import Settings, get_settings
 from carobra_rewards.infrastructure.database.session import get_session_factory
 from carobra_rewards.modules.customer_auth.application.service import CustomerAuthService
+from carobra_rewards.modules.customer_auth.infrastructure.admission import AuthAdmission
 from carobra_rewards.modules.sisca_validation.application.models import (
     ExecuteValidationCheckCommand,
     ValidationExecutionResult,
@@ -38,3 +39,7 @@ def get_customer_auth_service(
         session_ttl=timedelta(hours=settings.auth_session_ttl_hours),
         initial_validation_check=execute_initial_validation,
     )
+
+
+def get_auth_admission(settings: Annotated[Settings, Depends(get_settings)]) -> AuthAdmission:
+    return AuthAdmission(get_session_factory(), settings)

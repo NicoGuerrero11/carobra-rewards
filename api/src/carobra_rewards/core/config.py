@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnv = Literal["development", "test", "uat", "production"]
@@ -28,6 +28,28 @@ class Settings(BaseSettings):
     legacy_customer_intake_enabled: bool = Field(
         default=False,
         alias="LEGACY_CUSTOMER_INTAKE_ENABLED",
+    )
+    auth_admission_window_seconds: int = Field(
+        default=60, ge=1, le=300, alias="AUTH_ADMISSION_WINDOW_SECONDS"
+    )
+    auth_login_account_limit: int = Field(
+        default=10, ge=1, le=100, alias="AUTH_LOGIN_ACCOUNT_LIMIT"
+    )
+    auth_register_account_limit: int = Field(
+        default=5, ge=1, le=100, alias="AUTH_REGISTER_ACCOUNT_LIMIT"
+    )
+    auth_connection_limit: int = Field(default=240, ge=1, le=10000, alias="AUTH_CONNECTION_LIMIT")
+    auth_global_limit: int = Field(default=300, ge=1, le=10000, alias="AUTH_GLOBAL_LIMIT")
+    auth_admission_timeout_seconds: float = Field(
+        default=1, gt=0, le=2, alias="AUTH_ADMISSION_TIMEOUT_SECONDS"
+    )
+    auth_request_timeout_seconds: float = Field(
+        default=4, ge=1, le=10, alias="AUTH_REQUEST_TIMEOUT_SECONDS"
+    )
+    auth_hash_workers: int = Field(default=2, ge=1, le=8, alias="AUTH_HASH_WORKERS")
+    auth_hash_queue_size: int = Field(default=8, ge=0, le=64, alias="AUTH_HASH_QUEUE_SIZE")
+    auth_hash_timeout_seconds: float = Field(
+        default=2, gt=0, le=8, alias="AUTH_HASH_TIMEOUT_SECONDS"
     )
     auth_session_cookie_name: str = Field(
         default="carobra_session",
@@ -151,6 +173,14 @@ class Settings(BaseSettings):
         default=None,
         alias="SISCA_MINIMUM_TRANSFER_DATE",
     )
+
+    @model_validator(mode="after")
+    def validate_auth_timeouts(self) -> "Settings":
+        if self.auth_request_timeout_seconds < (
+            self.auth_admission_timeout_seconds + self.auth_hash_timeout_seconds + 0.5
+        ):
+            raise ValueError("Auth request budget must allow admission, hashing and 0.5s overhead")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

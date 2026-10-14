@@ -17,4 +17,4 @@ COPY certs ./certs
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
-CMD ["sh", "-c", "uvicorn carobra_rewards.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn carobra_rewards.main:app --no-proxy-headers --host 0.0.0.0 --port ${PORT:-8000}"]

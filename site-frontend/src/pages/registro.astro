@@ -119,7 +119,9 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
   </main>
 
   <script>
+    import { authRetrySeconds, authRetryMessage } from "../lib/auth-retry";
     import { productDestination } from '../lib/product-navigation';
+    let authRetryUntil = 0;
     const destination = productDestination(new URLSearchParams(window.location.search).get('next'));
     type StableErrorCode =
       | "duplicate_email"
@@ -264,6 +266,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (Date.now() < authRetryUntil) return;
       clearErrors();
       const formData = new FormData(form);
       const payload = {
@@ -304,6 +307,13 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
           error?: { code?: StableErrorCode };
         };
 
+        if (response.status === 429) {
+          const seconds = authRetrySeconds(response);
+          authRetryUntil = Date.now() + seconds * 1000;
+          setFeedback(authRetryMessage(seconds), true);
+          window.setTimeout(() => { submitButton.disabled = false; }, seconds * 1000);
+          return;
+        }
         if (!response.ok) {
           const code = data.error?.code ?? "api_unavailable";
           if (code === "duplicate_email") setFieldError("email", stableMessages[code]);
@@ -311,7 +321,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
           if (code === "password_mismatch") setFieldError("confirm_password", stableMessages[code]);
           if (code === "invalid_birth_date") setFieldError("birth_date", stableMessages[code]);
           if (code === "terms_not_accepted") setFieldError("terms_accepted", stableMessages[code]);
-          setFeedback(stableMessages[code], true);
+          setFeedback(stableMessages[code] ?? stableMessages.api_unavailable, true);
           focusFirstInvalid();
           return;
         }
@@ -323,7 +333,7 @@ const referralToken = /^[A-Za-z0-9_-]{32,64}$/.test(referralCandidate)
       } catch {
         setFeedback(stableMessages.api_unavailable, true);
       } finally {
-        submitButton.disabled = false;
+        submitButton.disabled = Date.now() < authRetryUntil;
         submitButton.removeAttribute("aria-busy");
       }
     });

@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { createDatabase } from '../../database/connection.js';
 import { loadConfig } from '../../config.js';
 import { affiliationFixture,prepareAffiliationFixture,activateAffiliationFixture,inspectAffiliationFixture } from './affiliate-fixture.js';
 import { BondaHttpGateway } from './http-gateway.js';
@@ -11,7 +11,7 @@ else {
   const config=loadConfig();
   if(!config.databaseUrl || !config.bonda?.affiliateProvisioningEnabled || config.bonda.localPreviewEnabled
       || config.bonda.points?.sendEnabled || config.bonda.profileSync?.enabled) throw Error('FIXTURE_CONFIGURATION_NOT_READY');
-  const database=new Pool({connectionString:config.databaseUrl});
+  const database=createDatabase(config.databaseUrl);
   try {
     const result=operation==='--prepare'?await prepareAffiliationFixture(database)
       :operation==='--activate'?await activateAffiliationFixture(database):await inspectAffiliationFixture(database);
