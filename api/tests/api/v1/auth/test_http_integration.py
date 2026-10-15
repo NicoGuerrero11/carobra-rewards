@@ -194,3 +194,44 @@ async def test_failed_credentials_consume_budget_and_recovery_allows_valid_login
         )
         assert recovered.status_code == 200
         assert "HttpOnly" in recovered.headers["set-cookie"]
+
+
+@pytest.mark.integration
+async def test_valid_login_with_cold_and_warm_database_network_latency(postgres_session_factory):
+    from tests.modules.customer_auth.test_admission_latency import delayed_postgres
+
+    from carobra_rewards.api.v1.auth.dependencies import get_auth_admission
+    from carobra_rewards.api.v1.auth.schemas import RegisterRequest
+    from carobra_rewards.core.config import Settings, get_settings
+    from carobra_rewards.modules.customer_auth.infrastructure.admission import AuthAdmission
+
+    # Seed only this isolated test DB; no external validation or external services.
+    seed_service = CustomerAuthService(
+        postgres_session_factory,
+        session_ttl=timedelta(days=7),
+        rewards_id_generator=FixedRewardsIdGenerator(),
+    )
+    await seed_service.register(RegisterRequest.model_validate(_payload()).to_command())
+    database_url = (
+        postgres_session_factory.kw["bind"]
+        .url.update_query_dict({"sslmode": "disable"})
+        .render_as_string(hide_password=False)
+    )
+    settings = Settings(AUTH_SESSION_COOKIE_SECURE=False)
+    async with delayed_postgres(database_url) as delayed_factory:
+        service = CustomerAuthService(delayed_factory, session_ttl=timedelta(days=7))
+        gate = AuthAdmission(delayed_factory, settings)
+        app = create_application()
+        app.dependency_overrides[get_settings] = lambda: settings
+        app.dependency_overrides[get_auth_admission] = lambda: gate
+        app.dependency_overrides[get_customer_auth_service] = lambda: service
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            for state in ("cold", "warm"):
+                response = await client.post(
+                    "/api/v1/auth/login",
+                    json={"email": "ada@example.com", "password": "correct-horse-7"},
+                )
+                assert response.status_code == 200, state
+                assert "HttpOnly" in response.headers["set-cookie"]

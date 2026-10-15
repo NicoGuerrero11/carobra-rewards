@@ -18,7 +18,10 @@ import uvicorn
 from carobra_rewards.api.v1.auth.dependencies import get_auth_admission, get_customer_auth_service
 from carobra_rewards.core.config import Settings, get_settings
 from carobra_rewards.main import create_application
-from carobra_rewards.modules.customer_auth.application.models import AuthAdmissionRejectedError
+from carobra_rewards.modules.customer_auth.application.models import (
+    AuthAdmissionRejectedError,
+    CustomerAuthPersistenceError,
+)
 from carobra_rewards.modules.customer_auth.infrastructure.password_worker import PasswordWorker
 
 BFF_ROOT = Path(__file__).resolve().parents[5] / "site-backend"
@@ -36,7 +39,9 @@ server.listen(0, '127.0.0.1', () => console.log(server.address().port));
 
 @pytest.mark.integration
 @pytest.mark.parametrize("endpoint", ["login", "register"])
-@pytest.mark.parametrize("failure", ["hash_timeout", "route_timeout", "transport_timeout"])
+@pytest.mark.parametrize(
+    "failure", ["hash_timeout", "route_timeout", "transport_timeout", "storage_failure"]
+)
 async def test_real_api_bff_deadline_contract(endpoint, failure):
     node = os.getenv("AUTH_TEST_NODE")
     if not node:
@@ -48,6 +53,8 @@ async def test_real_api_bff_deadline_contract(endpoint, failure):
 
     class Admission:
         async def admit(self, *_args):
+            if failure == "storage_failure":
+                raise CustomerAuthPersistenceError()
             return None
 
     class Service:
@@ -136,7 +143,7 @@ async def test_real_api_bff_deadline_contract(endpoint, failure):
                 json=payload,
             )
         assert "set-cookie" not in response.headers
-        if failure == "transport_timeout":
+        if failure in {"transport_timeout", "storage_failure"}:
             assert response.status_code == 503
             assert response.json()["error"]["code"] == "api_unavailable"
             assert "retry-after" not in response.headers
@@ -150,7 +157,7 @@ async def test_real_api_bff_deadline_contract(endpoint, failure):
             }
             assert response.headers["retry-after"] == "1"
             assert response.headers["cache-control"] == "no-store"
-        if failure != "route_timeout":
+        if failure not in {"route_timeout", "storage_failure"}:
             with pytest.raises(AuthAdmissionRejectedError):
                 await worker.run(lambda: None)
     finally:

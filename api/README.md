@@ -191,9 +191,9 @@ realiza el hash. Este cambio local no constituye autorización de despliegue.
 | `AUTH_GLOBAL_LIMIT` | 300 | Toda la API, login + registro |
 | `AUTH_HASH_WORKERS` | 2 | Hashes scrypt simultáneos por proceso |
 | `AUTH_HASH_QUEUE_SIZE` | 8 | Hashes en espera por proceso |
-| `AUTH_ADMISSION_TIMEOUT_SECONDS` | 1 | Adquisición/consulta de los contadores |
+| `AUTH_ADMISSION_TIMEOUT_SECONDS` | 4 | Adquisición/consulta de los contadores |
 | `AUTH_HASH_TIMEOUT_SECONDS` | 2 | Cola + cálculo del hash |
-| `AUTH_REQUEST_TIMEOUT_SECONDS` | 4 | Admisión + operación de login/registro |
+| `AUTH_REQUEST_TIMEOUT_SECONDS` | 7 | Admisión + operación de login/registro |
 
 El servidor debe arrancar con `--no-proxy-headers`, incluido al usar comandos
 alternativos al Dockerfile. La clave de conexión es el peer TCP de ASGI, sin
@@ -219,13 +219,26 @@ dirigidos; el vencimiento no se extiende por cada rechazo y no hay bloqueo
 permanente, aunque un ataque sostenido puede agotar cada ventana siguiente.
 
 Cada proceso admite hasta 16 operaciones concurrentes de contadores sin cola;
-la adquisición/consulta tiene un presupuesto predeterminado de 1 segundo, con timeout de lock de
+la adquisición/consulta tiene un presupuesto predeterminado de 4 segundos, con timeout de lock de
 200 ms y de sentencia de 500 ms. Un bloqueo o error de DB falla cerrado con 503.
 Las transacciones serializan el presupuesto global, confirman todos los consumos
-juntos solo al admitir y limpian hasta 32 claves vencidas por intento. El
+juntos solo al admitir y limpian hasta 32 claves vencidas por intento admitido. El
 presupuesto global limita las claves nuevas; no se almacenan identificadores
 en claro. Los hashes SHA-256 de email no deben considerarse anonimización y las
 filas vencidas restantes se eliminan al reanudarse el tráfico.
+
+La admisión usa tres ejecuciones SQL: configurar timeouts locales, adquirir el
+bloqueo global y decidir/consumir/limpiar conjuntamente. La decisión se ejecuta
+**después** del bloqueo en otra sentencia para ver el commit de la réplica anterior
+bajo READ COMMITTED. No se unen estas dos sentencias en un único snapshot. La
+limpieza excluye las tres claves actuales para no modificar una fila dos veces en
+los CTE de escritura. El plazo incluye inicialización del driver, preparación de
+sentencias y commit; tres ejecuciones no equivalen a solo tres viajes de red.
+
+Las fallas de persistencia en login/registro registran `auth_failure` con etapa,
+categoría (`timeout`, `sql`, `ssl`, `connection` o `persistence`) y duración. No se
+registran mensajes de excepción, traceback, SQL, parámetros, cuentas, tokens ni
+URLs. Los rechazos de cuota conservan 429 y las fallas de persistencia, 503.
 
 Scrypt conserva sus parámetros y formatos. El trabajo corre fuera del event
 loop; cancelar o agotar la espera no libera capacidad hasta que la tarea sale
@@ -237,13 +250,13 @@ inexistentes usan un verificador ficticio con el mismo costo actual.
 ### Plazos coordinados y límites de la protección
 
 La API valida al arrancar que `AUTH_REQUEST_TIMEOUT_SECONDS` deje al menos 0.5 s
-sobre la suma de admisión y cola/hash. Sus valores iniciales son 4 > 1 + 2 + 0.5 s;
+sobre la suma de admisión y cola/hash. Sus valores iniciales son 7 > 4 + 2 + 0.5 s;
 el vencimiento del plazo de la operación devuelve 429 genérico con Retry-After.
 Los errores o timeouts propios del almacén siguen devolviendo 503. La cancelación
 no interrumpe un scrypt en ejecución ni libera su slot antes de finalizar.
 
-El BFF usa un timeout exclusivo para login/registro: `AUTH_REQUEST_TIMEOUT_MS=6000`.
-`AUTH_API_RESPONSE_BUDGET_MS=4000` debe coincidir con el plazo API en milisegundos.
+El BFF usa un timeout exclusivo para login/registro: `AUTH_REQUEST_TIMEOUT_MS=9000`.
+`AUTH_API_RESPONSE_BUDGET_MS=7000` debe coincidir con el plazo API en milisegundos.
 El BFF exige al menos 1000 ms de margen; los defaults dejan 2000 ms para transporte
 y entrega de respuesta. Límites superiores: API 10 s, BFF 15 s. No hay validación
 automática entre servicios: los valores deben coordinarse al desplegar. El timeout
@@ -257,6 +270,14 @@ y timeout de auth coordinado; migración aditiva; API con los presupuestos igual
 en todas sus réplicas. No bajar el plazo BFF ni retirar la tabla mientras haya
 instancias que dependan de ellos. Una respuesta perdida cerca del commit no prueba
 que el registro o la sesión no se hayan persistido; no se implementa reintento automático.
+
+La corrección de latencia no agrega migraciones. Antes de desplegarla, revisar las
+sobrescrituras explícitas de estos plazos: una API que conserve 4 s junto con la
+nueva admisión predeterminada de 4 s rechazará su configuración al arrancar. El
+BFF debe aceptar el nuevo presupuesto antes de ampliar el plazo de la API. El
+bloqueo sigue siendo la misma fila global, compatible con las réplicas anteriores.
+El upsert de bloqueo no cambia sus contadores, pero escribe una versión de fila
+incluso al rechazar; conserva por tanto costo de WAL y contención.
 
 El presupuesto global protege trabajo admitido, no es un control total de DoS.
 Ataques distribuidos entre cuentas/conexiones todavía pueden agotarlo; todos los

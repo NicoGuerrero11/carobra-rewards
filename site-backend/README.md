@@ -87,8 +87,8 @@ are documented in [`docs/rewards-operations-runbook.md`](../docs/rewards-operati
 
 ### Timeout de autenticación
 
-Login y registro usan `AUTH_REQUEST_TIMEOUT_MS` (6000 ms), separado del timeout
-general `API_REQUEST_TIMEOUT_MS`. `AUTH_API_RESPONSE_BUDGET_MS` (4000 ms) debe
+Login y registro usan `AUTH_REQUEST_TIMEOUT_MS` (9000 ms), separado del timeout
+general `API_REQUEST_TIMEOUT_MS`. `AUTH_API_RESPONSE_BUDGET_MS` (7000 ms) debe
 reflejar `AUTH_REQUEST_TIMEOUT_SECONDS * 1000` de la API. Se rechaza al arrancar
 un timeout BFF menor que el presupuesto API + 1000 ms o mayor de 15000 ms.
 Los defaults dejan 2 s de margen; ambos servicios deben configurarse de forma
